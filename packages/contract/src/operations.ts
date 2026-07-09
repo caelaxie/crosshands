@@ -17,16 +17,24 @@ const WindowSelectorSchema = z.union([
   z.object({ id: z.string().min(1) }).strict(),
   z.object({ index: z.number().int().nonnegative() }).strict()
 ])
-const CaptureOptionsShape = { captureScreenshot: z.boolean().optional() }
+const CaptureOptionsShape = {
+  captureScreenshot: z.boolean().optional(),
+  restoreWindow: z.boolean().optional()
+}
+const ContextWindowTargetSchema = z.object({ kind: z.literal('context-window') }).strict()
+const ElementIndexTargetSchema = z
+  .object({ kind: z.literal('element'), elementIndex: z.number().int().nonnegative() })
+  .strict()
 const MutationBaseShape = {
   contextToken: InteractionContextTokenSchema,
-  target: TargetReferenceSchema,
+  app: AppQuerySchema.optional(),
+  target: z.union([TargetReferenceSchema, ContextWindowTargetSchema, ElementIndexTargetSchema]),
   ...CaptureOptionsShape
 }
 const CoordinateTargetSchema = z
   .object({
     kind: z.literal('coordinate'),
-    window: TargetReferenceSchema,
+    window: TargetReferenceSchema.optional(),
     x: z.number().finite(),
     y: z.number().finite()
   })
@@ -34,9 +42,11 @@ const CoordinateTargetSchema = z
 const ElementTargetSchema = z
   .object({ kind: z.literal('element'), ref: TargetReferenceSchema })
   .strict()
-const ActionTargetSchema = z.discriminatedUnion('kind', [
+const ActionTargetSchema = z.union([
   ElementTargetSchema,
-  CoordinateTargetSchema
+  ElementIndexTargetSchema,
+  CoordinateTargetSchema,
+  ContextWindowTargetSchema
 ])
 
 const PermissionsResultSchema = z
@@ -84,6 +94,7 @@ export const COMPUTER_OPERATIONS = {
     input: z
       .object({
         contextToken: InteractionContextTokenSchema,
+        app: AppQuerySchema.optional(),
         target: ActionTargetSchema,
         clickCount: z.number().int().min(1).max(3).optional(),
         button: z.enum(['left', 'right', 'middle']).optional(),
@@ -102,6 +113,7 @@ export const COMPUTER_OPERATIONS = {
     input: z
       .object({
         contextToken: InteractionContextTokenSchema,
+        app: AppQuerySchema.optional(),
         target: ActionTargetSchema,
         direction: z.enum(['up', 'down', 'left', 'right']),
         pages: z.number().int().min(1).max(100).optional(),
@@ -115,6 +127,7 @@ export const COMPUTER_OPERATIONS = {
     input: z
       .object({
         contextToken: InteractionContextTokenSchema,
+        app: AppQuerySchema.optional(),
         from: ActionTargetSchema,
         to: ActionTargetSchema,
         durationMs: z.number().int().min(50).max(30_000).optional(),

@@ -83,9 +83,75 @@ function targetReference(input: unknown): TargetReference | undefined {
   if (candidate === null || typeof candidate !== 'object') return undefined
   const target = candidate as Record<string, unknown>
   if (target.kind === 'element') return target.ref as TargetReference
-  if (target.kind === 'coordinate') return target.window as TargetReference
+  if (target.kind === 'coordinate' && target.window !== undefined)
+    return target.window as TargetReference
   if ('contextToken' in target) return target as TargetReference
   return undefined
+}
+
+function bindReference(
+  context: InteractionContext,
+  current: ReferenceBindings,
+  kind: TargetReference['kind'],
+  ref: string
+): TargetReference {
+  return {
+    ...current,
+    kind,
+    ref,
+    contextToken: context.token,
+    expiresAt: context.expiresAt
+  }
+}
+
+function normalizeTarget(
+  candidate: unknown,
+  context: InteractionContext,
+  current: ReferenceBindings
+): unknown {
+  if (candidate === null || typeof candidate !== 'object') return candidate
+  const target = candidate as Record<string, unknown>
+  if (target.kind === 'element' && typeof target.elementIndex === 'number') {
+    return {
+      kind: 'element',
+      ref: bindReference(context, current, 'element', `element:${target.elementIndex}`)
+    }
+  }
+  if (target.kind === 'coordinate' && target.window === undefined) {
+    return {
+      ...target,
+      window: bindReference(context, current, 'window', current.window.id)
+    }
+  }
+  if (target.kind === 'context-window') {
+    return bindReference(context, current, 'window', current.window.id)
+  }
+  return candidate
+}
+
+function normalizeMutationInput(
+  input: unknown,
+  context: InteractionContext,
+  current: ReferenceBindings
+): unknown {
+  if (input === null || typeof input !== 'object') return input
+  const record = input as Record<string, unknown>
+  return {
+    ...record,
+    ...(record.target === undefined
+      ? {}
+      : { target: normalizeTarget(record.target, context, current) }),
+    ...(record.from === undefined ? {} : { from: normalizeTarget(record.from, context, current) }),
+    ...(record.to === undefined ? {} : { to: normalizeTarget(record.to, context, current) })
+  }
+}
+
+function mutationReferences(input: unknown): TargetReference[] {
+  if (input === null || typeof input !== 'object') return []
+  const record = input as Record<string, unknown>
+  return [record.target, record.from, record.to]
+    .map((candidate) => targetReference({ target: candidate }))
+    .filter((candidate): candidate is TargetReference => candidate !== undefined)
 }
 
 function contextToken(input: unknown): string | undefined {
@@ -227,11 +293,10 @@ export class LocalBroker {
     const inspection = await this.#inspectTarget?.(request.operation, request.input)
     if (inspection !== undefined && inspection !== null) assertAppAllowed(inspection.appIdentity)
 
-    let target: TargetReference | undefined
+    let providerInput = request.input
     if (mutation) {
       const token = contextToken(request.input)
-      target = targetReference(request.input)
-      if (token === undefined || target === undefined) {
+      if (token === undefined) {
         throw createComputerError(
           'invalid_argument',
           'Mutation requires a context token and target'
@@ -240,14 +305,22 @@ export class LocalBroker {
       if (inspection === undefined || inspection === null) {
         throw createComputerError('stale_target', 'Target identity could not be re-resolved')
       }
-      assertFreshReference(target, this.#contexts.resolve(token), inspection.bindings, this.#now())
+      const context = this.#contexts.resolve(token)
+      providerInput = normalizeMutationInput(request.input, context, inspection.bindings)
+      const references = mutationReferences(providerInput)
+      if (references.length === 0) {
+        throw createComputerError('invalid_argument', 'Mutation requires a target selector')
+      }
+      for (const reference of references) {
+        assertFreshReference(reference, context, inspection.bindings, this.#now())
+      }
     }
 
     try {
       const providerResponse = await this.#supervisor.dispatch({
         requestId,
         operation: request.operation,
-        input: request.input,
+        input: providerInput,
         deadlineAt
       })
       if (mutation) {
