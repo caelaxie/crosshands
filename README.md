@@ -83,6 +83,15 @@ signing identities, notarization/timestamp services, protected environments,
 and backup release owners are configured. A candidate is built once and
 promoted by digest without rebuilding it.
 
+The checked-in conformance and release tests validate catalogs, schemas, and
+evidence policy; they are not a claim that live desktops or reference agents
+have passed. A release candidate must still run the final installed artifacts
+on the complete interactive matrix described in the
+[provider conformance guide](docs/platforms/conformance.md), then pass the
+[Codex, OpenCode, and OMP benchmark](docs/platforms/agent-benchmarks.md).
+Promotion requires those exact evidence artifacts, and v1 readiness is finalized
+only after the 24-hour canary gate.
+
 ## License
 
 CrossHands is MIT licensed. Copied or substantially derived Orca code retains

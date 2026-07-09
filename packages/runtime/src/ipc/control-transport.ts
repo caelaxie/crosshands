@@ -367,7 +367,11 @@ export class LocalControlClient {
   readonly #maxFrameBytes: number
   readonly #pending = new Map<
     string,
-    { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
+    {
+      resolve: (value: unknown) => void
+      reject: (reason: unknown) => void
+      timer: NodeJS.Timeout
+    }
   >()
   #sequence = 0
 
@@ -398,33 +402,47 @@ export class LocalControlClient {
       options.maxFrameBytes ?? DEFAULT_MAX_CONTROL_MESSAGE_BYTES
     )
     const requestId = `handshake-${randomUUID()}`
-    const response = client.#roundTrip(requestId, {
-      type: 'handshake',
+    const response = client.#roundTrip(
       requestId,
-      token: options.token,
-      versions: options.versions,
-      identity: options.identity
-    })
+      {
+        type: 'handshake',
+        requestId,
+        token: options.token,
+        versions: options.versions,
+        identity: options.identity
+      },
+      30_000
+    )
     await response
     return client
   }
 
   request(payload: unknown, options: { deadlineMs: number }): Promise<unknown> {
     const requestId = `request-${++this.#sequence}`
-    return this.#roundTrip(requestId, {
-      type: 'request',
+    return this.#roundTrip(
       requestId,
-      deadlineAt: Date.now() + options.deadlineMs,
-      payload
-    })
+      {
+        type: 'request',
+        requestId,
+        deadlineAt: Date.now() + options.deadlineMs,
+        payload
+      },
+      Math.max(0, options.deadlineMs)
+    )
   }
 
-  #roundTrip(requestId: string, message: unknown): Promise<unknown> {
+  #roundTrip(requestId: string, message: unknown, timeoutMs: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      this.#pending.set(requestId, { resolve, reject })
+      const timer = setTimeout(() => {
+        this.#pending.delete(requestId)
+        reject(Object.assign(new Error('Control request timed out'), { code: 'timeout' }))
+      }, timeoutMs)
+      timer.unref()
+      this.#pending.set(requestId, { resolve, reject, timer })
       this.#socket.write(encodeFrame(message, this.#maxFrameBytes), (cause) => {
         if (cause !== null && cause !== undefined) {
           this.#pending.delete(requestId)
+          clearTimeout(timer)
           reject(cause)
         }
       })
@@ -438,6 +456,7 @@ export class LocalControlClient {
     const pending = this.#pending.get(message.requestId)
     if (pending === undefined) return
     this.#pending.delete(message.requestId)
+    clearTimeout(pending.timer)
     if (message.type === 'error') {
       pending.reject(Object.assign(new Error(String(message.message)), { code: message.code }))
     } else if (message.type === 'response') {
@@ -450,7 +469,10 @@ export class LocalControlClient {
   }
 
   #failAll(cause: unknown): void {
-    for (const pending of this.#pending.values()) pending.reject(cause)
+    for (const pending of this.#pending.values()) {
+      clearTimeout(pending.timer)
+      pending.reject(cause)
+    }
     this.#pending.clear()
   }
 

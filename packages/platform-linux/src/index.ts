@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   COMPUTER_OPERATIONS,
+  CONTRACT_VERSIONS,
   createComputerError,
   type ComputerError,
   type ComputerOperationName,
@@ -19,15 +20,10 @@ import {
 } from '@crosshands/contract'
 
 const FIXED_SYSTEM_PATH = '/usr/local/bin:/usr/bin:/bin'
-export const packageVersion = '0.1.0'
+export const packageVersion = CONTRACT_VERSIONS.product
 const MAX_NATIVE_FRAME_BYTES = 1_048_576
 const PACKAGED_RUNTIME = fileURLToPath(new URL('../assets/runtime.py', import.meta.url))
 const PACKAGED_MANIFEST = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
-const MUTATIONS = new Set<ComputerOperationName>(
-  Object.entries(COMPUTER_OPERATIONS)
-    .filter(([, value]) => value.mutation)
-    .map(([name]) => name as ComputerOperationName)
-)
 
 type NativeReadiness = {
   available: boolean
@@ -488,7 +484,7 @@ export class LinuxComputerProvider implements ComputerProvider {
       }
       const input = record(request.input)
       const requestsScreenshot =
-        ['getAppState', ...MUTATIONS].includes(request.operation) &&
+        (request.operation === 'getAppState' || COMPUTER_OPERATIONS[request.operation].mutation) &&
         input.captureScreenshot !== false
       if (
         requestsScreenshot &&
@@ -543,7 +539,7 @@ export class LinuxComputerProvider implements ComputerProvider {
     }
     return {
       requestId: request.requestId,
-      dispatched: MUTATIONS.has(request.operation),
+      dispatched: COMPUTER_OPERATIONS[request.operation].mutation,
       result: await this.#normalizeResult(request.operation, frame.result)
     }
   }

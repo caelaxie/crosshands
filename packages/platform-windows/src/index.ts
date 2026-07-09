@@ -1,7 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-import type { ComputerOperationName, ReferenceBindings } from '@crosshands/contract'
+import {
+  CONTRACT_VERSIONS,
+  type ComputerOperationName,
+  type ReferenceBindings
+} from '@crosshands/contract'
 import type {
   BrokerEndpoint,
   LocalControlIdentity,
@@ -15,7 +19,7 @@ import {
   type WindowsRelayControlServer
 } from './windows-control-security.js'
 
-export const packageVersion = '0.1.0'
+export const packageVersion = CONTRACT_VERSIONS.product
 
 export * from './provider.js'
 export * from './security.js'

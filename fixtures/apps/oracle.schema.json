@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crosshands.dev/schemas/fixture-oracle-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "fixtureVersion",
+    "instance",
+    "renderEpoch",
+    "invokeCount",
+    "toggle",
+    "selection",
+    "focusedControl",
+    "ordinaryTextDigest",
+    "keyCount",
+    "hotkeyCount",
+    "scrollOffset",
+    "dragRegion",
+    "secondaryActionCount"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "crosshands.fixture-oracle/v1" },
+    "fixtureVersion": { "const": "1.0.0" },
+    "instance": { "enum": ["a", "b"] },
+    "renderEpoch": { "type": "integer", "minimum": 1 },
+    "invokeCount": { "type": "integer", "minimum": 0 },
+    "toggle": { "type": "boolean" },
+    "selection": { "enum": ["alpha", "beta", "gamma"] },
+    "focusedControl": { "type": "string" },
+    "ordinaryTextDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "keyCount": { "type": "integer", "minimum": 0 },
+    "hotkeyCount": { "type": "integer", "minimum": 0 },
+    "scrollOffset": { "type": "integer", "minimum": 0 },
+    "dragRegion": { "enum": ["origin", "target"] },
+    "secondaryActionCount": { "type": "integer", "minimum": 0 }
+  }
+}

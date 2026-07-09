@@ -1,0 +1,156 @@
+name: Reference-agent benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Release workflow run containing the immutable signed candidate
+        required: true
+        type: string
+      candidate_version:
+        description: Exact candidate package version
+        required: true
+        type: string
+      candidate_manifest_sha256:
+        description: Expected signed release-manifest SHA-256
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: reference-agent-${{ inputs.candidate_manifest_sha256 }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: ${{ matrix.agent }} / ${{ matrix.cell }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - agent: codex
+            cell: codex-macos-arm64
+            runner: [self-hosted, crosshands-interactive, macOS, ARM64]
+            config: benchmarks/agents/configs/codex-macos.json
+            api_secret: CODEX_BENCHMARK_API_KEY
+          - agent: opencode
+            cell: opencode-windows11-x64
+            runner: [self-hosted, crosshands-interactive, Windows, X64]
+            config: benchmarks/agents/configs/opencode-windows.json
+            api_secret: OPENCODE_BENCHMARK_API_KEY
+          - agent: omp
+            cell: omp-ubuntu-xorg-x64
+            runner: [self-hosted, crosshands-interactive, Linux, X64, xorg]
+            config: benchmarks/agents/configs/omp-ubuntu.json
+            api_secret: OMP_BENCHMARK_API_KEY
+    runs-on: ${{ matrix.runner }}
+    environment: agent-benchmark
+    timeout-minutes: 90
+    env:
+      CROSSHANDS_MODEL_API_KEY: ${{ secrets[matrix.api_secret] }}
+      EXPECTED_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
+      EVIDENCE_RUN_ID: ${{ inputs.candidate_run_id }}
+      CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+
+    steps:
+      - name: Check out frozen benchmark definitions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up the benchmark Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.17.0'
+          cache: pnpm
+
+      - name: Install frozen workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Verify the frozen catalog before touching the desktop
+        shell: bash
+        run: node -e "import('./benchmarks/agents/model.mjs').then((m) => m.loadBenchmarkDefinition())"
+
+      - name: Download the exact signed candidate without rebuilding
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$EVIDENCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "release-candidate-$CANDIDATE_VERSION" --dir artifacts
+          actual="$(sha256sum artifacts/release/release-manifest.json | cut -d ' ' -f 1)"
+          test "$actual" = "$EXPECTED_MANIFEST_SHA256"
+
+      - name: Require the interactive-runner safety hooks
+        shell: bash
+        run: |
+          test -x "$CROSSHANDS_AGENT_BENCHMARK_DRIVER"
+          test -x "$CROSSHANDS_BENCHMARK_RESET_HOOK"
+          test -x "$CROSSHANDS_NETWORK_GUARD"
+          test -n "$CROSSHANDS_MODEL_API_KEY"
+
+      - name: Reset fixture account and run five trials through each adapter
+        shell: bash
+        env:
+          AGENT_ID: ${{ matrix.agent }}
+          AGENT_CONFIG: ${{ matrix.config }}
+        run: |
+          "$CROSSHANDS_BENCHMARK_RESET_HOOK" --before --agent "$AGENT_ID"
+          "$CROSSHANDS_NETWORK_GUARD" apply --config "$AGENT_CONFIG"
+          mkdir -p artifacts/agent-fragments
+          "$CROSSHANDS_AGENT_BENCHMARK_DRIVER" \
+            --catalog benchmarks/agents/catalog.json \
+            --config "$AGENT_CONFIG" \
+            --candidate artifacts \
+            --runs-per-adapter 5 \
+            --output "artifacts/agent-fragments/$AGENT_ID.json"
+          "$CROSSHANDS_NETWORK_GUARD" verify --config "$AGENT_CONFIG"
+          "$CROSSHANDS_BENCHMARK_RESET_HOOK" --after --agent "$AGENT_ID"
+
+      - name: Upload privacy-safe agent fragment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-fragment-${{ matrix.agent }}
+          path: artifacts/agent-fragments/${{ matrix.agent }}.json
+          if-no-files-found: error
+          retention-days: 365
+
+  validate:
+    name: Validate 4/5 acceptance and evidence completeness
+    needs: benchmark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact benchmark validator
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.17.0'
+          cache: pnpm
+
+      - name: Install frozen workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Download all three agent fragments
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: agent-fragment-*
+          path: artifacts/fragments
+          merge-multiple: true
+
+      - name: Reject missing, inconsistent, sub-threshold, or raw evidence
+        run: >-
+          node benchmarks/agents/validate-evidence.mjs
+          --fragments artifacts/fragments
+          --output artifacts/evidence/agent-evidence.json
+
+      - name: Retain the validated aggregate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validated-agent-evidence-${{ inputs.candidate_manifest_sha256 }}
+          path: artifacts/evidence/agent-evidence.json
+          if-no-files-found: error
+          retention-days: 365

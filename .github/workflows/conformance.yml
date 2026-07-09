@@ -1,0 +1,123 @@
+name: Interactive provider conformance
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Immutable candidate identifier already installed on every runner
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conformance-${{ inputs.candidate }}
+  cancel-in-progress: false
+
+jobs:
+  conformance:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - role: macos-14-arm64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-14.8.7","arm64"]'
+          - role: macos-14-arm64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-14.8.7","arm64"]'
+          - role: macos-14-x64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-14.8.7","x64"]'
+          - role: macos-14-x64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-14.8.7","x64"]'
+          - role: macos-26-arm64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-26.5.2","arm64"]'
+          - role: macos-26-arm64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","macos-26.5.2","arm64"]'
+          - role: windows-10-x64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","windows-10-22h2","x64"]'
+          - role: windows-10-x64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","windows-10-22h2","x64"]'
+          - role: windows-11-current-x64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","windows-11-ga","x64"]'
+          - role: windows-11-current-x64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","windows-11-ga","x64"]'
+          - role: ubuntu-24.04-x64
+            node: '22'
+            labels: '["self-hosted","crosshands-interactive","resettable","ubuntu-24.04.4-xorg","x64"]'
+          - role: ubuntu-24.04-x64
+            node: '24'
+            labels: '["self-hosted","crosshands-interactive","resettable","ubuntu-24.04.4-xorg","x64"]'
+    runs-on: ${{ fromJSON(matrix.labels) }}
+    timeout-minutes: 720
+    env:
+      CROSSHANDS_CANDIDATE: ${{ inputs.candidate }}
+      CROSSHANDS_MATRIX_ROLE: ${{ matrix.role }}
+      CROSSHANDS_NODE_VERSION: ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: Validate resettable runner contract
+        run: node benchmarks/conformance/preflight.mjs --output evidence/manifest.json
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Run final-package conformance
+        run: >-
+          node benchmarks/conformance/run.mjs
+          --manifest evidence/manifest.json
+          --output evidence/runs.jsonl
+      - name: Upload immutable cell evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: conformance-${{ matrix.role }}-node${{ matrix.node }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    if: always()
+    needs: conformance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: conformance-*
+          path: evidence/cells
+      - name: Evaluate complete frozen matrix
+        env:
+          CROSSHANDS_CONFORMANCE_EVIDENCE: evidence/cells
+        run: >-
+          corepack pnpm exec vitest run --config vitest.workspace.ts tests/conformance
+          --reporter=default --reporter=json --outputFile=evidence/vitest-report.json
+      - name: Create release-facing conformance evidence
+        run: >-
+          node --experimental-strip-types benchmarks/conformance/evaluate.mjs
+          --evidence evidence/cells
+          --output evidence/conformance-evidence.json
+      - name: Upload exact conformance evidence artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: conformance-evidence-${{ inputs.candidate }}
+          path: evidence/conformance-evidence.json
+          if-no-files-found: error
+          retention-days: 90

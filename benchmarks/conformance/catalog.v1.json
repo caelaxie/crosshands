@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "crosshands.conformance-catalog/v1",
+  "catalogVersion": "1.0.0",
+  "fixtureVersion": "1.0.0",
+  "repetitions": 100,
+  "automaticRetries": "forbidden",
+  "adapters": ["broker", "cli", "mcp"],
+  "thresholds": {
+    "macos": 95,
+    "windows": 95,
+    "linux-x11": 90
+  },
+  "infrastructureInvalidations": [
+    "host-power-loss",
+    "host-kernel-panic",
+    "runner-orchestrator-loss",
+    "session-locked-before-fixture-reset",
+    "display-device-disconnected",
+    "artifact-store-unavailable"
+  ],
+  "zeroToleranceFailureClasses": [
+    "identity-boundary",
+    "peer-boundary",
+    "secret-leak",
+    "payload-integrity",
+    "silent-success",
+    "sensitive-target",
+    "unsigned-artifact",
+    "mcp-stdout-corruption",
+    "human-boundary-bypass",
+    "rollback-failure"
+  ],
+  "tasks": [
+    {
+      "id": "observe.discovery-duplicates",
+      "operations": ["capabilities", "permissions", "listApps", "listWindows"],
+      "tags": ["discovery", "duplicate-names", "multiple-windows"],
+      "oracle": "Two fixture processes and three windows are returned with distinct stable identities."
+    },
+    {
+      "id": "observe.state-unicode-secure",
+      "operations": ["getAppState"],
+      "tags": ["unicode", "secure-fields", "focus", "value"],
+      "oracle": "Unicode labels and ordinary values match fixture state while secure values remain redacted."
+    },
+    {
+      "id": "act.invoke-focus",
+      "operations": ["click", "getAppState"],
+      "tags": ["invoke", "focus", "verification"],
+      "oracle": "The invocation counter increments once and the requested control owns focus."
+    },
+    {
+      "id": "act.toggle-selection",
+      "operations": ["click", "getAppState"],
+      "tags": ["toggle", "selection", "verification"],
+      "oracle": "Toggle and selection state equal the requested deterministic values."
+    },
+    {
+      "id": "act.secondary-action",
+      "operations": ["performSecondaryAction", "getAppState"],
+      "tags": ["secondary-actions", "context-menu"],
+      "oracle": "The fixture records exactly one secondary action on the intended identity."
+    },
+    {
+      "id": "act.scroll",
+      "operations": ["scroll", "getAppState"],
+      "tags": ["scroll", "off-screen"],
+      "oracle": "The scroll marker becomes visible and the offset advances in the requested direction."
+    },
+    {
+      "id": "act.drag",
+      "operations": ["drag", "getAppState"],
+      "tags": ["drag", "coordinates", "negative-origin", "mixed-scale"],
+      "oracle": "The draggable marker ends in the target region on the intended display."
+    },
+    {
+      "id": "act.type-unicode-ime",
+      "operations": ["typeText", "getAppState"],
+      "tags": ["text", "unicode", "ime"],
+      "oracle": "The ordinary text field contains the frozen Unicode and composed-character vector."
+    },
+    {
+      "id": "act.keys-hotkeys",
+      "operations": ["pressKey", "hotkey", "getAppState"],
+      "tags": ["keys", "hotkeys", "focus"],
+      "oracle": "The key and platform-neutral shortcut counters each increment once."
+    },
+    {
+      "id": "act.paste-clipboard-restoration",
+      "operations": ["pasteText", "getAppState"],
+      "tags": ["clipboard", "text", "canary"],
+      "oracle": "The target receives the vector and the pre-run clipboard digest is restored without retained literal data."
+    },
+    {
+      "id": "act.set-value",
+      "operations": ["setValue", "getAppState"],
+      "tags": ["value", "verification"],
+      "oracle": "The fixture semantic value equals the requested value."
+    },
+    {
+      "id": "observe.screenshot-window",
+      "operations": ["getAppState"],
+      "tags": ["screenshot", "occluded", "minimized", "off-screen"],
+      "oracle": "The window-scoped image digest matches the non-sensitive fixture pattern or reports the frozen honest capability error."
+    },
+    {
+      "id": "freshness.rerender-stale-reference",
+      "operations": ["getAppState", "click"],
+      "tags": ["rerender", "stale-reference", "identity"],
+      "oracle": "The pre-rerender reference is rejected and the replacement control is not invoked."
+    },
+    {
+      "id": "freshness.process-replacement",
+      "operations": ["getAppState", "click"],
+      "tags": ["stale-process", "identity-swap"],
+      "oracle": "A replaced process/window identity is rejected before observation or mutation."
+    },
+    {
+      "id": "layout.multimonitor-mixed-dpi",
+      "operations": ["listWindows", "getAppState", "click"],
+      "tags": ["multi-monitor", "negative-origin", "mixed-scale", "coordinates"],
+      "oracle": "The intended window and control are resolved in physical and logical coordinates without cross-display substitution."
+    },
+    {
+      "id": "layout.window-visibility-states",
+      "operations": ["listWindows", "getAppState"],
+      "tags": ["minimized", "occluded", "off-screen"],
+      "oracle": "Each visibility state is either observed correctly or returns its frozen explicit error without stale content."
+    },
+    {
+      "id": "recovery.timeout-after-dispatch",
+      "operations": ["click"],
+      "tags": ["timeout", "indeterminate", "no-silent-success"],
+      "oracle": "A post-dispatch timeout is indeterminate unless refreshed state independently proves the mutation."
+    },
+    {
+      "id": "recovery.cancel-before-dispatch",
+      "operations": ["click"],
+      "tags": ["cancellation", "not-attempted"],
+      "oracle": "Cancellation before dispatch is not attempted and leaves fixture state unchanged."
+    },
+    {
+      "id": "recovery.provider-crash",
+      "operations": ["getAppState", "click"],
+      "tags": ["crash", "restart", "stale-reference"],
+      "oracle": "Crash invalidates contexts; no mutation is claimed and a restarted provider requires fresh observation."
+    },
+    {
+      "id": "concurrency.two-clients",
+      "operations": ["getAppState", "click", "setValue"],
+      "tags": ["concurrent-client", "serialization", "desktop-epoch"],
+      "oracle": "Mutations are serialized, exactly-once, and the losing stale context is rejected."
+    },
+    {
+      "id": "safety.sensitive-app-deny",
+      "operations": ["listApps", "getAppState", "click"],
+      "tags": ["sensitive-target", "zero-tolerance"],
+      "oracle": "The known sensitive fixture identity is classified without returning content and is never dispatched."
+    },
+    {
+      "id": "safety.secure-field-canary",
+      "operations": ["getAppState", "typeText", "pasteText", "setValue"],
+      "tags": ["secure-fields", "canary", "zero-tolerance"],
+      "oracle": "Secure values and canaries never cross the provider boundary or persist in CrossHands-owned artifacts."
+    },
+    {
+      "id": "safety.peer-session-rejection",
+      "operations": ["capabilities"],
+      "tags": ["different-user", "different-session", "remote", "peer", "zero-tolerance"],
+      "oracle": "Different-user, different-session, remote, and unverifiable peers are rejected before request parsing."
+    },
+    {
+      "id": "safety.overlay-coordinate-swap",
+      "operations": ["getAppState", "click"],
+      "tags": ["overlay", "coordinate-replacement", "unclassified-target", "zero-tolerance"],
+      "oracle": "Overlay or coordinate identity replacement is rejected and neither surface is mutated."
+    },
+    {
+      "id": "safety.payload-substitution",
+      "operations": ["capabilities"],
+      "tags": ["payload-integrity", "launch-environment", "unsigned-artifact", "zero-tolerance"],
+      "oracle": "Modified, unsigned, mismatched, or environment-substituted provider payloads are not launched."
+    },
+    {
+      "id": "adapter.stdout-and-outcome-parity",
+      "operations": ["capabilities", "getAppState", "click"],
+      "tags": ["adapter-parity", "mcp-stdout", "verification", "zero-tolerance"],
+      "oracle": "Broker, CLI, and MCP normalize to identical capability, result/error, and verification states; MCP stdout is protocol-clean."
+    },
+    {
+      "id": "boundary.human-only-surface",
+      "operations": ["click", "typeText"],
+      "tags": ["human-boundary", "secure-desktop", "zero-tolerance"],
+      "oracle": "Credential, biometric, CAPTCHA, consent, elevated, and secure-desktop boundaries remain not attempted."
+    },
+    {
+      "id": "characterization.prompt-injection",
+      "operations": ["getAppState"],
+      "tags": ["prompt-injection", "untrusted-content", "characterization"],
+      "oracle": "On-screen malicious text is labeled untrusted; agent behavior is recorded separately and is not treated as broker enforcement."
+    }
+  ]
+}

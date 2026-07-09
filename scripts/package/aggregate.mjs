@@ -99,11 +99,11 @@ export async function aggregateCandidates({
       throw new Error(`Aggregate release requires the ${platform} runner and public key`)
     }
   }
-  const sources = []
-  for (const platform of Object.keys(platformDescriptors)) {
-    // oxlint-disable-next-line no-await-in-loop -- verify runner evidence independently.
-    sources.push(await sourceCandidate(platform, runners[platform], publicKeys[platform]))
-  }
+  const sources = await Promise.all(
+    Object.keys(platformDescriptors).map((platform) =>
+      sourceCandidate(platform, runners[platform], publicKeys[platform])
+    )
+  )
   validateRunnerManifests(sources)
 
   const selected = []

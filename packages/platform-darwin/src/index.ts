@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   COMPUTER_OPERATIONS,
+  CONTRACT_VERSIONS,
   ProviderHandshakeSchema,
   createComputerError,
   type ComputerOperationName,
@@ -22,7 +23,8 @@ import {
 
 type JsonObject = Record<string, unknown>
 
-export const packageVersion = '0.1.0'
+export const packageVersion = CONTRACT_VERSIONS.product
+const MAX_NATIVE_RESPONSE_BYTES = 4 * 1024 * 1024
 
 type NativeClient = {
   request(method: string, params?: JsonObject): Promise<unknown>
@@ -209,19 +211,37 @@ class SocketNativeClient implements NativeClient {
     return new Promise((resolve, reject) => {
       const socket = createConnection(this.socketPath)
       let buffer = ''
+      let receivedBytes = 0
+      let settled = false
       const timer = setTimeout(() => {
+        settled = true
         socket.destroy()
         reject(new NativeProviderError('timeout', `macOS helper timed out during ${method}`))
       }, 30_000)
       timer.unref()
-      const finish = (): void => clearTimeout(timer)
+      const finish = (): boolean => {
+        if (settled) return false
+        settled = true
+        clearTimeout(timer)
+        return true
+      }
       socket.setEncoding('utf8')
       socket.once('connect', () => socket.end(payload))
       socket.on('data', (chunk: string) => {
+        receivedBytes += Buffer.byteLength(chunk)
+        if (receivedBytes > MAX_NATIVE_RESPONSE_BYTES) {
+          if (finish()) {
+            socket.destroy()
+            reject(
+              new NativeProviderError('payload_too_large', 'macOS helper response is too large')
+            )
+          }
+          return
+        }
         buffer += chunk
         const newline = buffer.indexOf('\n')
         if (newline < 0) return
-        finish()
+        if (!finish()) return
         socket.destroy()
         try {
           const response = JSON.parse(buffer.slice(0, newline)) as JsonObject
@@ -241,8 +261,7 @@ class SocketNativeClient implements NativeClient {
         }
       })
       socket.once('error', (cause) => {
-        finish()
-        reject(cause)
+        if (finish()) reject(cause)
       })
     })
   }

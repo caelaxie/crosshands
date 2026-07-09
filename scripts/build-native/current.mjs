@@ -1,30 +1,18 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
 
-export const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+import { run as runCommand, workspaceRoot } from '../package/lib.mjs'
+
+export { workspaceRoot }
 const darwinApp = join(workspaceRoot, 'packages/platform-darwin/assets/CrossHands Computer Use.app')
 const darwinManifest = join(workspaceRoot, 'packages/platform-darwin/assets/payload.json')
 
 function run(command, args, options = {}) {
-  return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(command, args, {
-      cwd: workspaceRoot,
-      stdio: 'inherit',
-      shell: false,
-      ...options
-    })
-    child.once('error', rejectRun)
-    child.once('exit', (code, signal) => {
-      if (code === 0) resolveRun()
-      else rejectRun(new Error(`${command} exited with ${code ?? signal ?? 'unknown status'}`))
-    })
-  })
+  return runCommand(command, args, { stdio: 'inherit', ...options })
 }
 
 async function sameBytes(left, right) {

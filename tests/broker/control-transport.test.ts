@@ -133,6 +133,34 @@ describe('local control transport', () => {
     await client.close()
   })
 
+  it('expires an unresponsive client request and remains usable for later responses', async () => {
+    const { options, tokenFile } = await fixture()
+    let requests = 0
+    options.handler = async (request) => {
+      requests += 1
+      await new Promise<void>((resolve) => setTimeout(resolve, requests === 1 ? 40 : 0))
+      return { echoed: request.payload }
+    }
+    const server = new LocalControlServer(options)
+    servers.push(server)
+    await server.start()
+    const client = await LocalControlClient.connect({
+      endpoint: options.endpoint,
+      token: (await readFile(tokenFile, 'utf8')).trim(),
+      versions: CONTRACT_VERSIONS,
+      identity: options.identity,
+      maxFrameBytes: 2048
+    })
+
+    await expect(client.request({ slow: true }, { deadlineMs: 5 })).rejects.toMatchObject({
+      code: 'timeout'
+    })
+    await expect(client.request({ next: true }, { deadlineMs: 1_000 })).resolves.toEqual({
+      echoed: { next: true }
+    })
+    await client.close()
+  })
+
   it('rejects malformed and oversized frames without dispatch and closes cleanly', async () => {
     const { options } = await fixture()
     const server = new LocalControlServer(options)

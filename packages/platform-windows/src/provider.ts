@@ -395,6 +395,16 @@ function targetReference(input: JsonRecord): JsonRecord {
   return {}
 }
 
+function setBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > 32) {
+    const oldest = map.keys().next().value as K | undefined
+    if (oldest === undefined) return
+    map.delete(oldest)
+  }
+}
+
 export class WindowsComputerProvider implements ComputerProvider {
   readonly generation = `windows-${randomUUID()}`
   readonly #transport: NativeWindowsTransport
@@ -498,7 +508,7 @@ export class WindowsComputerProvider implements ComputerProvider {
     if (!frame.ok)
       throw createComputerError(errorCode(frame.error ?? ''), frame.error ?? 'Inspect failed')
     const identity = frame.identity as NativeProcessIdentity
-    this.#identities.set(app, identity)
+    setBounded(this.#identities, app, identity)
     const nativeExecutableId = executableId(identity)
     return {
       bindings: {
@@ -644,8 +654,8 @@ export class WindowsComputerProvider implements ComputerProvider {
     const identity = native.processIdentity as NativeProcessIdentity
     const bounds = record(native.windowBounds)
     const appId = String(app.bundleId)
-    this.#snapshots.set(appId, native)
-    this.#identities.set(appId, identity)
+    setBounded(this.#snapshots, appId, native)
+    setBounded(this.#identities, appId, identity)
     const snapshot = {
       id: String(native.snapshotId),
       app: {

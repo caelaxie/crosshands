@@ -4,10 +4,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const runtimePath = resolve('native/windows/runtime.ps1')
+const runtimeSource = readFile(runtimePath, 'utf8')
 
 describe('Windows native provider characterization', () => {
   it('uses persistent stdin frames and never accepts an operation path', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     expect(source).toContain('[Console]::In.ReadLine()')
     expect(source).toContain('ConvertFrom-Json')
     expect(source).not.toContain('$OperationPath')
@@ -15,7 +16,7 @@ describe('Windows native provider characterization', () => {
   })
 
   it('bounds and redacts UI Automation discovery before serialization', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     expect(source).toContain('$MaxNodes = 1200')
     expect(source).toContain('$MaxDepth = 64')
     expect(source).toContain('if ($Element.Current.IsPassword)')
@@ -24,7 +25,7 @@ describe('Windows native provider characterization', () => {
   })
 
   it('tries UI Automation patterns before any synthetic click fallback', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     const invoke = source.indexOf('Invoke-CrossHandsPrimaryAction $element')
     const fallback = source.indexOf('Send-CrossHandsMouseClick $handle', invoke)
     expect(invoke).toBeGreaterThan(0)
@@ -34,7 +35,7 @@ describe('Windows native provider characterization', () => {
   })
 
   it('fails closed across lock, secure desktop, RDP, session and integrity transitions', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     expect(source).toContain('OpenInputDesktop')
     expect(source).toContain('GetSystemMetrics(0x1000)')
     expect(source).toContain('$desktop -ine "Default"')
@@ -46,7 +47,7 @@ describe('Windows native provider characterization', () => {
   })
 
   it('binds PID reuse and lookalikes to full executable provenance', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     for (const field of [
       'pid',
       'startedAt',
@@ -64,7 +65,7 @@ describe('Windows native provider characterization', () => {
   })
 
   it('keeps Unicode, modifier, clipboard, multi-monitor and mixed-DPI behavior bounded', async () => {
-    const source = await readFile(runtimePath, 'utf8')
+    const source = await runtimeSource
     expect(source).toContain('$WindowsMessages.Char')
     expect(source).toContain('ConvertTo-CrossHandsSendKeysModifier')
     expect(source).toContain('[System.Windows.Forms.Clipboard]::SetDataObject($previous, $true)')

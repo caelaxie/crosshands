@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Build a candidate, promote an existing candidate, or roll back to a last-known-good candidate
+        description: Build, promote, roll back, or finalize 24-hour release evidence
         required: true
         type: choice
         options:
           - candidate
           - promote
           - rollback
+          - finalize
       version:
         description: Exact package version, without a leading v
         required: true
@@ -20,11 +21,39 @@ on:
         required: false
         type: string
       evidence_run_id:
-        description: Workflow run containing the signed candidate evidence for promotion or rollback
+        description: Workflow run containing signed candidate evidence for promotion, rollback, or finalization
         required: false
         type: string
       manifest_sha256:
-        description: Expected SHA-256 of the signed release manifest for promotion or rollback
+        description: Expected SHA-256 of the signed release manifest for promotion, rollback, or finalization
+        required: false
+        type: string
+      conformance_evidence_run_id:
+        description: Promotion/finalize workflow run containing provider conformance evidence
+        required: false
+        type: string
+      conformance_evidence_artifact:
+        description: Exact artifact name containing conformance-evidence.json
+        required: false
+        type: string
+      agent_evidence_run_id:
+        description: Promotion/finalize workflow run containing validated reference-agent evidence
+        required: false
+        type: string
+      agent_evidence_artifact:
+        description: Exact artifact name containing agent-evidence.json
+        required: false
+        type: string
+      release_evidence_run_id:
+        description: Promotion/finalize workflow run containing signed combined release evidence
+        required: false
+        type: string
+      release_evidence_artifact:
+        description: Exact artifact name containing release-evidence.json and release-evidence.sig
+        required: false
+        type: string
+      release_evidence_signer_fingerprint:
+        description: Expected sha256 fingerprint of the combined-evidence Ed25519 public key
         required: false
         type: string
 
@@ -43,6 +72,13 @@ env:
   RELEASE_OPERATION: ${{ inputs.operation }}
   EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
   EXPECTED_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+  CONFORMANCE_EVIDENCE_RUN_ID: ${{ inputs.conformance_evidence_run_id }}
+  CONFORMANCE_EVIDENCE_ARTIFACT: ${{ inputs.conformance_evidence_artifact }}
+  AGENT_EVIDENCE_RUN_ID: ${{ inputs.agent_evidence_run_id }}
+  AGENT_EVIDENCE_ARTIFACT: ${{ inputs.agent_evidence_artifact }}
+  RELEASE_EVIDENCE_RUN_ID: ${{ inputs.release_evidence_run_id }}
+  RELEASE_EVIDENCE_ARTIFACT: ${{ inputs.release_evidence_artifact }}
+  RELEASE_EVIDENCE_SIGNER_FINGERPRINT: ${{ inputs.release_evidence_signer_fingerprint }}
 
 jobs:
   candidate-preflight:
@@ -498,7 +534,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   load-existing-candidate:
-    if: inputs.operation == 'promote' || inputs.operation == 'rollback'
+    if: inputs.operation == 'promote' || inputs.operation == 'rollback' || inputs.operation == 'finalize'
     runs-on: ubuntu-24.04
     environment: release-production
     timeout-minutes: 15
@@ -506,6 +542,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
       CROSSHANDS_RELEASE_PUBLIC_KEY: ${{ secrets.RELEASE_MANIFEST_PUBLIC_KEY_PEM }}
+      CROSSHANDS_RELEASE_EVIDENCE_PUBLIC_KEY: ${{ secrets.RELEASE_EVIDENCE_PUBLIC_KEY_PEM }}
     steps:
       - name: Require immutable evidence coordinates
         shell: bash
@@ -515,6 +552,32 @@ jobs:
           [[ "$EXPECTED_MANIFEST_SHA256" =~ ^[a-f0-9]{64}$ ]]
           test -n "$COSIGN_PUBLIC_KEY"
           test -n "$CROSSHANDS_RELEASE_PUBLIC_KEY"
+
+      - name: Require exact benchmark evidence coordinates for promotion or finalization
+        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        shell: bash
+        run: |
+          [[ "$CONFORMANCE_EVIDENCE_RUN_ID" =~ ^[0-9]+$ ]]
+          test -n "$CONFORMANCE_EVIDENCE_ARTIFACT"
+          [[ "$AGENT_EVIDENCE_RUN_ID" =~ ^[0-9]+$ ]]
+          test -n "$AGENT_EVIDENCE_ARTIFACT"
+          [[ "$RELEASE_EVIDENCE_RUN_ID" =~ ^[0-9]+$ ]]
+          test -n "$RELEASE_EVIDENCE_ARTIFACT"
+          [[ "$RELEASE_EVIDENCE_SIGNER_FINGERPRINT" =~ ^sha256:[a-f0-9]{64}$ ]]
+          test -n "$CROSSHANDS_RELEASE_EVIDENCE_PUBLIC_KEY"
+
+      - name: Check out the immutable release validator
+        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: v${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Set up the pinned validation runtime
+        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
 
       - name: Download the exact candidate without rebuilding
         shell: bash
@@ -553,13 +616,76 @@ jobs:
             --signature artifacts/release/registry-integrity.cosign.sig \
             artifacts/release/registry-integrity.json
 
+      - name: Download exact conformance, agent, and combined evidence
+        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        shell: bash
+        run: |
+          mkdir -p external-evidence/conformance external-evidence/agents external-evidence/combined
+          gh run download "$CONFORMANCE_EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$CONFORMANCE_EVIDENCE_ARTIFACT" \
+            --dir external-evidence/conformance
+          gh run download "$AGENT_EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$AGENT_EVIDENCE_ARTIFACT" \
+            --dir external-evidence/agents
+          gh run download "$RELEASE_EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$RELEASE_EVIDENCE_ARTIFACT" \
+            --dir external-evidence/combined
+          test -f external-evidence/conformance/conformance-evidence.json
+          test -f external-evidence/agents/agent-evidence.json
+          test -f external-evidence/combined/release-evidence.json
+          test -f external-evidence/combined/release-evidence.sig
+
+      - name: Verify signed pre-promotion evidence and candidate identity
+        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        shell: bash
+        run: |
+          printf '%s' "$CROSSHANDS_RELEASE_EVIDENCE_PUBLIC_KEY" > release-evidence.pub
+          node benchmarks/agents/validate-prepromotion.mjs
+
+      - name: Validate complete 24-hour release evidence without moving tags
+        if: inputs.operation == 'finalize'
+        shell: bash
+        run: |
+          printf '%s' "$CROSSHANDS_RELEASE_PUBLIC_KEY" > release-manifest.pub
+          node benchmarks/agents/validate-evidence.mjs \
+            --release-evidence external-evidence/combined/release-evidence.json \
+            --artifacts artifacts \
+            --public-key release-manifest.pub
+
       - name: Preserve verified evidence for the channel operation
+        if: inputs.operation == 'promote' || inputs.operation == 'rollback'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-${{ inputs.operation }}-${{ inputs.version }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 365
+
+      - name: Record immutable v1-ready evidence after the 24-hour gate
+        if: inputs.operation == 'finalize'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: v1-ready-${{ inputs.version }}
+          path: |
+            artifacts/
+            external-evidence/
+          if-no-files-found: error
+          retention-days: 365
+
+      - name: Publish finalization coordinates without rebuilding or moving tags
+        if: inputs.operation == 'finalize'
+        shell: bash
+        run: |
+          {
+            echo '### CrossHands v1 evidence declared ready'
+            echo "- version: $RELEASE_VERSION"
+            echo "- candidate evidence run: $EVIDENCE_RUN_ID"
+            echo "- release manifest SHA-256: \`$EXPECTED_MANIFEST_SHA256\`"
+            echo '- complete 0/1/6/24-hour evidence passed; this operation did not publish, rebuild, or move a registry tag'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   move-default-channel:
     if: inputs.operation == 'promote' || inputs.operation == 'rollback'
