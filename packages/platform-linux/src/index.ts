@@ -636,7 +636,8 @@ export class LinuxComputerProvider implements ComputerProvider {
               typeof verification.reason === 'string'
                 ? verification.reason
                 : 'fresh state returned but the provider could not prove the requested effect'
-          }
+          },
+      freshState: normalizedSnapshot
     }
   }
 
@@ -644,6 +645,7 @@ export class LinuxComputerProvider implements ComputerProvider {
     bindings: ReferenceBindings
     snapshot: Record<string, unknown>
     screenshot: Record<string, unknown> | null
+    issues: Record<string, unknown>[]
   }> {
     const app = appInfo(raw.app)
     const snapshotId = String(raw.snapshotId)
@@ -699,7 +701,8 @@ export class LinuxComputerProvider implements ComputerProvider {
               scale: Number(raw.screenshotScale),
               data: screenshotData
             }
-          : null
+          : null,
+      issues: normalizeScreenshotIssues(raw.screenshotError)
     }
   }
 
@@ -745,6 +748,14 @@ export class LinuxComputerProvider implements ComputerProvider {
     child.stdin.end()
     if (child.exitCode === null) child.kill('SIGTERM')
   }
+}
+
+export function normalizeScreenshotIssues(value: unknown): Record<string, unknown>[] {
+  const error = record(value)
+  if (typeof error.message !== 'string' || error.message.length === 0) return []
+  return [
+    createComputerError('screenshot_failed', error.message, { component: 'screenshots' }).toJSON()
+  ]
 }
 
 let activeProvider: LinuxComputerProvider | undefined

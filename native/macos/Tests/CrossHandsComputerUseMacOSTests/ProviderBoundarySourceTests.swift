@@ -68,6 +68,13 @@ final class ProviderBoundarySourceTests: XCTestCase {
         XCTAssertFalse(limiter.contains("return best"))
     }
 
+    func testScreenshotFailuresCarryActionableCodes() throws {
+        let source = try entrypoint()
+        XCTAssertTrue(source.contains("code: \"permission_denied\""))
+        XCTAssertTrue(source.contains("code: \"screenshot_failed\""))
+        XCTAssertTrue(source.contains("case let .failed(code, message)"))
+    }
+
     private func entrypoint(file: StaticString = #filePath) throws -> String {
         let root = URL(fileURLWithPath: "\(file)")
             .deletingLastPathComponent()

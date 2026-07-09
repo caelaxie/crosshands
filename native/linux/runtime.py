@@ -732,15 +732,21 @@ def rendered_element_index(line, depth):
 
 
 def capture_png(rect):
+    failure = {
+        "error": {
+            "code": "screenshot_failed",
+            "message": "window screenshot capture failed; retry with --no-screenshot or verify the X11 capture dependencies",
+        }
+    }
     if Gdk is None or GdkPixbuf is None or rect is None or os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
-        return None
+        return failure
     screen = Gdk.Screen.get_default()
     root = screen.get_root_window() if screen else None
     if root is None:
-        return None
+        return failure
     pixbuf = Gdk.pixbuf_get_from_window(root, round(rect.x), round(rect.y), max(1, round(rect.width)), max(1, round(rect.height)))
     if pixbuf is None:
-        return None
+        return failure
     return bounded_png_payload(pixbuf)
 
 
@@ -763,7 +769,12 @@ def bounded_png_payload(pixbuf):
     original_height = max(1, pixbuf.get_height())
     data = png_bytes(pixbuf)
     if data is None:
-        return None
+        return {
+            "error": {
+                "code": "screenshot_failed",
+                "message": "window screenshot PNG encoding failed; retry with --no-screenshot",
+            }
+        }
     if len(data) <= MAX_SCREENSHOT_PNG_BYTES:
         return screenshot_payload(data, original_width, original_height, original_width)
 

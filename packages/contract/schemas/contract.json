@@ -545,9 +545,60 @@
                 "type": "null"
               }
             ]
+          },
+          "issues": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "app_not_found",
+                    "app_unavailable",
+                    "app_blocked",
+                    "window_not_found",
+                    "window_unavailable",
+                    "window_not_focused",
+                    "permission_denied",
+                    "stale_target",
+                    "element_not_found",
+                    "element_not_clickable",
+                    "action_not_supported",
+                    "value_not_settable",
+                    "invalid_argument",
+                    "timeout",
+                    "unsupported_capability",
+                    "provider_unavailable",
+                    "provider_crashed",
+                    "version_incompatible",
+                    "interaction_context_invalid",
+                    "interaction_context_expired",
+                    "session_unavailable",
+                    "screenshot_failed",
+                    "accessibility_error"
+                  ]
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "retry": {
+                  "type": "boolean"
+                },
+                "remediation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "details": {}
+              },
+              "required": ["code", "message", "retry", "remediation"],
+              "additionalProperties": false
+            }
           }
         },
-        "required": ["context", "snapshot", "screenshot"],
+        "required": ["context", "snapshot", "screenshot", "issues"],
         "additionalProperties": false
       }
     },
@@ -1284,9 +1335,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -1888,9 +1990,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -2631,9 +2784,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -3643,9 +3847,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -4119,9 +4374,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -4596,9 +4902,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -5078,9 +5435,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -5554,9 +5962,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },
@@ -6157,9 +6616,60 @@
                     "type": "null"
                   }
                 ]
+              },
+              "issues": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "app_not_found",
+                        "app_unavailable",
+                        "app_blocked",
+                        "window_not_found",
+                        "window_unavailable",
+                        "window_not_focused",
+                        "permission_denied",
+                        "stale_target",
+                        "element_not_found",
+                        "element_not_clickable",
+                        "action_not_supported",
+                        "value_not_settable",
+                        "invalid_argument",
+                        "timeout",
+                        "unsupported_capability",
+                        "provider_unavailable",
+                        "provider_crashed",
+                        "version_incompatible",
+                        "interaction_context_invalid",
+                        "interaction_context_expired",
+                        "session_unavailable",
+                        "screenshot_failed",
+                        "accessibility_error"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "retry": {
+                      "type": "boolean"
+                    },
+                    "remediation": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {}
+                  },
+                  "required": ["code", "message", "retry", "remediation"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["context", "snapshot", "screenshot"],
+            "required": ["context", "snapshot", "screenshot", "issues"],
             "additionalProperties": false
           }
         },

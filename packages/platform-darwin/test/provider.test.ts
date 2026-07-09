@@ -5,7 +5,12 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { DarwinComputerProvider, resolveHelperPath, verifyDarwinPayload } from '../src/index.js'
+import {
+  DarwinComputerProvider,
+  normalizeScreenshotIssues,
+  resolveHelperPath,
+  verifyDarwinPayload
+} from '../src/index.js'
 
 const app = {
   name: 'Fixture',
@@ -74,6 +79,23 @@ function harness() {
 }
 
 describe('@crosshands/platform-darwin', () => {
+  it('preserves actionable screenshot permission and capture issues', () => {
+    expect(
+      normalizeScreenshotIssues({
+        state: 'failed',
+        code: 'permission_denied',
+        message: 'Screen Recording permission is required'
+      })
+    ).toEqual([
+      expect.objectContaining({
+        code: 'permission_denied',
+        retry: false,
+        remediation: 'grant_permission'
+      })
+    ])
+    expect(normalizeScreenshotIssues({ state: 'captured' })).toEqual([])
+  })
+
   it('verifies version, bundle identity, and helper digest before launch', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-darwin-integrity-'))
     const helperPath = join(directory, 'crosshands-computer-use-macos')

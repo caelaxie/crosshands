@@ -23,4 +23,14 @@ describe('Linux provider source safety characterization', () => {
     expect(source).toContain('ensure_provider_available("hotkey")')
     expect(source).toContain('return "[redacted]"')
   })
+
+  test('returns native screenshot failures and fresh post-action state', async () => {
+    const [nativeSource, providerSource] = await Promise.all([
+      readFile(new URL('../../../native/linux/runtime.py', import.meta.url), 'utf8'),
+      readFile(new URL('../../../packages/platform-linux/src/index.ts', import.meta.url), 'utf8')
+    ])
+    expect(nativeSource).toContain('"code": "screenshot_failed"')
+    expect(providerSource).toContain('issues: normalizeScreenshotIssues(raw.screenshotError)')
+    expect(providerSource).toContain('freshState: normalizedSnapshot')
+  })
 })

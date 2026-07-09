@@ -9,10 +9,26 @@ import {
   linuxProviderEnvironment,
   mapNativeOperation,
   normalizeNativeError,
+  normalizeScreenshotIssues,
   verifyLinuxPayload
 } from '../src/index.js'
 
 describe('Linux provider boundary', () => {
+  test('preserves actionable screenshot capture issues', () => {
+    expect(
+      normalizeScreenshotIssues({
+        code: 'screenshot_failed',
+        message: 'window screenshot PNG encoding failed'
+      })
+    ).toEqual([
+      expect.objectContaining({
+        code: 'screenshot_failed',
+        retry: true,
+        remediation: 'check_screenshot_permission'
+      })
+    ])
+  })
+
   test('uses a fixed environment and removes Python and caller search paths', () => {
     const environment = linuxProviderEnvironment({
       PATH: '/poison',

@@ -204,7 +204,7 @@ struct CapturedImage {
 enum ScreenshotStatus {
     case captured
     case skipped
-    case failed(String)
+    case failed(code: String, message: String)
 }
 
 private struct CachedSnapshotEntry {
@@ -735,9 +735,15 @@ final class Provider {
         let screenshotStatus: ScreenshotStatus = if screenshot != nil {
             .captured
         } else if includeScreenshot && !canCaptureScreenshot {
-            .failed("Screen Recording permission is required for CrossHands Computer Use; grant permission or pass --no-screenshot to inspect accessibility state only.")
+            .failed(
+                code: "permission_denied",
+                message: "Screen Recording permission is required for CrossHands Computer Use; grant permission or pass --no-screenshot to inspect accessibility state only."
+            )
         } else if includeScreenshot {
-            .failed("window screenshot capture returned no image; retry with --no-screenshot if accessibility state is sufficient.")
+            .failed(
+                code: "screenshot_failed",
+                message: "window screenshot capture returned no image; retry with --no-screenshot if accessibility state is sufficient."
+            )
         } else {
             .skipped
         }
@@ -1585,8 +1591,8 @@ private func renderScreenshotStatus(_ status: ScreenshotStatus, snapshot: Snapsh
         return ["state": "captured", "metadata": metadata]
     case .skipped:
         return ["state": "skipped", "reason": "no_screenshot_flag"]
-    case let .failed(message):
-        return ["state": "failed", "code": "screenshot_failed", "message": message, "metadata": metadata]
+    case let .failed(code, message):
+        return ["state": "failed", "code": code, "message": message, "metadata": metadata]
     }
 }
 

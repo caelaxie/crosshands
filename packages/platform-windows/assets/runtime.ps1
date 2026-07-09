@@ -825,7 +825,12 @@ function Get-CrossHandsScreenshot([bool]$IncludeScreenshot, [IntPtr]$WindowHandl
         $hdc = [IntPtr]::Zero
         Get-CrossHandsBoundedScreenshotPayload $bitmap
     } catch {
-        $null
+        [pscustomobject]@{
+            error = [pscustomobject]@{
+                code = "screenshot_failed"
+                message = "target-window screenshot capture failed; retry with --no-screenshot or verify the target supports PrintWindow"
+            }
+        }
     } finally {
         if ($hdc -ne [IntPtr]::Zero -and $null -ne $graphics) { $graphics.ReleaseHdc($hdc) }
         if ($null -ne $graphics) { $graphics.Dispose() }

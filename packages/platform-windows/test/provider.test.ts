@@ -8,6 +8,7 @@ import type { ProviderRequest, TargetReference } from '@crosshands/contract'
 
 import {
   WindowsComputerProvider,
+  normalizeScreenshotIssues,
   verifyWindowsPayload,
   windowsPowerShellLaunchSpec,
   type NativeFrame,
@@ -50,11 +51,44 @@ const identity = {
   sha256: 'a'.repeat(64)
 }
 
+function nativeSnapshot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    snapshotId: 'snapshot-1',
+    app: { name: 'Fixture', bundleId: 'fixture', pid: 42 },
+    processIdentity: identity,
+    windowId: 7,
+    windowTitle: 'One',
+    windowBounds: { x: -100, y: 20, width: 900, height: 700 },
+    treeLines: ['button "Save"', 'edit "Password", Value: [redacted]'],
+    elements: [{ index: 0, runtimeId: [1, 2] }],
+    screenshotPngBase64: 'cG5n',
+    screenshotWidth: 900,
+    screenshotHeight: 700,
+    screenshotScale: 1,
+    ...overrides
+  }
+}
+
 function request(operation: ProviderRequest['operation'], input: unknown): ProviderRequest {
   return { requestId: 'request-1', operation, input, deadlineAt: Date.now() + 5_000 }
 }
 
 describe('WindowsComputerProvider', () => {
+  it('preserves actionable screenshot capture issues', () => {
+    expect(
+      normalizeScreenshotIssues({
+        code: 'screenshot_failed',
+        message: 'target-window screenshot capture failed'
+      })
+    ).toEqual([
+      expect.objectContaining({
+        code: 'screenshot_failed',
+        retry: true,
+        remediation: 'check_screenshot_permission'
+      })
+    ])
+  })
+
   it('verifies the packaged payload and rejects a substituted script', async () => {
     await expect(verifyWindowsPayload()).resolves.toBeUndefined()
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-integrity-'))
@@ -97,20 +131,7 @@ describe('WindowsComputerProvider', () => {
       },
       {
         ok: true,
-        snapshot: {
-          snapshotId: 'snapshot-1',
-          app: { name: 'Fixture', bundleId: 'fixture', pid: 42 },
-          processIdentity: identity,
-          windowId: 7,
-          windowTitle: 'One',
-          windowBounds: { x: -100, y: 20, width: 900, height: 700 },
-          treeLines: ['button "Save"', 'edit "Password", Value: [redacted]'],
-          elements: [{ index: 0, runtimeId: [1, 2] }],
-          screenshotPngBase64: 'cG5n',
-          screenshotWidth: 900,
-          screenshotHeight: 700,
-          screenshotScale: 1
-        }
+        snapshot: nativeSnapshot()
       }
     )
     const provider = new WindowsComputerProvider({ transport, graphicalSessionId: 'console:1' })
@@ -145,7 +166,11 @@ describe('WindowsComputerProvider', () => {
   it('re-resolves process identity and carries it in the stdin mutation envelope', async () => {
     const transport = new FakeTransport(
       { ok: true, identity, appId: 'fixture', windowId: 7, windowTitle: 'One' },
-      { ok: true, action: { verification: { state: 'verified' } } }
+      {
+        ok: true,
+        action: { verification: { state: 'verified' } },
+        snapshot: nativeSnapshot()
+      }
     )
     const provider = new WindowsComputerProvider({ transport, graphicalSessionId: 'console:1' })
     const ref: TargetReference = {
@@ -172,7 +197,10 @@ describe('WindowsComputerProvider', () => {
     })
     await expect(provider.dispatch(request('click', input))).resolves.toMatchObject({
       dispatched: true,
-      result: { outcome: { state: 'verified' } }
+      result: {
+        outcome: { state: 'verified' },
+        freshState: { snapshot: { id: 'snapshot-1' }, issues: [] }
+      }
     })
     expect(transport.requests[1]).toMatchObject({
       tool: 'click',

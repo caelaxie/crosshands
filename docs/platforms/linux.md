@@ -53,6 +53,10 @@ and rechecks process start/executable identity for action targets. A stale PID,
 changed executable, window/element mismatch, session transition, or provider
 restart requires a fresh observation.
 
+On X11, a native screenshot capture or PNG encoding failure is preserved in
+the observation `issues` array. It is not collapsed into an unexplained
+`screenshot: null` result.
+
 ## Release-runner evidence
 
 Static, standard-library protocol, hash, and degradation tests run on every

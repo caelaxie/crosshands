@@ -31,7 +31,7 @@
       "package": "crosshands@0.1.0",
       "command": "crosshands computer",
       "skill": "skills/computer-use/SKILL.md",
-      "skillSha256": "cd95777cdbf253f2b62165c780ea95e745e973702630198193a48f279e118bb4"
+      "skillSha256": "57da5046581aab22adace95f3d6491eb8ef3a2801e3472383699c53bbfd3eed2"
     },
     "mcp": {
       "package": "@crosshands/mcp@0.1.0",

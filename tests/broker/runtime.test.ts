@@ -39,7 +39,7 @@ function target(contextToken: string, value: ReferenceBindings): TargetReference
   }
 }
 
-function observedState(value: ReferenceBindings, treeText: string) {
+function observedState(value: ReferenceBindings, treeText: string, issues?: unknown[]) {
   return {
     bindings: value,
     snapshot: {
@@ -64,7 +64,8 @@ function observedState(value: ReferenceBindings, treeText: string) {
       focusedElementRef: null,
       desktopEpoch: value.desktopEpoch
     },
-    screenshot: null
+    screenshot: null,
+    ...(issues === undefined ? {} : { issues })
   }
 }
 
@@ -101,7 +102,14 @@ describe('local broker', () => {
       })
       .enqueue({
         kind: 'result',
-        result: observedState(bindings(), 'two'),
+        result: observedState(bindings(), 'two', [
+          {
+            code: 'permission_denied',
+            message: 'Screen Recording permission is required',
+            retry: false,
+            remediation: 'grant_permission'
+          }
+        ]),
         dispatched: false
       })
       .enqueue({ kind: 'result', result: { outcome: { state: 'verified' } } })
@@ -120,6 +128,8 @@ describe('local broker', () => {
     const first = await cli.request({ operation: 'getAppState', input: { app: 'fixture.app' } })
     const second = await mcp.request({ operation: 'getAppState', input: { app: 'fixture.app' } })
     expect(first.context?.token).not.toBe(second.context?.token)
+    expect(first.result).toMatchObject({ issues: [] })
+    expect(second.result).toMatchObject({ issues: [{ code: 'permission_denied' }] })
 
     const action = await mcp.request({
       operation: 'click',

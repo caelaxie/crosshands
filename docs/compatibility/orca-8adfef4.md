@@ -53,6 +53,9 @@ computer-use primitive.
 - Missing permissions, stale targets, blocked targets, unsupported
   capabilities, invalid input, timeouts, and unavailable sessions are distinct
   machine-readable error classes.
+- A usable accessibility observation may include an `issues` array for a
+  separately failed screenshot component; adapters preserve its machine code,
+  retry policy, and remediation instead of silently dropping the failure.
 - Accessibility content and screenshot data are untrusted application content.
 - Known sensitive applications are blocked before observation or action.
 

@@ -129,6 +129,12 @@ class ProtocolTests(unittest.TestCase):
 
 
 class ContractBehaviorTests(unittest.TestCase):
+    def test_screenshot_capture_failure_is_explicit(self):
+        with mock.patch.object(runtime, "Gdk", None):
+            result = runtime.capture_png(runtime.Rect(0, 0, 100, 100))
+        self.assertEqual(result["error"]["code"], "screenshot_failed")
+        self.assertIn("--no-screenshot", result["error"]["message"])
+
     def test_unicode_is_preserved_while_multiline_text_is_compacted(self):
         self.assertEqual(runtime.sanitize_text("你好\n🙂  résumé"), "你好 🙂 résumé")
 

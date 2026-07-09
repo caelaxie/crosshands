@@ -39,6 +39,9 @@ Carry the complete `context` returned by observation in agent state and pass
 its `token` as `--context` to the next action. Element indexes and coordinates
 belong only to that context. They become stale after navigation, rerender,
 focus/window changes, scrolling, another mutation, provider restart, or expiry.
+Inspect the result's `issues` array before acting. A returned accessibility
+snapshot can still carry an actionable screenshot permission or capture issue;
+do not treat `screenshot: null` as an unexplained success.
 After any mutation, use its verified fresh state when present; otherwise
 observe again. If the outcome is `indeterminate`, observe before any retry so
 the same destructive action is not performed twice.

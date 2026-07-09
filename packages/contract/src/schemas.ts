@@ -127,7 +127,8 @@ export const SnapshotResultSchema = z
   .object({
     context: InteractionContextSchema,
     snapshot: SnapshotSchema,
-    screenshot: ScreenshotSchema.nullable()
+    screenshot: ScreenshotSchema.nullable(),
+    issues: z.array(SerializedComputerErrorSchema).default([])
   })
   .strict()
 

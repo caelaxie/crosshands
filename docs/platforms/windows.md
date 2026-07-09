@@ -42,6 +42,10 @@ fails closed; Node's named-pipe API alone is not treated as proof.
 
 ## Verification status
 
+Target-window capture failures are returned in the observation `issues` array
+with `screenshot_failed` remediation. CrossHands never falls back to sampling
+the desktop when `PrintWindow` cannot capture the selected HWND.
+
 Static TypeScript and source-characterization tests run on every development
 platform. A release claim additionally requires real clean Windows 10/11 x64
 runners to execute:

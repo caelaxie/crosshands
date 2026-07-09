@@ -659,7 +659,8 @@ export class WindowsComputerProvider implements ComputerProvider {
           : {
               state: 'indeterminate',
               reason: String(verification.reason ?? 'native_action_unverified')
-            }
+            },
+      freshState: this.#snapshotResult(record(frame.snapshot))
     }
   }
 
@@ -725,7 +726,16 @@ export class WindowsComputerProvider implements ComputerProvider {
               scale: Number(native.screenshotScale),
               data: native.screenshotPngBase64
             }
-          : null
+          : null,
+      issues: normalizeScreenshotIssues(native.screenshotError)
     }
   }
+}
+
+export function normalizeScreenshotIssues(value: unknown): JsonRecord[] {
+  const error = record(value)
+  if (typeof error.message !== 'string' || error.message.length === 0) return []
+  return [
+    createComputerError('screenshot_failed', error.message, { component: 'screenshots' }).toJSON()
+  ]
 }

@@ -30,6 +30,6 @@ The helper rejects known password-manager bundle identifiers before observation 
 - Actions include semantic and coordinate clicks, secondary accessibility actions, scrolling, dragging, literal typing, keys, hotkeys, exact paste, and value setting.
 - Window or element changes produce an explicit stale/missing-target error. A provider restart changes its generation and invalidates old references.
 - Minimized or unavailable windows are not silently treated as successful targets.
-- Screenshot permission, lookup, timeout, and capture failures are returned explicitly; accessibility-only observation remains available with screenshots disabled.
+- Screenshot permission, lookup, timeout, and capture failures are returned explicitly in the observation `issues` array; accessibility-only observation remains available with `screenshot: null`, and callers can retry with screenshots disabled.
 
 The provider only controls the local, unlocked Aqua session. Remote machines, background login sessions, privilege elevation, and automated permission grants are outside the first release.

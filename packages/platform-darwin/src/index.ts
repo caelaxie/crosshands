@@ -393,8 +393,26 @@ function normalizeSnapshot(
     screenshot:
       raw.screenshot === null || raw.screenshot === undefined
         ? null
-        : normalizeScreenshot(raw.screenshot)
+        : normalizeScreenshot(raw.screenshot),
+    issues: normalizeScreenshotIssues(raw.screenshotStatus)
   }
+}
+
+export function normalizeScreenshotIssues(value: unknown): JsonObject[] {
+  if (value === null || value === undefined) return []
+  const status = asObject(value)
+  if (status.state !== 'failed') return []
+  const message = asString(status.message, 'screenshotStatus.message')
+  const code =
+    status.code === 'permission_denied' || status.code === 'screenshot_failed'
+      ? status.code
+      : 'screenshot_failed'
+  return [
+    createComputerError(code, message, {
+      component: 'screenshots',
+      ...(status.metadata === undefined ? {} : { native: status.metadata })
+    }).toJSON()
+  ]
 }
 
 function normalizeScreenshot(value: unknown): JsonObject {

@@ -24,6 +24,7 @@ describe('Windows native provider characterization', () => {
     expect(source).toContain('$MaxScreenshotPngBytes = 900000')
     expect(source).toContain('CrossHandsDesktopWin32]::PrintWindow')
     expect(source).not.toContain('CopyFromScreen')
+    expect(source).toContain('target-window screenshot capture failed')
   })
 
   it('tries UI Automation patterns before any synthetic click fallback', async () => {
