@@ -413,7 +413,12 @@ function targetReference(input: JsonObject): TargetReference | undefined {
     const target = input[key]
     if (target === null || typeof target !== 'object') continue
     const record = target as JsonObject
-    const candidate = record.kind === 'element' ? record.ref : (record.window ?? target)
+    const candidate =
+      'contextToken' in record
+        ? target
+        : record.kind === 'element'
+          ? record.ref
+          : (record.window ?? target)
     if (candidate !== null && typeof candidate === 'object' && 'snapshotId' in candidate) {
       return candidate as TargetReference
     }
@@ -468,9 +473,23 @@ function nativeInput(operation: ComputerOperationName, input: unknown): JsonObje
       : reference
         ? `pid:${reference.process.pid}`
         : undefined
-  const actionCommon = { ...common, ...(app === undefined ? {} : { app }) }
+  const actionCommon = {
+    ...common,
+    ...(app === undefined ? {} : { app }),
+    ...(reference === undefined
+      ? {}
+      : {
+          expectedProcessStartedAt: reference.process.startedAt,
+          expectedExecutableId: reference.process.executableId
+        })
+  }
   if (operation === 'drag') {
-    return { ...actionCommon, ...nativeTarget(value.from, 'from'), ...nativeTarget(value.to, 'to') }
+    return {
+      ...actionCommon,
+      ...nativeTarget(value.from, 'from'),
+      ...nativeTarget(value.to, 'to'),
+      ...(typeof value.durationMs === 'number' ? { durationMs: value.durationMs } : {})
+    }
   }
   const target = nativeTarget(value.target)
   switch (operation) {

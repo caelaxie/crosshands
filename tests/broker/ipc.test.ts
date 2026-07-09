@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
+import net from 'node:net'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -87,6 +89,30 @@ describe('restricted local IPC', () => {
     expect(decodeFrames(frame, 1024)).toEqual([{ type: 'cancel', requestId: 'r1' }])
     expect(() => encodeFrame({ payload: 'x'.repeat(20) }, 8)).toThrow(/maximum/)
     expect(() => decodeFrames(Buffer.from([0, 0, 0, 8]), 1024)).toThrow(/incomplete/)
+  })
+
+  it('recovers a user-owned socket only after proving its lease owner is dead', async () => {
+    const root = join(tmpdir(), `chs-${randomUUID().slice(0, 8)}`)
+    await mkdir(root, { mode: 0o700 })
+    const socket = join(root, 'broker.sock')
+    const staleServer = net.createServer()
+    await new Promise<void>((resolve, reject) => {
+      staleServer.once('error', reject)
+      staleServer.listen(socket, resolve)
+    })
+    await chmod(socket, 0o600)
+    await writeFile(`${socket}.lease`, JSON.stringify({ pid: 999_999, owner: 'stale' }), {
+      mode: 0o600
+    })
+
+    const lease = await acquireUnixLease({
+      runtimeDirectory: root,
+      endpoint: socket,
+      owner: 'replacement',
+      isProcessAlive: () => false
+    })
+    await lease.release()
+    await new Promise<void>((resolve) => staleServer.close(() => resolve()))
   })
 
   it('does not pretend Windows DACL or peer guarantees exist on other platforms', () => {

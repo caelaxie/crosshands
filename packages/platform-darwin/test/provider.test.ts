@@ -153,7 +153,13 @@ describe('@crosshands/platform-darwin', () => {
     })
     expect(calls.at(-1)).toMatchObject({
       method: 'click',
-      params: { app: 'pid:42', elementIndex: 0, snapshotId: 'snapshot-1' }
+      params: {
+        app: 'pid:42',
+        elementIndex: 0,
+        snapshotId: 'snapshot-1',
+        expectedProcessStartedAt: app.processStartedAt,
+        expectedExecutableId: app.executableId
+      }
     })
     expect(response).toMatchObject({
       dispatched: true,

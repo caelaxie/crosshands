@@ -1,5 +1,6 @@
 import {
   CONTRACT_VERSIONS,
+  createComputerError,
   parseOperationInput,
   type ComputerOperationName,
   type ComputerProvider,
@@ -93,7 +94,15 @@ export async function runBrokerHost(): Promise<void> {
     const record = payload as Record<string, unknown>
     if (typeof record.operation !== 'string') throw new Error('Missing operation')
     const operation = record.operation as ComputerOperationName
-    const input = parseOperationInput(operation, record.input)
+    let input: unknown
+    try {
+      input = parseOperationInput(operation, record.input)
+    } catch (cause) {
+      if (cause instanceof Error && cause.name === 'ZodError') {
+        throw createComputerError('invalid_argument', 'Invalid input for the selected operation')
+      }
+      throw cause
+    }
     return broker.request({ operation, input, deadlineMs: Math.max(1, deadlineAt - Date.now()) })
   }
   const server =

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 
 import { run as runCommand, workspaceRoot } from '../package/lib.mjs'
 
@@ -27,6 +28,40 @@ async function syncFile(source, destination, mode) {
   await mkdir(dirname(destination), { recursive: true })
   if (!(await sameBytes(source, destination))) await copyFile(source, destination)
   await chmod(destination, mode)
+}
+
+async function refreshPayloadDigest(manifestPath, fileName, payloadPath) {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.files = {
+    ...manifest.files,
+    [fileName]: createHash('sha256')
+      .update(await readFile(payloadPath))
+      .digest('hex')
+  }
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 })
+}
+
+export async function syncPortableNativeSources() {
+  const linuxSource = join(workspaceRoot, 'native/linux/runtime.py')
+  const linuxPayload = join(workspaceRoot, 'packages/platform-linux/assets/runtime.py')
+  const windowsSource = join(workspaceRoot, 'native/windows/runtime.ps1')
+  const windowsPayload = join(workspaceRoot, 'packages/platform-windows/assets/runtime.ps1')
+  await Promise.all([
+    syncFile(linuxSource, linuxPayload, 0o755),
+    syncFile(windowsSource, windowsPayload, 0o644)
+  ])
+  await Promise.all([
+    refreshPayloadDigest(
+      join(workspaceRoot, 'packages/platform-linux/assets/payload.json'),
+      'runtime.py',
+      linuxPayload
+    ),
+    refreshPayloadDigest(
+      join(workspaceRoot, 'packages/platform-windows/assets/payload.json'),
+      'runtime.ps1',
+      windowsPayload
+    )
+  ])
 }
 
 async function packageVersion(directory) {
@@ -222,5 +257,6 @@ export async function cleanCurrentNativeBuild(platform = process.platform) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await syncPortableNativeSources()
   await buildAndTestCurrentNative()
 }

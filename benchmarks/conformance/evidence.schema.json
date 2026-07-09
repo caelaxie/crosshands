@@ -24,6 +24,7 @@
     "normalizedErrorCode",
     "verificationState",
     "fixtureResetDigest",
+    "driverSha256",
     "privacy"
   ],
   "properties": {
@@ -45,7 +46,7 @@
     },
     "failureClass": { "type": "string" },
     "infrastructureCode": { "type": "string" },
-    "runnerEvidence": { "type": "string" },
+    "runnerEvidence": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "automaticRetryCount": { "type": "integer", "minimum": 0 },
     "oracleMatched": { "type": "boolean" },
     "normalizedResultDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -54,6 +55,7 @@
       "enum": ["verified", "indeterminate", "failed", "not-attempted", "observation"]
     },
     "fixtureResetDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "driverSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "privacy": {
       "type": "object",
       "additionalProperties": false,

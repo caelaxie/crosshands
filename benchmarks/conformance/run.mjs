@@ -6,6 +6,8 @@ import { access, appendFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
+import { validateDriverResponse } from './driver-response.mjs'
+
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((entries, value, index, values) => {
     if (value.startsWith('--') && values[index + 1] && !values[index + 1].startsWith('--')) {
@@ -26,6 +28,12 @@ await access(driver, constants.X_OK)
 
 const catalog = JSON.parse(await readFile(new URL('./catalog.v1.json', import.meta.url), 'utf8'))
 const manifest = JSON.parse(await readFile(resolve(args.manifest), 'utf8'))
+const driverSha256 = createHash('sha256')
+  .update(await readFile(driver))
+  .digest('hex')
+if (driverSha256 !== manifest.driverSha256) {
+  throw new Error('the conformance driver digest differs from the reviewed candidate manifest')
+}
 const output = resolve(args.output)
 await mkdir(dirname(output), { recursive: true })
 
@@ -41,6 +49,26 @@ function stableJson(value) {
 }
 
 const catalogDigest = `sha256:${createHash('sha256').update(stableJson(catalog)).digest('hex')}`
+const driverEnvironment = Object.fromEntries(
+  [
+    'PATH',
+    'HOME',
+    'DISPLAY',
+    'WAYLAND_DISPLAY',
+    'XDG_RUNTIME_DIR',
+    'XDG_SESSION_ID',
+    'XDG_SESSION_TYPE',
+    'DBUS_SESSION_BUS_ADDRESS',
+    'SECURITYSESSIONID',
+    'LOCALAPPDATA',
+    'USERPROFILE',
+    'SESSIONNAME',
+    'SystemRoot',
+    'WINDIR',
+    'TEMP',
+    'TMP'
+  ].flatMap((name) => (process.env[name] === undefined ? [] : [[name, process.env[name]]]))
+)
 const cellId = [
   manifest.matrixRole,
   manifest.osBuild,
@@ -67,18 +95,15 @@ for (const task of catalog.tasks) {
           adapter,
           repetition,
           attempt,
-          fixtureResetDigest: manifest.fixtureResetDigest
+          fixtureResetDigest: manifest.fixtureResetDigest,
+          driverSha256
         }
         const startedAt = new Date().toISOString()
         const started = performance.now()
         const result = spawnSync(driver, ['run'], {
           input: `${JSON.stringify(request)}\n`,
           encoding: 'utf8',
-          env: {
-            PATH: process.env.PATH ?? '',
-            HOME: process.env.HOME ?? '',
-            CROSSHANDS_CONFORMANCE: '1'
-          },
+          env: { ...driverEnvironment, CROSSHANDS_CONFORMANCE: '1' },
           timeout: 120_000,
           maxBuffer: 1024 * 1024,
           windowsHide: true
@@ -91,10 +116,7 @@ for (const task of catalog.tasks) {
         const lines = result.stdout.trim().split(/\r?\n/)
         if (lines.length !== 1)
           throw new Error('driver stdout must contain exactly one JSON response')
-        const response = JSON.parse(lines[0])
-        if (response.schemaVersion !== 'crosshands.conformance-driver-response/v1') {
-          throw new Error('driver returned an unsupported response schema')
-        }
+        const response = validateDriverResponse(JSON.parse(lines[0]), catalog)
         const record = {
           ...response,
           schemaVersion: 'crosshands.conformance-run/v1',

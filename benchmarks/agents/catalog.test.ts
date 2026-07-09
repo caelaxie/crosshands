@@ -26,6 +26,13 @@ describe('frozen reference-agent benchmark', () => {
     expect(() => validateAgentEvidence(evidence, definition)).not.toThrow()
   })
 
+  it('rejects a scored run produced against another candidate package set', async () => {
+    const definition = await loadBenchmarkDefinition()
+    const evidence = validAgentEvidence(definition, 'a'.repeat(64))
+    evidence.runs[0]!.candidateDigest = 'b'.repeat(64)
+    expect(() => validateAgentEvidence(evidence, definition)).toThrow(/frozen value/)
+  })
+
   it('assembles one privacy-safe fragment from each interactive agent runner', async () => {
     const definition = await loadBenchmarkDefinition()
     const evidence = validAgentEvidence(definition, 'a'.repeat(64))

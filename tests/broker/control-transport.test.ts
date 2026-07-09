@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CONTRACT_VERSIONS } from '../../packages/contract/src/index.js'
+import { CONTRACT_VERSIONS, createComputerError } from '../../packages/contract/src/index.js'
 import {
   LocalControlClient,
   LocalControlServer,
@@ -138,7 +138,7 @@ describe('local control transport', () => {
     let requests = 0
     options.handler = async (request) => {
       requests += 1
-      await new Promise<void>((resolve) => setTimeout(resolve, requests === 1 ? 40 : 0))
+      await new Promise<void>((resolve) => setTimeout(resolve, requests === 1 ? 200 : 0))
       return { echoed: request.payload }
     }
     const server = new LocalControlServer(options)
@@ -157,6 +157,33 @@ describe('local control transport', () => {
     })
     await expect(client.request({ next: true }, { deadlineMs: 1_000 })).resolves.toEqual({
       echoed: { next: true }
+    })
+    await client.close()
+  })
+
+  it('preserves actionable broker error metadata through control IPC', async () => {
+    const { options, tokenFile } = await fixture()
+    options.handler = async () => {
+      throw createComputerError('stale_target', 'Refresh the observed target', {
+        snapshotId: 'snapshot-1'
+      })
+    }
+    const server = new LocalControlServer(options)
+    servers.push(server)
+    await server.start()
+    const client = await LocalControlClient.connect({
+      endpoint: options.endpoint,
+      token: (await readFile(tokenFile, 'utf8')).trim(),
+      versions: CONTRACT_VERSIONS,
+      identity: options.identity,
+      maxFrameBytes: 2048
+    })
+
+    await expect(client.request({}, { deadlineMs: 1_000 })).rejects.toMatchObject({
+      code: 'stale_target',
+      retry: true,
+      remediation: 'refresh_state',
+      details: { snapshotId: 'snapshot-1' }
     })
     await client.close()
   })

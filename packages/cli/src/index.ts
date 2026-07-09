@@ -134,7 +134,6 @@ const ALLOWED: Record<string, readonly string[]> = {
     'app',
     'context',
     'text',
-    'text-stdin',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -344,24 +343,20 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const coordinates = ['from-x', 'from-y', 'to-x', 'to-y'].map((name) =>
         numberFlag(flags, name)
       )
-      const hasAnyCoordinate = coordinates.some((value) => value !== undefined)
-      const hasAnyElement = fromElement !== undefined || toElement !== undefined
-      if (hasAnyElement && hasAnyCoordinate)
-        throw new CliError('invalid_argument', 'Choose element indexes or coordinates for drag')
-      let from: unknown
-      let to: unknown
-      if (fromElement !== undefined && toElement !== undefined) {
-        from = { kind: 'element', elementIndex: fromElement }
-        to = { kind: 'element', elementIndex: toElement }
-      } else if (coordinates.every((value) => value !== undefined)) {
-        from = { kind: 'coordinate', x: coordinates[0], y: coordinates[1] }
-        to = { kind: 'coordinate', x: coordinates[2], y: coordinates[3] }
-      } else {
-        throw new CliError(
-          'invalid_argument',
-          'Drag requires a complete element or coordinate pair'
-        )
+      const endpoint = (
+        label: string,
+        element: number | undefined,
+        x: number | undefined,
+        y: number | undefined
+      ): unknown => {
+        if (element !== undefined && (x !== undefined || y !== undefined))
+          throw new CliError('invalid_argument', `Choose one selector for drag ${label}`)
+        if (element !== undefined) return { kind: 'element', elementIndex: element }
+        if (x !== undefined && y !== undefined) return { kind: 'coordinate', x, y }
+        throw new CliError('invalid_argument', `Drag ${label} requires an element or coordinates`)
       }
+      const from = endpoint('start', fromElement, coordinates[0], coordinates[1])
+      const to = endpoint('end', toElement, coordinates[2], coordinates[3])
       const durationMs = numberFlag(flags, 'duration-ms', { integer: true, min: 50 })
       return {
         ...common(),
@@ -419,7 +414,17 @@ function readiness(capabilities: unknown): string {
 async function runDoctor(client: CliBrokerClient): Promise<unknown> {
   const capabilities = await client.request('capabilities', {})
   const permissions = await client.request('permissions', {})
-  return { readiness: readiness(capabilities), checks: { capabilities, permissions } }
+  const capabilityResult =
+    capabilities !== null && typeof capabilities === 'object' && 'result' in capabilities
+      ? (capabilities as Record<string, unknown>).result
+      : capabilities
+  return { readiness: readiness(capabilityResult), checks: { capabilities, permissions } }
+}
+
+function publicBrokerResult(value: unknown): unknown {
+  if (value !== null && typeof value === 'object' && 'requestId' in value && 'result' in value)
+    return (value as Record<string, unknown>).result
+  return value
 }
 
 function serializedError(cause: unknown): Record<string, unknown> {
@@ -515,7 +520,9 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     const brokerResult =
       operation === 'doctor'
         ? await runDoctor(client)
-        : await client.request(operation, await operationInput(command, flags, io))
+        : publicBrokerResult(
+            await client.request(operation, await operationInput(command, flags, io))
+          )
     const result = structuredClone(brokerResult)
     const screenshotOutput = stringFlag(flags, 'screenshot-output')
     if (screenshotOutput !== undefined) await exportScreenshot(result, screenshotOutput)

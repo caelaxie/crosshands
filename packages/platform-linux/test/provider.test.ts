@@ -50,6 +50,32 @@ describe('Linux provider boundary', () => {
         button: 'right'
       })
     ).toMatchObject({ tool: 'click', app: 'Editor', x: 12, y: 34, click_count: 2 })
+
+    const process = {
+      pid: 42,
+      startedAt: '2026-07-10T00:00:00.000Z',
+      executableId: '/usr/bin/editor:1:2:boot:3'
+    }
+    expect(
+      mapNativeOperation('pressKey', {
+        contextToken: `ctx_${'a'.repeat(32)}`,
+        target: {
+          kind: 'window',
+          ref: 'linux:42:window:0',
+          contextToken: `ctx_${'a'.repeat(32)}`,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+          brokerGeneration: 'broker-1',
+          providerGeneration: 'provider-1',
+          graphicalSessionId: 'x11:1',
+          process,
+          appId: 'linux:42:Editor',
+          window: { id: 'linux:42:window:0', ownerPid: 42 },
+          snapshotId: 'snapshot-1',
+          desktopEpoch: 0
+        },
+        key: 'Enter'
+      })
+    ).toMatchObject({ tool: 'press_key', app: 'pid:42', expectedIdentity: process })
   })
 
   test.each([

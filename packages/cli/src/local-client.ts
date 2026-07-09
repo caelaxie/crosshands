@@ -115,6 +115,12 @@ function defaultSpawnBroker(entrypoint: string): void {
   child.unref()
 }
 
+function brokerIsAbsent(cause: unknown): boolean {
+  if (cause === null || typeof cause !== 'object') return false
+  const code = (cause as { code?: unknown }).code
+  return code === 'ENOENT' || code === 'ECONNREFUSED'
+}
+
 export async function createProductionBrokerClient(
   options: ProductionClientOptions = {}
 ): Promise<CliBrokerClient> {
@@ -123,7 +129,8 @@ export async function createProductionBrokerClient(
   try {
     const control = await connect(paths)
     return controlAdapter(control)
-  } catch {
+  } catch (cause) {
+    if (!brokerIsAbsent(cause)) throw cause
     const rawEntrypoint = options.entrypoint ?? process.argv[1]
     if (rawEntrypoint === undefined)
       throw createComputerError(

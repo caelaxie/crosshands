@@ -274,6 +274,14 @@ final class Provider {
         let windowId = try requestedWindowId(params)
         let windowIndex = try requestedWindowIndex(params)
         let app = try resolveApp(query)
+        if let expectedStartedAt = params["expectedProcessStartedAt"]?.string,
+           ISO8601DateFormatter().string(from: app.processStartedAt) != expectedStartedAt {
+            throw ProviderError.coded("window_stale", "target process changed before dispatch")
+        }
+        if let expectedExecutableId = params["expectedExecutableId"]?.string,
+           app.executableId != expectedExecutableId {
+            throw ProviderError.coded("window_stale", "target executable changed before dispatch")
+        }
         if params["restoreWindow"]?.bool == true {
             recoverWindow(app)
         }
@@ -642,7 +650,7 @@ final class Provider {
                     "y": Int(candidate.bounds.origin.y.rounded()),
                     "width": Int(candidate.bounds.width.rounded()),
                     "height": Int(candidate.bounds.height.rounded()),
-                    "isMinimized": false,
+                    "isMinimized": !candidate.isOnScreen,
                     "isOffscreen": !candidate.isOnScreen,
                     "screenIndex": jsonNullable(screenIndex(for: candidate.bounds)),
                     "isMain": NSNull(),
@@ -887,8 +895,8 @@ final class Provider {
         }
         let actual = rawStringAttribute(record.element, kAXValueAttribute as String)
         let verification = actual == expected
-            ? verifiedAction(property: "value", expected: expected, actualPreview: actual)
-            : unverifiedAction(reason: actual == nil ? "provider_unavailable" : "value_mismatch", expected: expected, actualPreview: actual)
+            ? verifiedAction(property: "value")
+            : unverifiedAction(reason: actual == nil ? "provider_unavailable" : "value_mismatch")
         return actionMetadata(path: "accessibility", actionName: "AXSetValue", verification: verification)
     }
 
@@ -996,7 +1004,8 @@ final class Provider {
             start = try coordinatePoint(params: params, xKey: "fromX", yKey: "fromY", snapshot: snapshot)
             end = try coordinatePoint(params: params, xKey: "toX", yKey: "toY", snapshot: snapshot)
         }
-        try Input.drag(pid: snapshot.app.pid, from: start, to: end)
+        let durationMs = try positiveNumber(params["durationMs"]?.number, defaultValue: 240, name: "durationMs")
+        try Input.drag(pid: snapshot.app.pid, from: start, to: end, durationMs: durationMs)
         return actionMetadata(path: "synthetic")
     }
 
@@ -2117,21 +2126,17 @@ private func actionMetadata(
     return metadata
 }
 
-private func verifiedAction(property: String, expected: String? = nil, actualPreview: String? = nil) -> [String: Any] {
+private func verifiedAction(property: String) -> [String: Any] {
     [
         "state": "verified",
         "property": property,
-        "expected": jsonNullable(expected),
-        "actualPreview": jsonNullable(actualPreview),
     ]
 }
 
-private func unverifiedAction(reason: String, expected: String? = nil, actualPreview: String? = nil) -> [String: Any] {
+private func unverifiedAction(reason: String) -> [String: Any] {
     [
         "state": "unverified",
         "reason": reason,
-        "expected": jsonNullable(expected),
-        "actualPreview": jsonNullable(actualPreview),
     ]
 }
 
@@ -2222,7 +2227,7 @@ private struct WindowCapture {
     }
 
     static func candidates(pid: pid_t) -> [WindowCandidate] {
-        guard let infos = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+        guard let infos = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
         return infos.compactMap { info in
@@ -2330,18 +2335,16 @@ private func boundedPngData(_ image: CGImage) -> BoundedPNG? {
         return BoundedPNG(data: data, width: image.width, height: image.height)
     }
     var scale = min(1, 1280 / CGFloat(max(image.width, image.height)))
-    var best = BoundedPNG(data: data, width: image.width, height: image.height)
     while scale >= 0.25 {
         guard let resized = resizePng(image, scale: scale) else {
             break
         }
-        best = resized
         if resized.data.count <= 900_000 {
             return resized
         }
         scale *= 0.85
     }
-    return best
+    return nil
 }
 
 private func resizePng(_ image: CGImage, scale: CGFloat) -> BoundedPNG? {
@@ -2384,7 +2387,7 @@ private enum Input {
         event.postToPid(pid)
     }
 
-    static func drag(pid: pid_t, from start: CGPoint, to end: CGPoint) throws {
+    static func drag(pid: pid_t, from start: CGPoint, to end: CGPoint, durationMs: Double) throws {
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
             throw ProviderError.coded("accessibility_error", "failed to create event source")
         }
@@ -2399,22 +2402,26 @@ private enum Input {
                 button: .left,
                 pid: pid
             )
+            Thread.sleep(forTimeInterval: durationMs / 10_000)
         }
         try mouse(.leftMouseUp, source: source, point: end, button: .left, pid: pid)
     }
 
     static func typeText(_ text: String, pid: pid_t) throws {
-        for unit in text.utf16 {
-            var char = unit
+        for character in text {
+            let units = Array(String(character).utf16)
             guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
                   let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
             else {
                 throw ProviderError.coded("accessibility_error", "failed to create keyboard event")
             }
-            down.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
-            up.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
-            down.post(tap: .cghidEventTap)
-            up.post(tap: .cghidEventTap)
+            units.withUnsafeBufferPointer { buffer in
+                guard let baseAddress = buffer.baseAddress else { return }
+                down.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
+                up.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
+            }
+            down.postToPid(pid)
+            up.postToPid(pid)
         }
     }
 
@@ -2467,7 +2474,7 @@ private enum Input {
             throw ProviderError.coded("accessibility_error", "failed to create key event")
         }
         event.flags = flags
-        event.post(tap: .cghidEventTap)
+        event.postToPid(pid)
     }
 }
 
@@ -2491,11 +2498,7 @@ private enum TextInput {
         guard rawStringAttribute(element, kAXValueAttribute as String) == next else {
             return nil
         }
-        return verifiedAction(
-            property: "focusedText",
-            expected: text,
-            actualPreview: preview(next)
-        )
+        return verifiedAction(property: "focusedText")
     }
 
     static func selectAll(_ element: AXUIElement) -> Bool {
@@ -2513,7 +2516,7 @@ private enum TextInput {
         else {
             return unverifiedAction(reason: "provider_unavailable")
         }
-        return verifiedAction(property: "selection", actualPreview: preview(current))
+        return verifiedAction(property: "selection")
     }
 
     private static func selectedTextRange(_ element: AXUIElement) -> CFRange? {
@@ -3613,6 +3616,17 @@ private final class SocketListener: @unchecked Sendable {
                 if !isStopped {
                     fputs("computer-use socket accept failed: \(String(cString: strerror(errno)))\n", stderr)
                 }
+                continue
+            }
+            var noSigPipe: Int32 = 1
+            guard setsockopt(
+                fd,
+                SOL_SOCKET,
+                SO_NOSIGPIPE,
+                &noSigPipe,
+                socklen_t(MemoryLayout<Int32>.size)
+            ) == 0 else {
+                close(fd)
                 continue
             }
             Thread.detachNewThread { [weak self] in

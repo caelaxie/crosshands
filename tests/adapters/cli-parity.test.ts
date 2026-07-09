@@ -323,6 +323,43 @@ describe('CrossHands JSON CLI', () => {
     expect(JSON.parse(state.stdout.join(''))).toMatchObject({ error: { code: errorCode } })
   })
 
+  it('unwraps production broker envelopes when computing doctor readiness', async () => {
+    const state = harness()
+    state.client.request = async (operation) => ({
+      requestId: `r-${operation}`,
+      result:
+        operation === 'capabilities'
+          ? {
+              operations: { click: true },
+              permissions: { accessibility: 'denied', screenshots: 'granted' }
+            }
+          : { permissions: { accessibility: 'denied' } }
+    })
+
+    await expect(runCli(['computer', 'doctor', '--json'], state.io, state.client)).resolves.toBe(0)
+    expect(JSON.parse(state.stdout.join(''))).toMatchObject({
+      readiness: 'operator_action_required'
+    })
+  })
+
+  it('never treats paste stdin as a secret-safe clipboard channel', async () => {
+    const state = harness()
+    let stdinReads = 0
+    state.io.stdin = async () => {
+      stdinReads += 1
+      return 'CANARY_SECRET'
+    }
+    await expect(
+      runCli(
+        ['computer', 'paste-text', '--context', `ctx_${'a'.repeat(32)}`, '--text-stdin'],
+        state.io,
+        state.client
+      )
+    ).resolves.toBe(2)
+    expect(stdinReads).toBe(0)
+    expect(state.calls).toHaveLength(0)
+  })
+
   it('auto-starts the protected broker seam and reaches the fake provider', async () => {
     const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-autostart-'))
     await chmod(runtimeDirectory, 0o700)
@@ -374,6 +411,39 @@ describe('CrossHands JSON CLI', () => {
     expect(starts).toBe(1)
     expect(provider.calls).toHaveLength(1)
     await client.close()
+    await server.close()
+  })
+
+  it('does not replace an authenticated broker after a rejected handshake', async () => {
+    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-rejected-'))
+    await chmod(runtimeDirectory, 0o700)
+    const identity = { osIdentity: 'uid:test', graphicalSessionId: 'session:test' }
+    const paths: LocalClientPaths = {
+      identity,
+      runtimeDirectory,
+      tokenFile: join(runtimeDirectory, 'control.token'),
+      endpoint: { transport: 'unix', address: join(runtimeDirectory, 'control.sock') }
+    }
+    const server = new LocalControlServer({
+      endpoint: paths.endpoint,
+      runtimeDirectory,
+      tokenFile: paths.tokenFile,
+      identity: { ...identity, graphicalSessionId: 'different-session' },
+      handler: async () => ({})
+    })
+    await server.start()
+    let starts = 0
+
+    await expect(
+      createProductionBrokerClient({
+        paths,
+        entrypoint: '/installed/crosshands',
+        spawnBroker: async () => {
+          starts += 1
+        }
+      })
+    ).rejects.toMatchObject({ code: 'peer_rejected' })
+    expect(starts).toBe(0)
     await server.close()
   })
 })

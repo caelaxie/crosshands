@@ -61,6 +61,7 @@ export interface CandidateManifest {
   permissionBaseline: Record<string, string>
   runnerImageSha256: string
   runnerBaselineSha256: string
+  driverSha256: string
   candidatePackageSetSha256: string
   packageDigests: Record<string, string>
   signerFingerprints: Record<string, string>
@@ -114,6 +115,7 @@ export interface ConformanceRunRecord {
   normalizedErrorCode: string | null
   verificationState: 'verified' | 'indeterminate' | 'failed' | 'not-attempted' | 'observation'
   fixtureResetDigest: string
+  driverSha256: string
   privacy: {
     rawAccessibilityRetained: false
     screenshotRetained: false
@@ -256,6 +258,7 @@ export function evaluateConformance(
       Object.keys(manifest.signerFingerprints).length === 0 ||
       !/^[a-f0-9]{64}$/.test(manifest.runnerImageSha256) ||
       !/^[a-f0-9]{64}$/.test(manifest.runnerBaselineSha256) ||
+      !/^[a-f0-9]{64}$/.test(manifest.driverSha256) ||
       !/^[a-f0-9]{64}$/.test(manifest.candidatePackageSetSha256)
     ) {
       recordFailure(
@@ -290,6 +293,14 @@ export function evaluateConformance(
         failures,
         'fixture-reset',
         `${record.runId} did not begin from the frozen oracle`,
+        scope
+      )
+    }
+    if (record.driverSha256 !== manifest?.driverSha256) {
+      recordFailure(
+        failures,
+        'driver-identity',
+        `${record.runId} used an unreviewed conformance driver`,
         scope
       )
     }

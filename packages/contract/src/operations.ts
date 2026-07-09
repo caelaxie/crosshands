@@ -25,12 +25,6 @@ const ContextWindowTargetSchema = z.object({ kind: z.literal('context-window') }
 const ElementIndexTargetSchema = z
   .object({ kind: z.literal('element'), elementIndex: z.number().int().nonnegative() })
   .strict()
-const MutationBaseShape = {
-  contextToken: InteractionContextTokenSchema,
-  app: AppQuerySchema.optional(),
-  target: z.union([TargetReferenceSchema, ContextWindowTargetSchema, ElementIndexTargetSchema]),
-  ...CaptureOptionsShape
-}
 const CoordinateTargetSchema = z
   .object({
     kind: z.literal('coordinate'),
@@ -42,6 +36,19 @@ const CoordinateTargetSchema = z
 const ElementTargetSchema = z
   .object({ kind: z.literal('element'), ref: TargetReferenceSchema })
   .strict()
+const ElementActionTargetSchema = z.union([ElementTargetSchema, ElementIndexTargetSchema])
+const ContextWindowMutationBaseShape = {
+  contextToken: InteractionContextTokenSchema,
+  app: AppQuerySchema.optional(),
+  target: ContextWindowTargetSchema,
+  ...CaptureOptionsShape
+}
+const ElementMutationBaseShape = {
+  contextToken: InteractionContextTokenSchema,
+  app: AppQuerySchema.optional(),
+  target: ElementActionTargetSchema,
+  ...CaptureOptionsShape
+}
 const ActionTargetSchema = z.union([
   ElementTargetSchema,
   ElementIndexTargetSchema,
@@ -105,7 +112,7 @@ export const COMPUTER_OPERATIONS = {
   },
   performSecondaryAction: {
     mutation: true,
-    input: z.object({ ...MutationBaseShape, action: z.string().min(1).max(256) }).strict(),
+    input: z.object({ ...ElementMutationBaseShape, action: z.string().min(1).max(256) }).strict(),
     output: MutationResultSchema
   },
   scroll: {
@@ -138,29 +145,38 @@ export const COMPUTER_OPERATIONS = {
   },
   typeText: {
     mutation: true,
-    input: z.object({ ...MutationBaseShape, text: z.string().max(1_000_000) }).strict(),
+    input: z
+      .object({ ...ContextWindowMutationBaseShape, text: z.string().max(1_000_000) })
+      .strict(),
     output: MutationResultSchema
   },
   pressKey: {
     mutation: true,
-    input: z.object({ ...MutationBaseShape, key: z.string().min(1).max(128) }).strict(),
+    input: z
+      .object({ ...ContextWindowMutationBaseShape, key: z.string().min(1).max(128) })
+      .strict(),
     output: MutationResultSchema
   },
   hotkey: {
     mutation: true,
     input: z
-      .object({ ...MutationBaseShape, keys: z.array(z.string().min(1).max(128)).min(2).max(5) })
+      .object({
+        ...ContextWindowMutationBaseShape,
+        keys: z.array(z.string().min(1).max(128)).min(2).max(5)
+      })
       .strict(),
     output: MutationResultSchema
   },
   pasteText: {
     mutation: true,
-    input: z.object({ ...MutationBaseShape, text: z.string().max(1_000_000) }).strict(),
+    input: z
+      .object({ ...ContextWindowMutationBaseShape, text: z.string().max(1_000_000) })
+      .strict(),
     output: MutationResultSchema
   },
   setValue: {
     mutation: true,
-    input: z.object({ ...MutationBaseShape, value: z.string().max(1_000_000) }).strict(),
+    input: z.object({ ...ElementMutationBaseShape, value: z.string().max(1_000_000) }).strict(),
     output: MutationResultSchema
   }
 } as const

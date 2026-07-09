@@ -11,6 +11,7 @@ revalidated without operation files or secrets in command-line arguments.
 """
 
 import base64
+import datetime
 import json
 import math
 import os
@@ -20,6 +21,11 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
+
+
+class PostDispatchError(RuntimeError):
+    pass
+
 
 try:
     import gi
@@ -388,6 +394,38 @@ def find_app(query):
             reject_blocked_app(app)
             return app
     raise RuntimeError(f'appNotFound("{query}")')
+
+
+def assert_expected_process_identity(app, expected):
+    if not expected:
+        return
+    actual_pid = pid_of(app)
+    if actual_pid != int(expected.get("pid", 0)):
+        raise RuntimeError("stale_target: target process changed before dispatch")
+    proc = f"/proc/{actual_pid}"
+    try:
+        executable = os.readlink(f"{proc}/exe")
+        executable_stat = os.stat(f"{proc}/exe")
+        process_stat = os.stat(proc)
+        with open(f"{proc}/stat", "r", encoding="utf-8") as handle:
+            fields = handle.read().rsplit(")", 1)[1].strip().split()
+        with open("/proc/sys/kernel/random/boot_id", "r", encoding="utf-8") as handle:
+            boot_id = handle.read().strip()
+        start_ticks = fields[19]
+        started_at = datetime.datetime.fromtimestamp(
+            process_stat.st_ctime, datetime.timezone.utc
+        ).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        executable_id = (
+            f"{executable}:{executable_stat.st_dev}:{executable_stat.st_ino}:"
+            f"{boot_id}:{start_ticks}"
+        )
+    except (OSError, IndexError, ValueError) as error:
+        raise RuntimeError("stale_target: target process identity is unavailable") from error
+    if (
+        started_at != expected.get("startedAt")
+        or executable_id != expected.get("executableId")
+    ):
+        raise RuntimeError("stale_target: target process changed before dispatch")
 
 
 def reject_blocked_app(app):
@@ -1031,14 +1069,15 @@ def scroll_at(x, y, direction, pages):
         Atspi.generate_mouse_event(round(x), round(y), up)
 
 
-def drag_between(start, end):
+def drag_between(start, end, duration_ms=240):
+    duration_ms = min(30_000, require_positive_number(duration_ms, "duration_ms"))
     Atspi.generate_mouse_event(round(start[0]), round(start[1]), "abs")
     Atspi.generate_mouse_event(round(start[0]), round(start[1]), "b1p")
     for step in range(1, 13):
         x = start[0] + (end[0] - start[0]) * step / 12
         y = start[1] + (end[1] - start[1]) * step / 12
         Atspi.generate_mouse_event(round(x), round(y), "abs")
-        time.sleep(0.02)
+        time.sleep(duration_ms / 12 / 1000)
     Atspi.generate_mouse_event(round(end[0]), round(end[1]), "b1r")
 
 
@@ -1187,6 +1226,7 @@ def run_operation(operation):
         }
 
     app = find_app(operation.get("app", ""))
+    assert_expected_process_identity(app, operation.get("expectedIdentity"))
     _, window = choose_window(app, operation.get("windowId"), operation.get("windowIndex"))
     if operation.get("restoreWindow"):
         restore_window(app, window)
@@ -1245,6 +1285,7 @@ def run_operation(operation):
         drag_between(
             screen_point(bounds, operation.get("fromElement"), operation.get("from_x"), operation.get("from_y"), from_node),
             screen_point(bounds, operation.get("toElement"), operation.get("to_x"), operation.get("to_y"), to_node),
+            operation.get("duration_ms", 240),
         )
         action = {"path": "synthetic", "actionName": "drag", "fallbackReason": None}
     elif tool == "type_text":
@@ -1275,11 +1316,14 @@ def run_operation(operation):
             operation.get("windowId"),
             operation.get("windowIndex"),
         )
-    except Exception:
+    except Exception as exc:
         if operation.get("windowId") is None and operation.get("windowIndex") is None:
-            raise
+            raise PostDispatchError(str(exc)) from exc
         action.setdefault("verification", {"state": "unverified", "reason": "window_changed"})
-        snapshot = make_snapshot(operation.get("app", ""), include_screenshot, None, None)
+        try:
+            snapshot = make_snapshot(operation.get("app", ""), include_screenshot, None, None)
+        except Exception as fallback_exc:
+            raise PostDispatchError(str(fallback_exc)) from fallback_exc
 
     return {"ok": True, "action": action, "snapshot": snapshot}
 
@@ -1321,7 +1365,13 @@ def handle_frame(frame):
         result = run_operation(operation)
         return {"type": "response", "requestId": request_id, "ok": True, "result": result}
     except Exception as exc:
-        return {"type": "response", "requestId": request_id, "ok": False, "error": str(exc)}
+        return {
+            "type": "response",
+            "requestId": request_id,
+            "ok": False,
+            "error": str(exc),
+            "dispatched": isinstance(exc, PostDispatchError),
+        }
 
 
 def main():

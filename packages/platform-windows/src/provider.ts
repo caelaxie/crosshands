@@ -122,7 +122,7 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
     child.stderr.on('data', (chunk: string) => {
       if (stderr.length < 8_192) stderr += chunk.slice(0, 8_192 - stderr.length)
     })
-    child.once('error', (cause) => this.#fail(cause))
+    child.once('error', (cause) => this.#fail(cause, child))
     child.once('exit', (code) =>
       this.#fail(
         createComputerError(
@@ -131,7 +131,8 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
           {
             stderr
           }
-        )
+        ),
+        child
       )
     )
     return this.#ready
@@ -148,6 +149,12 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
         const timer = setTimeout(
           () => {
             this.#active = undefined
+            if (this.#child === child) {
+              this.#child = undefined
+              this.#ready = undefined
+              this.#resolveReady = undefined
+              this.#rejectReady = undefined
+            }
             child.kill()
             rejectFrame(createComputerError('timeout', 'Windows provider request timed out'))
           },
@@ -156,7 +163,7 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
         timer.unref()
         this.#active = { resolve: resolveFrame, reject: rejectFrame, timer }
         child.stdin.write(`${JSON.stringify(payload)}\n`, 'utf8', (cause) => {
-          if (cause !== null && cause !== undefined) this.#fail(cause)
+          if (cause !== null && cause !== undefined) this.#fail(cause, child)
         })
       })
     })
@@ -174,6 +181,9 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
   async close(): Promise<void> {
     const child = this.#child
     this.#child = undefined
+    this.#ready = undefined
+    this.#resolveReady = undefined
+    this.#rejectReady = undefined
     child?.stdin.end()
     child?.kill()
   }
@@ -207,7 +217,10 @@ export class PowerShellStdioTransport implements NativeWindowsTransport {
     active.resolve(frame)
   }
 
-  #fail(cause: unknown): void {
+  #fail(cause: unknown, source?: ChildProcessWithoutNullStreams): void {
+    if (source !== undefined && this.#child !== source) return
+    this.#child = undefined
+    this.#ready = undefined
     const rejectReady = this.#rejectReady
     this.#resolveReady = undefined
     this.#rejectReady = undefined
@@ -582,6 +595,7 @@ export class WindowsComputerProvider implements ComputerProvider {
       from_y: from.y,
       to_x: to.x,
       to_y: to.y,
+      duration_ms: input.durationMs,
       click_count: input.clickCount,
       mouse_button: input.button,
       action: input.action,

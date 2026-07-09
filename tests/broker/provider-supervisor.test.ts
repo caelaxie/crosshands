@@ -62,4 +62,47 @@ describe('provider supervision', () => {
       remediation: 'upgrade_or_downgrade'
     })
   })
+
+  it('retires and closes a provider generation before a timed-out dispatch returns', async () => {
+    class RetiringProvider extends FakeComputerProvider {
+      closeCalls = 0
+
+      override async close(): Promise<void> {
+        this.closeCalls += 1
+        await super.close()
+      }
+    }
+    const timedOut = new RetiringProvider({
+      generation: 'provider-1',
+      graphicalSessionId: 'session-1'
+    }).enqueue({ kind: 'barrier', name: 'blocked' })
+    const replacement = new RetiringProvider({
+      generation: 'provider-2',
+      graphicalSessionId: 'session-1'
+    }).enqueue({ kind: 'result', result: {}, dispatched: false })
+    const providers = [timedOut, replacement]
+    const supervisor = new ProviderSupervisor({
+      providerFactory: () => providers.shift()!,
+      graphicalSessionId: 'session-1'
+    })
+
+    await expect(
+      supervisor.dispatch({
+        requestId: 'timeout-1',
+        operation: 'getAppState',
+        input: {},
+        deadlineAt: Date.now() + 5
+      })
+    ).rejects.toMatchObject({ code: 'timeout' })
+    expect(timedOut.closeCalls).toBe(1)
+    await expect(
+      supervisor.dispatch({
+        requestId: 'replacement-1',
+        operation: 'capabilities',
+        input: {},
+        deadlineAt: Date.now() + 1_000
+      })
+    ).resolves.toMatchObject({ requestId: 'replacement-1' })
+    expect(supervisor.generation).toBe('provider-2')
+  })
 })

@@ -5,6 +5,7 @@ import {
   InteractionContextStore,
   createComputerError,
   negotiateVersionHandshake,
+  parseOperationOutput,
   type ComputerOperationName,
   type ContractVersions,
   type InteractionContext,
@@ -74,6 +75,14 @@ class SerialQueue {
 
 function isMutation(operation: ComputerOperationName): boolean {
   return COMPUTER_OPERATIONS[operation].mutation
+}
+
+function assertedInputApp(input: unknown): void {
+  if (input === null || typeof input !== 'object') return
+  const app = (input as { app?: unknown }).app
+  if (typeof app === 'string' && app.length > 0) {
+    assertAppAllowed({ appId: app, executableId: app })
+  }
 }
 
 function targetReference(input: unknown): TargetReference | undefined {
@@ -290,10 +299,9 @@ export class LocalBroker {
     const requestId = `broker-${++this.#requestSequence}`
     const deadlineAt = this.#now() + (request.deadlineMs ?? 30_000)
     const mutation = isMutation(request.operation)
-    const inspection = await this.#inspectTarget?.(request.operation, request.input)
-    if (inspection !== undefined && inspection !== null) assertAppAllowed(inspection.appIdentity)
-
-    let providerInput = request.input
+    assertedInputApp(request.input)
+    let context: InteractionContext | undefined
+    let inspectionInput = request.input
     if (mutation) {
       const token = contextToken(request.input)
       if (token === undefined) {
@@ -302,17 +310,27 @@ export class LocalBroker {
           'Mutation requires a context token and target'
         )
       }
+      context = this.#contexts.resolve(token)
+      // Context-window and index shorthand do not carry an identity until the
+      // broker binds them. Inspect the bound form so native providers can
+      // re-resolve the exact process/window before dispatch.
+      inspectionInput = normalizeMutationInput(request.input, context, context)
+    }
+    const inspection = await this.#inspectTarget?.(request.operation, inspectionInput)
+    if (inspection !== undefined && inspection !== null) assertAppAllowed(inspection.appIdentity)
+
+    let providerInput = request.input
+    if (mutation) {
       if (inspection === undefined || inspection === null) {
         throw createComputerError('stale_target', 'Target identity could not be re-resolved')
       }
-      const context = this.#contexts.resolve(token)
-      providerInput = normalizeMutationInput(request.input, context, inspection.bindings)
+      providerInput = normalizeMutationInput(request.input, context!, inspection.bindings)
       const references = mutationReferences(providerInput)
       if (references.length === 0) {
         throw createComputerError('invalid_argument', 'Mutation requires a target selector')
       }
       for (const reference of references) {
-        assertFreshReference(reference, context, inspection.bindings, this.#now())
+        assertFreshReference(reference, context!, inspection.bindings, this.#now())
       }
     }
 
@@ -336,14 +354,14 @@ export class LocalBroker {
             : providerResponse.result
         const response = {
           requestId,
-          result,
+          result: this.#publicResult(request.operation, result),
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
         await this.#publish?.(response)
         return response
       }
-      return this.#observationResponse(requestId, providerResponse.result)
+      return this.#observationResponse(requestId, request.operation, providerResponse.result)
     } catch (cause) {
       const error = computerError(cause)
       if (!mutation && error.code === 'provider_crashed') {
@@ -356,14 +374,16 @@ export class LocalBroker {
           deadlineAt
         })
         if ('error' in retry) throw Object.assign(new Error(retry.error.message), retry.error)
-        return this.#observationResponse(requestId, retry.result)
+        return this.#observationResponse(requestId, request.operation, retry.result)
       }
       if (mutation && (error.code === 'provider_crashed' || error.code === 'timeout')) {
         this.#desktopEpoch += 1
         this.#contexts.invalidateAll()
         const response = {
           requestId,
-          result: { outcome: { state: 'indeterminate', reason: error.message } },
+          result: this.#publicResult(request.operation, {
+            outcome: { state: 'indeterminate', reason: error.message }
+          }),
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
@@ -374,17 +394,46 @@ export class LocalBroker {
     }
   }
 
-  #observationResponse(requestId: string, result: unknown): BrokerResponse {
+  #observationResponse(
+    requestId: string,
+    operation: ComputerOperationName,
+    result: unknown
+  ): BrokerResponse {
     let context: InteractionContext | undefined
-    if (result !== null && typeof result === 'object' && 'bindings' in result) {
-      context = this.issueContext((result as { bindings: ReferenceBindings }).bindings)
-    }
+    const publicResult = this.#publicResult(operation, result)
+    if (publicResult !== null && typeof publicResult === 'object' && 'context' in publicResult)
+      context = (publicResult as { context: InteractionContext }).context
     return {
       requestId,
-      result,
+      result: publicResult,
       desktopEpoch: this.#desktopEpoch,
       providerGeneration: this.#supervisor.generation ?? 'unknown',
       ...(context === undefined ? {} : { context })
     }
+  }
+
+  #publicResult(operation: ComputerOperationName, result: unknown): unknown {
+    if (result === null || typeof result !== 'object')
+      return parseOperationOutput(operation, result)
+    const value = result as Record<string, unknown>
+    let publicResult: Record<string, unknown> = value
+    if ('bindings' in value) {
+      const { bindings, ...snapshot } = value
+      publicResult = { ...snapshot, context: this.issueContext(bindings as ReferenceBindings) }
+    } else if (
+      value.freshState !== null &&
+      typeof value.freshState === 'object' &&
+      'bindings' in value.freshState
+    ) {
+      const { bindings, ...freshState } = value.freshState as Record<string, unknown>
+      publicResult = {
+        ...value,
+        freshState: {
+          ...freshState,
+          context: this.issueContext(bindings as ReferenceBindings)
+        }
+      }
+    }
+    return parseOperationOutput(operation, publicResult)
   }
 }

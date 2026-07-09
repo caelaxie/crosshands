@@ -25,7 +25,7 @@ Window-manager states (multiple monitors, negative origins, mixed scaling, minim
 
 ## Evidence rules
 
-The platform driver protocol is intentionally external to the package under test. `run.mjs` refuses to run without an absolute executable supplied by the dedicated runner and records every attempt immediately. The driver must return only normalized digests, semantic assertion state, error/outcome classification, retry count, and privacy attestations. Raw accessibility text, screenshots, clipboard data, window titles, literal input, and canary values are forbidden in retained evidence.
+The platform driver protocol is intentionally external to the package under test. `run.mjs` refuses to run without an absolute executable supplied by the dedicated runner, verifies its SHA-256 against the reviewed digest frozen in each candidate manifest, and records every attempt immediately. The driver must return only normalized digests, semantic assertion state, error/outcome classification, retry count, and privacy attestations. Raw accessibility text, screenshots, clipboard data, window titles, literal input, and canary values are forbidden in retained evidence. The release owner reviews the exact driver digest as part of the runner trust root; a driver-provided classification alone is never evidence that another driver binary was reviewed.
 
 Any identity/peer boundary failure, canary leak, sensitive-target exposure, payload-integrity failure, unsigned required artifact, MCP stdout corruption, human-only boundary bypass, rollback failure, or claimed success without a matching oracle rejects the release regardless of score. Result, error, and verification-state digests must match between broker, CLI, and MCP for an equivalent reset repetition.
 

@@ -62,7 +62,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: crosshands-release-${{ inputs.operation }}
+  group: crosshands-release-${{ inputs.operation == 'candidate' && inputs.version || 'default-channel' }}
   cancel-in-progress: false
 
 env:
@@ -441,7 +441,7 @@ jobs:
       - name: Validate aggregate signed-manifest input
         run: corepack pnpm release:validate
 
-      - name: Refuse an existing immutable package version
+      - name: Verify new or byte-identical immutable package versions
         shell: bash
         run: |
           while IFS= read -r -d '' archive; do
@@ -449,8 +449,10 @@ jobs:
             version="$(tar -xOf "$archive" package/package.json | jq -r .version)"
             test "$version" = "$RELEASE_VERSION"
             if npm view "$name@$version" version --registry "$NPM_REGISTRY_URL" >/dev/null 2>&1; then
-              echo "$name@$version already exists; candidates are immutable" >&2
-              exit 1
+              local_integrity="$(node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFileSync } from "node:fs"; process.stdout.write(`sha512-${createHash("sha512").update(readFileSync(process.argv[1])).digest("base64")}`)' "$archive")"
+              remote_integrity="$(npm view "$name@$version" dist.integrity --registry "$NPM_REGISTRY_URL")"
+              test "$local_integrity" = "$remote_integrity"
+              echo "$name@$version already exists with the signed candidate bytes; resuming"
             fi
           done < <(find artifacts/packages -type f -name '*.tgz' -print0)
 
@@ -461,7 +463,12 @@ jobs:
             while IFS= read -r -d '' archive; do
               name="$(tar -xOf "$archive" package/package.json | jq -r .name)"
               if [ "$name" != crosshands ]; then
-                npm publish "$archive" --registry "$NPM_REGISTRY_URL" --tag "$CANDIDATE_TAG"
+                version="$(tar -xOf "$archive" package/package.json | jq -r .version)"
+                if npm view "$name@$version" version --registry "$NPM_REGISTRY_URL" >/dev/null 2>&1; then
+                  npm dist-tag add "$name@$version" "$CANDIDATE_TAG" --registry "$NPM_REGISTRY_URL"
+                else
+                  npm publish "$archive" --registry "$NPM_REGISTRY_URL" --tag "$CANDIDATE_TAG"
+                fi
               fi
             done
 
@@ -475,7 +482,12 @@ jobs:
             fi
           done < <(find artifacts/packages -type f -name '*.tgz' -print0)
           test -n "$main_archive"
-          npm publish "$main_archive" --registry "$NPM_REGISTRY_URL" --tag "$CANDIDATE_TAG"
+          main_version="$(tar -xOf "$main_archive" package/package.json | jq -r .version)"
+          if npm view "crosshands@$main_version" version --registry "$NPM_REGISTRY_URL" >/dev/null 2>&1; then
+            npm dist-tag add "crosshands@$main_version" "$CANDIDATE_TAG" --registry "$NPM_REGISTRY_URL"
+          else
+            npm publish "$main_archive" --registry "$NPM_REGISTRY_URL" --tag "$CANDIDATE_TAG"
+          fi
 
       - name: Record and verify registry integrity
         shell: bash

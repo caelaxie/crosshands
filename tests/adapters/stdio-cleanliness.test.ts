@@ -80,7 +80,8 @@ describe('CrossHands MCP stdio entrypoint', () => {
       expect(tools.tools).toHaveLength(14)
       const response = await client.callTool({ name: 'listApps', arguments: {} })
       expect(response.structuredContent).toMatchObject({
-        result: { applicationText: 'screen-secret-canary' }
+        apps: [],
+        applicationText: 'screen-secret-canary'
       })
       await client.callTool({
         name: 'typeText',

@@ -22,6 +22,8 @@ export type LocalControlIdentity = {
   graphicalSessionId: string
 }
 
+const CONTROL_RESPONSE_GRACE_MS = 100
+
 export type LocalControlHandshake = {
   type: 'handshake'
   requestId: string
@@ -105,8 +107,27 @@ async function writeAtomicToken(path: string, token: string): Promise<void> {
   await chmod(path, 0o600)
 }
 
-function errorMessage(requestId: string | undefined, code: string, message: string): object {
-  return { type: 'error', requestId: requestId ?? '', code, message }
+function errorMessage(
+  requestId: string | undefined,
+  code: string,
+  message: string,
+  metadata: { retry?: boolean; remediation?: string; details?: unknown } = {}
+): object {
+  return { type: 'error', requestId: requestId ?? '', code, message, ...metadata }
+}
+
+function errorMetadata(cause: unknown): {
+  retry?: boolean
+  remediation?: string
+  details?: unknown
+} {
+  if (cause === null || typeof cause !== 'object') return {}
+  const value = cause as { retry?: unknown; remediation?: unknown; details?: unknown }
+  return {
+    ...(typeof value.retry === 'boolean' ? { retry: value.retry } : {}),
+    ...(typeof value.remediation === 'string' ? { remediation: value.remediation } : {}),
+    ...(value.details === undefined ? {} : { details: value.details })
+  }
 }
 
 export class LocalControlServer {
@@ -250,7 +271,12 @@ export class LocalControlServer {
     if (!versions.ok) {
       this.#sendAndClose(
         socket,
-        errorMessage(handshake.requestId, versions.error.code, versions.error.message)
+        errorMessage(
+          handshake.requestId,
+          versions.error.code,
+          versions.error.message,
+          versions.error
+        )
       )
       return false
     }
@@ -302,7 +328,7 @@ export class LocalControlServer {
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(createComputerError('timeout', 'Control request deadline elapsed')),
-          (message.deadlineAt as number) - this.#now()
+          (message.deadlineAt as number) - this.#now() + CONTROL_RESPONSE_GRACE_MS
         )
         timer.unref()
       })
@@ -318,7 +344,8 @@ export class LocalControlServer {
         errorMessage(
           message.requestId,
           code,
-          cause instanceof Error ? cause.message : 'Request failed'
+          cause instanceof Error ? cause.message : 'Request failed',
+          errorMetadata(cause)
         )
       )
     } finally {
@@ -427,7 +454,7 @@ export class LocalControlClient {
         deadlineAt: Date.now() + options.deadlineMs,
         payload
       },
-      Math.max(0, options.deadlineMs)
+      Math.max(0, options.deadlineMs) + CONTROL_RESPONSE_GRACE_MS
     )
   }
 
@@ -435,7 +462,7 @@ export class LocalControlClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(requestId)
-        reject(Object.assign(new Error('Control request timed out'), { code: 'timeout' }))
+        reject(createComputerError('timeout', 'Control request timed out'))
       }, timeoutMs)
       timer.unref()
       this.#pending.set(requestId, { resolve, reject, timer })
@@ -458,7 +485,14 @@ export class LocalControlClient {
     this.#pending.delete(message.requestId)
     clearTimeout(pending.timer)
     if (message.type === 'error') {
-      pending.reject(Object.assign(new Error(String(message.message)), { code: message.code }))
+      pending.reject(
+        Object.assign(new Error(String(message.message)), {
+          code: message.code,
+          retry: message.retry,
+          remediation: message.remediation,
+          ...(message.details === undefined ? {} : { details: message.details })
+        })
+      )
     } else if (message.type === 'response') {
       pending.resolve(message.result)
     } else if (message.type === 'handshake-ok') {

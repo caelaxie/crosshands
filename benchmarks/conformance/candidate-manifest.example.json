@@ -33,6 +33,7 @@
   },
   "runnerImageSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
   "runnerBaselineSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+  "driverSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
   "candidatePackageSetSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
   "packageDigests": {
     "crosshands": "sha256:REPLACE_WITH_64_HEX_CHARACTERS",

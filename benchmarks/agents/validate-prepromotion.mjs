@@ -63,8 +63,12 @@ export function validatePrepromotionEvidence({
     if (cell.candidatePackageSetSha256 !== packageSet) {
       throw new Error(`${frozen.id} tested another candidate`)
     }
-    if (!cell.osBuild || !/^[a-f0-9]{64}$/.test(cell.runnerImageSha256 ?? '')) {
-      throw new Error(`${frozen.id} did not freeze an exact build and runner image digest`)
+    if (
+      !cell.osBuild ||
+      !/^[a-f0-9]{64}$/.test(cell.runnerImageSha256 ?? '') ||
+      !/^[a-f0-9]{64}$/.test(cell.driverSha256 ?? '')
+    ) {
+      throw new Error(`${frozen.id} did not freeze exact build, runner, and driver digests`)
     }
     if (cell.exclusions.length !== 0) {
       throw new Error(`${frozen.id} contains an unreviewed exclusion`)
@@ -137,19 +141,13 @@ export function validatePrepromotionEvidence({
   }
 }
 
-async function main() {
-  const definition = await loadBenchmarkDefinition()
-  const [combined, conformanceEnvelope, agentEnvelope, manifest, signature, publicKeyText] =
-    await Promise.all([
-      readFile('external-evidence/combined/release-evidence.json', 'utf8').then(JSON.parse),
-      readFile('external-evidence/conformance/conformance-evidence.json', 'utf8').then(JSON.parse),
-      readFile('external-evidence/agents/agent-evidence.json', 'utf8').then(JSON.parse),
-      readFile('artifacts/release/release-manifest.json', 'utf8').then(JSON.parse),
-      readFile('external-evidence/combined/release-evidence.sig', 'utf8'),
-      readFile('release-evidence.pub', 'utf8')
-    ])
-  const publicKey = createPublicKey(publicKeyText)
-  if (signerFingerprint(publicKey) !== process.env.RELEASE_EVIDENCE_SIGNER_FINGERPRINT) {
+export function verifyPrepromotionSignature({
+  combined,
+  signature,
+  publicKey,
+  expectedFingerprint
+}) {
+  if (signerFingerprint(publicKey) !== expectedFingerprint) {
     throw new Error('combined release-evidence signer fingerprint changed')
   }
   if (
@@ -162,6 +160,26 @@ async function main() {
   ) {
     throw new Error('combined release-evidence signature is invalid')
   }
+}
+
+async function main() {
+  const definition = await loadBenchmarkDefinition()
+  const [combined, conformanceEnvelope, agentEnvelope, manifest, signature, publicKeyText] =
+    await Promise.all([
+      readFile('external-evidence/combined/release-evidence.json', 'utf8').then(JSON.parse),
+      readFile('external-evidence/conformance/conformance-evidence.json', 'utf8').then(JSON.parse),
+      readFile('external-evidence/agents/agent-evidence.json', 'utf8').then(JSON.parse),
+      readFile('artifacts/release/release-manifest.json', 'utf8').then(JSON.parse),
+      readFile('external-evidence/combined/release-evidence.sig', 'utf8'),
+      readFile('release-evidence.pub', 'utf8')
+    ])
+  const publicKey = createPublicKey(publicKeyText)
+  verifyPrepromotionSignature({
+    combined,
+    signature,
+    publicKey,
+    expectedFingerprint: process.env.RELEASE_EVIDENCE_SIGNER_FINGERPRINT
+  })
   validatePrepromotionEvidence({
     combined,
     conformanceEnvelope,

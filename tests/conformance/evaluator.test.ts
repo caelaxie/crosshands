@@ -55,6 +55,7 @@ function manifests(): CandidateManifest[] {
       permissionBaseline: { accessibility: 'granted' },
       runnerImageSha256: '5'.repeat(64),
       runnerBaselineSha256: '6'.repeat(64),
+      driverSha256: '8'.repeat(64),
       candidatePackageSetSha256: '7'.repeat(64),
       packageDigests: { crosshands: digest({ package: matrixRole }) },
       signerFingerprints: { crosshands: 'fixture-signer' },
@@ -93,6 +94,7 @@ function records(candidates: CandidateManifest[]): ConformanceRunRecord[] {
         normalizedErrorCode: null,
         verificationState: 'observation' as const,
         fixtureResetDigest: manifest.fixtureResetDigest,
+        driverSha256: manifest.driverSha256,
         privacy: {
           rawAccessibilityRetained: false as const,
           screenshotRetained: false as const,
@@ -138,6 +140,15 @@ describe('conformance evidence evaluator', () => {
     expect(evaluation.failures).toContainEqual(expect.objectContaining({ code: 'automatic-retry' }))
   })
 
+  it('rejects records produced by a different conformance driver', () => {
+    const candidates = manifests()
+    const evidence = records(candidates)
+    evidence[0] = { ...evidence[0]!, driverSha256: '9'.repeat(64) }
+    const evaluation = evaluateConformance(candidates, evidence, catalog)
+    expect(evaluation.accepted).toBe(false)
+    expect(evaluation.failures).toContainEqual(expect.objectContaining({ code: 'driver-identity' }))
+  })
+
   it('retains a predeclared infrastructure invalidation and requires a replacement attempt', () => {
     const candidates = manifests()
     const evidence = records(candidates)
@@ -147,7 +158,7 @@ describe('conformance evidence evaluator', () => {
       attempt: 2,
       classification: 'infrastructure-invalidated',
       infrastructureCode: 'host-power-loss',
-      runnerEvidence: 'runner-controller-event:123',
+      runnerEvidence: `sha256:${'a'.repeat(64)}`,
       oracleMatched: false
     })
     const evaluation = evaluateConformance(candidates, evidence, catalog)

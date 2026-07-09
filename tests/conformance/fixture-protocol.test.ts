@@ -28,9 +28,9 @@ describe('platform fixture sources', () => {
     const schema = JSON.parse(await readFile(new URL('oracle.schema.json', root), 'utf8')) as {
       properties: Record<string, unknown>
     }
-    expect(Object.keys(schema.properties)).not.toEqual(
-      expect.arrayContaining(['text', 'literalInput', 'clipboard', 'secureValue', 'canary'])
-    )
+    for (const forbidden of ['text', 'literalInput', 'clipboard', 'secureValue', 'canary']) {
+      expect(schema.properties).not.toHaveProperty(forbidden)
+    }
     expect(Object.keys(schema.properties)).toContain('ordinaryTextDigest')
   })
 })

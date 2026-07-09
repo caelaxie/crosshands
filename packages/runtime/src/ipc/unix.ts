@@ -47,6 +47,20 @@ async function rejectPrecreatedEndpoint(endpoint: string): Promise<void> {
   }
 }
 
+async function removeVerifiedStaleEndpoint(endpoint: string, uid: number): Promise<void> {
+  let info
+  try {
+    info = await lstat(endpoint)
+  } catch (cause) {
+    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return
+    throw cause
+  }
+  if (!info.isSocket() || info.uid !== uid || (info.mode & 0o077) !== 0) {
+    throw new Error('Stale broker endpoint is unsafe to remove')
+  }
+  await unlink(endpoint)
+}
+
 export async function acquireUnixLease(options: UnixLeaseOptions): Promise<UnixLease> {
   const uid = process.getuid?.()
   if (uid === undefined) throw new Error('Unix lease is unsupported on this platform')
@@ -55,11 +69,17 @@ export async function acquireUnixLease(options: UnixLeaseOptions): Promise<UnixL
     stopAt: options.runtimeDirectory
   })
   const leasePath = `${options.endpoint}.lease`
-  await rejectPrecreatedEndpoint(options.endpoint)
 
   let handle
   try {
     handle = await open(leasePath, 'wx', 0o600)
+    try {
+      await rejectPrecreatedEndpoint(options.endpoint)
+    } catch (cause) {
+      await handle.close()
+      await unlink(leasePath)
+      throw cause
+    }
   } catch (cause) {
     if (!(cause instanceof Error && 'code' in cause && cause.code === 'EEXIST')) throw cause
     let stale = false
@@ -70,8 +90,8 @@ export async function acquireUnixLease(options: UnixLeaseOptions): Promise<UnixL
       throw new Error('Existing broker lease is unverifiable', { cause: parseCause })
     }
     if (!stale) throw new Error('A compatible broker lease is already active', { cause })
+    await removeVerifiedStaleEndpoint(options.endpoint, uid)
     await unlink(leasePath)
-    await rejectPrecreatedEndpoint(options.endpoint)
     handle = await open(leasePath, 'wx', 0o600)
   }
   await handle.writeFile(JSON.stringify({ pid: process.pid, owner: options.owner }), 'utf8')

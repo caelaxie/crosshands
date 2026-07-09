@@ -139,6 +139,7 @@ export function validReleaseEvidence(definition, options = {}) {
             : undefined,
         runnerImageSha256: '5'.repeat(64),
         runnerBaselineSha256: 'd'.repeat(64),
+        driverSha256: 'e'.repeat(64),
         candidatePackageSetSha256: packageSet,
         nodeGates: definition.policy.nodeVersions.map((node) => ({
           node,

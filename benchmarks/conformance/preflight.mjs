@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
@@ -22,6 +23,10 @@ await access(driver, constants.X_OK)
 
 const manifestBytes = await readFile(source)
 const manifest = JSON.parse(manifestBytes.toString('utf8'))
+const driverSha256 = createHash('sha256')
+  .update(await readFile(driver))
+  .digest('hex')
+if (manifest.driverSha256 !== driverSha256) throw new Error('conformance driver digest mismatch')
 if (manifest.releaseCandidateId !== candidate)
   throw new Error('release candidate identity mismatch')
 if (manifest.matrixRole !== matrixRole) throw new Error('matrix role mismatch')

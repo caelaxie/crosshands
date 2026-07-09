@@ -22,6 +22,8 @@ describe('Windows native provider characterization', () => {
     expect(source).toContain('if ($Element.Current.IsPassword)')
     expect(source).toContain('return "[redacted]"')
     expect(source).toContain('$MaxScreenshotPngBytes = 900000')
+    expect(source).toContain('CrossHandsDesktopWin32]::PrintWindow')
+    expect(source).not.toContain('CopyFromScreen')
   })
 
   it('tries UI Automation patterns before any synthetic click fallback', async () => {

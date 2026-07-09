@@ -21,6 +21,7 @@ export class ProviderSupervisor {
   readonly #inFlight = new Set<string>()
   #provider: ComputerProvider | undefined
   #handshake: ProviderHandshake | undefined
+  #retirement: Promise<void> = Promise.resolve()
 
   constructor(options: ProviderSupervisorOptions) {
     this.#providerFactory = options.providerFactory
@@ -34,6 +35,7 @@ export class ProviderSupervisor {
   }
 
   async start(): Promise<ProviderHandshake> {
+    await this.#retirement
     if (this.#handshake !== undefined) return this.#handshake
     const provider = this.#providerFactory()
     let handshake: ProviderHandshake
@@ -85,16 +87,19 @@ export class ProviderSupervisor {
     }
     this.#inFlight.add(request.requestId)
     let timer: NodeJS.Timeout | undefined
+    let timedOut = false
     try {
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
-          void provider.cancel(request.requestId).catch(() => undefined)
+          timedOut = true
+          this.#retirement = this.#retire(provider, request.requestId)
           reject(createComputerError('timeout', 'Provider request deadline elapsed'))
         }, request.deadlineAt - Date.now())
         timer.unref()
       })
       return await Promise.race([provider.dispatch(request), timeout])
     } catch (cause) {
+      if (timedOut) await this.#retirement
       if (typeof cause === 'object' && cause !== null && 'code' in cause) throw cause
       throw createComputerError('provider_crashed', 'Provider crashed or disconnected', {
         cause: cause instanceof Error ? cause.message : 'unknown'
@@ -116,10 +121,20 @@ export class ProviderSupervisor {
   }
 
   async close(): Promise<void> {
+    await this.#retirement
     const provider = this.#provider
     this.#provider = undefined
     this.#handshake = undefined
     this.#inFlight.clear()
     await provider?.close()
+  }
+
+  async #retire(provider: ComputerProvider, requestId: string): Promise<void> {
+    if (this.#provider === provider) {
+      this.#provider = undefined
+      this.#handshake = undefined
+    }
+    await provider.cancel(requestId).catch(() => undefined)
+    await provider.close().catch(() => undefined)
   }
 }

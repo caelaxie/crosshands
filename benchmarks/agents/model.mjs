@@ -408,6 +408,11 @@ export function validateAgentEvidence(evidence, definition) {
           fail(`${run.runId}.durationMs must be a positive integer`)
         }
         digest(run.candidateDigest, `${run.runId}.candidateDigest`)
+        exactValue(
+          run.candidateDigest,
+          evidence.candidatePackageSetSha256,
+          `${run.runId}.candidateDigest`
+        )
         if (run.status === 'passed') {
           exactValue(run.oracleMatched, true, `${run.runId}.oracleMatched`)
           passes += 1

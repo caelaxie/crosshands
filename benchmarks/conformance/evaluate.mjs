@@ -94,6 +94,7 @@ export function aggregateConformance(manifests, records, catalog = CONFORMANCE_C
       'permissionBaseline',
       'runnerImageSha256',
       'runnerBaselineSha256',
+      'driverSha256',
       'candidatePackageSetSha256',
       'packageDigests',
       'signerFingerprints'
@@ -173,6 +174,7 @@ export function aggregateConformance(manifests, records, catalog = CONFORMANCE_C
       desktop: manifest.desktopSession,
       runnerImageSha256: manifest.runnerImageSha256,
       runnerBaselineSha256: manifest.runnerBaselineSha256,
+      driverSha256: manifest.driverSha256,
       candidatePackageSetSha256: manifest.candidatePackageSetSha256,
       packageDigests: manifest.packageDigests,
       signerFingerprints: manifest.signerFingerprints,

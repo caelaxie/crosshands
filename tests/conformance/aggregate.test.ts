@@ -56,6 +56,7 @@ function evidence(): { manifests: CandidateManifest[]; records: ConformanceRunRe
       permissionBaseline: { accessibility: 'granted' },
       runnerImageSha256: '5'.repeat(64),
       runnerBaselineSha256: '6'.repeat(64),
+      driverSha256: '8'.repeat(64),
       candidatePackageSetSha256: '7'.repeat(64),
       packageDigests: { crosshands: digest({ candidate: 1 }) },
       signerFingerprints: { crosshands: 'fixture-signer' },
@@ -91,6 +92,7 @@ function evidence(): { manifests: CandidateManifest[]; records: ConformanceRunRe
         normalizedErrorCode: null,
         verificationState: 'observation' as const,
         fixtureResetDigest: manifest.fixtureResetDigest,
+        driverSha256: manifest.driverSha256,
         privacy: {
           rawAccessibilityRetained: false as const,
           screenshotRetained: false as const,
@@ -123,7 +125,7 @@ describe('release-facing conformance aggregate', () => {
       attempt: 2,
       classification: 'infrastructure-invalidated',
       infrastructureCode: 'host-power-loss',
-      runnerEvidence: 'controller-event-1',
+      runnerEvidence: `sha256:${'a'.repeat(64)}`,
       oracleMatched: false
     })
 

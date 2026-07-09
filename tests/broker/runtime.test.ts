@@ -39,6 +39,35 @@ function target(contextToken: string, value: ReferenceBindings): TargetReference
   }
 }
 
+function observedState(value: ReferenceBindings, treeText: string) {
+  return {
+    bindings: value,
+    snapshot: {
+      id: value.snapshotId,
+      app: {
+        id: value.appId,
+        name: 'Fixture',
+        bundleId: value.appId,
+        pid: value.process.pid,
+        isRunning: true
+      },
+      window: {
+        id: value.window.id,
+        appId: value.appId,
+        title: 'Fixture Window',
+        index: 0,
+        bounds: { x: 0, y: 0, width: 800, height: 600 },
+        minimized: false
+      },
+      treeText,
+      elementCount: 1,
+      focusedElementRef: null,
+      desktopEpoch: value.desktopEpoch
+    },
+    screenshot: null
+  }
+}
+
 async function waitFor(predicate: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (predicate()) return
@@ -49,6 +78,17 @@ async function waitFor(predicate: () => boolean): Promise<void> {
 }
 
 describe('local broker', () => {
+  it('blocks sensitive app observations before provider capture', async () => {
+    const provider = new FakeComputerProvider({ graphicalSessionId: peer.graphicalSessionId })
+    const broker = new LocalBroker({ identity: peer, providerFactory: () => provider })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+
+    await expect(
+      client.request({ operation: 'getAppState', input: { app: 'org.keepassxc.keepassxc' } })
+    ).rejects.toMatchObject({ code: 'app_blocked' })
+    expect(provider.calls).toHaveLength(0)
+  })
+
   it('shares a session broker while issuing portable bearer contexts', async () => {
     const provider = new FakeComputerProvider({
       generation: 'provider-1',
@@ -56,12 +96,12 @@ describe('local broker', () => {
     })
       .enqueue({
         kind: 'result',
-        result: { bindings: bindings(), value: { treeText: 'one' } },
+        result: observedState(bindings(), 'one'),
         dispatched: false
       })
       .enqueue({
         kind: 'result',
-        result: { bindings: bindings(), value: { treeText: 'two' } },
+        result: observedState(bindings(), 'two'),
         dispatched: false
       })
       .enqueue({ kind: 'result', result: { outcome: { state: 'verified' } } })
@@ -90,6 +130,50 @@ describe('local broker', () => {
     })
     expect(action.result).toMatchObject({ outcome: { state: 'verified' } })
     expect(provider.calls).toHaveLength(3)
+  })
+
+  it('binds context-window shorthand before provider identity inspection', async () => {
+    const current = bindings()
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({ kind: 'result', result: { outcome: { state: 'verified' } } })
+    let inspectedInput: unknown
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-1',
+      providerFactory: () => provider,
+      inspectTarget: async (_operation, input) => {
+        inspectedInput = input
+        return {
+          bindings: current,
+          appIdentity: { appId: current.appId, executableId: current.process.executableId }
+        }
+      }
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const context = broker.issueContext(current)
+
+    await client.request({
+      operation: 'pressKey',
+      input: {
+        contextToken: context.token,
+        target: { kind: 'context-window' },
+        key: 'Enter'
+      }
+    })
+
+    expect(inspectedInput).toMatchObject({
+      target: {
+        kind: 'window',
+        contextToken: context.token,
+        process: current.process,
+        window: current.window
+      }
+    })
+    expect(provider.calls[0]?.input).toMatchObject({
+      target: { kind: 'window', process: current.process }
+    })
   })
 
   it('serializes mutations through publication and advances the epoch', async () => {
@@ -170,7 +254,7 @@ describe('local broker', () => {
       graphicalSessionId: peer.graphicalSessionId
     }).enqueue({
       kind: 'result',
-      result: { bindings: bindings({ providerGeneration: 'provider-2' }), value: {} },
+      result: observedState(bindings({ providerGeneration: 'provider-2' }), 'restarted'),
       dispatched: false
     })
     const providers = [crashed, restarted]

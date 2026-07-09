@@ -114,6 +114,19 @@ class ProtocolTests(unittest.TestCase):
         process.stderr.close()
         self.assertEqual(process.returncode, 0)
 
+    def test_post_dispatch_error_is_explicit_in_response(self):
+        frame = {
+            "type": "request",
+            "requestId": "mutation-1",
+            "operation": {"tool": "click"},
+        }
+        with mock.patch.object(runtime, "ensure_provider_available"), mock.patch.object(
+            runtime, "run_operation", side_effect=runtime.PostDispatchError("snapshot failed")
+        ):
+            response = runtime.handle_frame(frame)
+        self.assertFalse(response["ok"])
+        self.assertTrue(response["dispatched"])
+
 
 class ContractBehaviorTests(unittest.TestCase):
     def test_unicode_is_preserved_while_multiline_text_is_compacted(self):
@@ -148,6 +161,12 @@ class ContractBehaviorTests(unittest.TestCase):
             runtime, "name_of", return_value="Save copy"
         ):
             self.assertFalse(runtime.same_element_signature(node, saved))
+
+    def test_native_dispatch_rejects_changed_process_identity(self):
+        app = object()
+        with mock.patch.object(runtime, "pid_of", return_value=42):
+            with self.assertRaisesRegex(RuntimeError, "stale_target"):
+                runtime.assert_expected_process_identity(app, {"pid": 43})
 
 
 if __name__ == "__main__":

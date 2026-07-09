@@ -42,6 +42,9 @@ public static class CrossHandsDesktopWin32 {
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint flags);
+
     [DllImport("user32.dll")]
     public static extern bool ScreenToClient(IntPtr hwnd, ref POINT point);
 
@@ -802,20 +805,29 @@ function Get-CrossHandsBoundedScreenshotPayload([System.Drawing.Bitmap]$Bitmap) 
     }
 }
 
-function Get-CrossHandsScreenshot([bool]$IncludeScreenshot, $WindowFrame) {
-    if (-not $IncludeScreenshot -or $null -eq $WindowFrame) { return $null }
+function Get-CrossHandsScreenshot([bool]$IncludeScreenshot, [IntPtr]$WindowHandle, $WindowFrame) {
+    if (-not $IncludeScreenshot -or $WindowHandle -eq [IntPtr]::Zero -or $null -eq $WindowFrame) { return $null }
     $bitmap = $null
     $graphics = $null
+    $hdc = [IntPtr]::Zero
     try {
         $width = [int][Math]::Max(1, [Math]::Round($WindowFrame.width))
         $height = [int][Math]::Max(1, [Math]::Round($WindowFrame.height))
         $bitmap = New-Object System.Drawing.Bitmap $width, $height
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-        $graphics.CopyFromScreen([int][Math]::Round($WindowFrame.x), [int][Math]::Round($WindowFrame.y), 0, 0, $bitmap.Size)
+        $hdc = $graphics.GetHdc()
+        # PrintWindow captures only the selected HWND. Desktop overlays and
+        # unrelated windows must never be sampled into an agent observation.
+        if (-not [CrossHandsDesktopWin32]::PrintWindow($WindowHandle, $hdc, 2)) {
+            throw "screenshot_failed: target-window capture failed"
+        }
+        $graphics.ReleaseHdc($hdc)
+        $hdc = [IntPtr]::Zero
         Get-CrossHandsBoundedScreenshotPayload $bitmap
     } catch {
         $null
     } finally {
+        if ($hdc -ne [IntPtr]::Zero -and $null -ne $graphics) { $graphics.ReleaseHdc($hdc) }
         if ($null -ne $graphics) { $graphics.Dispose() }
         if ($null -ne $bitmap) { $bitmap.Dispose() }
     }
@@ -829,7 +841,7 @@ function New-CrossHandsSnapshot([string]$Query, [bool]$IncludeScreenshot, $Windo
     $root = Get-CrossHandsRootElement $process
     $windowFrame = Get-CrossHandsWindowFrame $process $root
     $tree = Render-CrossHandsTree $root $windowFrame (Test-CrossHandsBrowserProcess $process)
-    $screenshot = Get-CrossHandsScreenshot $IncludeScreenshot $windowFrame
+    $screenshot = Get-CrossHandsScreenshot $IncludeScreenshot $process.MainWindowHandle $windowFrame
 
     [pscustomobject]@{
         snapshotId = [guid]::NewGuid().ToString()
@@ -1075,7 +1087,7 @@ function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$S
     }
 }
 
-function Send-CrossHandsDrag([IntPtr]$WindowHandle, $From, $To) {
+function Send-CrossHandsDrag([IntPtr]$WindowHandle, $From, $To, [double]$DurationMs) {
     [void][CrossHandsDesktopWin32]::SetForegroundWindow($WindowHandle)
     if (-not (Wait-CrossHandsWindowFocused $WindowHandle 500)) {
         throw "window_not_focused: foreground activation could not be verified before drag input"
@@ -1090,7 +1102,7 @@ function Send-CrossHandsDrag([IntPtr]$WindowHandle, $From, $To) {
         $x = [int][Math]::Round($startX + (($endX - $startX) * $step / 12))
         $y = [int][Math]::Round($startY + (($endY - $startY) * $step / 12))
         [void][CrossHandsDesktopWin32]::SetCursorPos($x, $y)
-        Start-Sleep -Milliseconds 20
+        Start-Sleep -Milliseconds ([Math]::Max(1, [Math]::Round($DurationMs / 12)))
     }
     [CrossHandsDesktopWin32]::mouse_event($MouseEvents.LeftUp, 0, 0, 0, [UIntPtr]::Zero)
 }
@@ -1317,7 +1329,8 @@ function Invoke-CrossHandsOperation($Operation) {
                     y = $windowFrame.y + (Get-CrossHandsRequiredNumber $Operation.to_y "to_y")
                 }
             }
-            Send-CrossHandsDrag $handle $from $to
+            $durationMs = if ($null -eq $Operation.duration_ms) { 240 } else { [Math]::Min(30000, (Get-CrossHandsPositiveNumber $Operation.duration_ms "duration_ms")) }
+            Send-CrossHandsDrag $handle $from $to $durationMs
             $action = [pscustomobject]@{ path = "synthetic"; actionName = "drag"; fallbackReason = $null }
         }
         "type_text" {

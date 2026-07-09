@@ -106,6 +106,15 @@ jobs:
             --runs-per-adapter 5 \
             --output "artifacts/agent-fragments/$AGENT_ID.json"
           "$CROSSHANDS_NETWORK_GUARD" verify --config "$AGENT_CONFIG"
+
+      - name: Restore runner network and fixture state
+        if: always()
+        shell: bash
+        env:
+          AGENT_ID: ${{ matrix.agent }}
+          AGENT_CONFIG: ${{ matrix.config }}
+        run: |
+          "$CROSSHANDS_NETWORK_GUARD" restore --config "$AGENT_CONFIG"
           "$CROSSHANDS_BENCHMARK_RESET_HOOK" --after --agent "$AGENT_ID"
 
       - name: Upload privacy-safe agent fragment

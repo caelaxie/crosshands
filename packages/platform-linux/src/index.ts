@@ -49,7 +49,7 @@ type NativeHandshake = {
 
 type NativeResponse =
   | { type: 'response'; requestId: string; ok: true; result: Record<string, unknown> }
-  | { type: 'response'; requestId: string; ok: false; error: string }
+  | { type: 'response'; requestId: string; ok: false; error: string; dispatched?: boolean }
 type NativeFrame = NativeHandshake | NativeResponse | { type: 'fatal'; error: string }
 type Pending = { resolve: (frame: NativeResponse) => void; reject: (cause: unknown) => void }
 
@@ -94,7 +94,9 @@ function targetFields(targetValue: unknown, prefix = ''): Record<string, unknown
   if (target.kind === 'coordinate') {
     return { [`${prefix}x`]: target.x, [`${prefix}y`]: target.y }
   }
-  const reference = record(target.ref ?? target)
+  const reference = record(
+    target.ref !== null && typeof target.ref === 'object' ? target.ref : target
+  )
   if (reference.kind === 'element') {
     const match = /^element:(\d+)$/.exec(String(reference.ref ?? ''))
     return match === null ? {} : { [`${prefix}elementIndex`]: Number(match[1]) }
@@ -105,12 +107,33 @@ function targetFields(targetValue: unknown, prefix = ''): Record<string, unknown
   return {}
 }
 
+function targetReferenceValue(inputValue: unknown): TargetReference | undefined {
+  const source = record(inputValue)
+  for (const candidate of [source.target, source.from, source.to]) {
+    const target = record(candidate)
+    const nested = target.ref !== null && typeof target.ref === 'object' ? target.ref : undefined
+    const coordinateWindow =
+      target.kind === 'coordinate' && target.window !== null && typeof target.window === 'object'
+        ? target.window
+        : undefined
+    const reference = record(nested ?? coordinateWindow ?? target)
+    if (typeof reference.contextToken === 'string' && typeof reference.ref === 'string')
+      return reference as TargetReference
+  }
+  return undefined
+}
+
 export function mapNativeOperation(
   operation: ComputerOperationName,
   inputValue: unknown
 ): Record<string, unknown> {
   const input = record(inputValue)
-  const base = typeof input.app === 'string' ? { app: input.app } : {}
+  const reference = targetReferenceValue(input)
+  const base = reference
+    ? { app: `pid:${reference.process.pid}`, expectedIdentity: reference.process }
+    : typeof input.app === 'string'
+      ? { app: input.app }
+      : {}
   switch (operation) {
     case 'capabilities':
       return { tool: 'handshake' }
@@ -162,6 +185,7 @@ export function mapNativeOperation(
         ...base,
         ...targetFields(input.from, 'from_'),
         ...targetFields(input.to, 'to_'),
+        ...(typeof input.durationMs === 'number' ? { duration_ms: input.durationMs } : {}),
         ...captureOptions(input)
       }
     case 'typeText':
@@ -275,14 +299,7 @@ function operations(readiness: NativeReadiness): Record<string, boolean> {
 }
 
 function targetReference(input: unknown): TargetReference | undefined {
-  const source = record(input)
-  for (const candidate of [source.target, source.from, source.to]) {
-    const target = record(candidate)
-    const reference = record(target.ref ?? target.window ?? target)
-    if (typeof reference.contextToken === 'string' && typeof reference.ref === 'string')
-      return reference as TargetReference
-  }
-  return undefined
+  return targetReferenceValue(input)
 }
 
 async function processIdentity(pid: number): Promise<ReferenceBindings['process']> {
@@ -533,7 +550,7 @@ export class LinuxComputerProvider implements ComputerProvider {
     if (!frame.ok) {
       return {
         requestId: request.requestId,
-        dispatched: false,
+        dispatched: frame.dispatched === true,
         error: normalizeNativeError(frame.error).toJSON()
       }
     }
@@ -606,7 +623,7 @@ export class LinuxComputerProvider implements ComputerProvider {
     if (operation === 'getAppState') return normalizedSnapshot
     const action = record(native.action)
     const verification = record(action.verification)
-    const verified = action.path === 'accessibility' && verification.state !== 'unverified'
+    const verified = action.path === 'accessibility' && verification.state === 'verified'
     return {
       outcome: verified
         ? {
