@@ -28,6 +28,38 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@24.10.1)(vite@8.1.4(@types/node@24.10.1))
 
+  packages/contract:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@types/node@24.10.1)(vite@8.1.4(@types/node@24.10.1))
+
+  packages/provider-testkit:
+    dependencies:
+      '@crosshands/contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@types/node@24.10.1)(vite@8.1.4(@types/node@24.10.1))
+
 packages:
 
   '@emnapi/core@1.11.1':
