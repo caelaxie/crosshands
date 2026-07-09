@@ -167,6 +167,9 @@ jobs:
           ref: ${{ inputs.git_ref }}
           fetch-depth: 0
 
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
       - name: Set up Node.js 22 for the one candidate pack
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
