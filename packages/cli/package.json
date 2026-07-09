@@ -8,6 +8,7 @@
   },
   "files": [
     "dist",
+    "src",
     "README.md"
   ],
   "type": "module",
@@ -31,6 +32,11 @@
     "@types/node": "24.10.1",
     "typescript": "5.9.3",
     "vitest": "4.1.5"
+  },
+  "optionalDependencies": {
+    "@crosshands/platform-darwin": "workspace:*",
+    "@crosshands/platform-linux": "workspace:*",
+    "@crosshands/platform-windows": "workspace:*"
   },
   "engines": {
     "node": ">=22"

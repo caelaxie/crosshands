@@ -1,6 +1,11 @@
+import { createHash } from 'node:crypto'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { DarwinComputerProvider, resolveHelperPath } from '../src/index.js'
+import { DarwinComputerProvider, resolveHelperPath, verifyDarwinPayload } from '../src/index.js'
 
 const app = {
   name: 'Fixture',
@@ -69,6 +74,29 @@ function harness() {
 }
 
 describe('@crosshands/platform-darwin', () => {
+  it('verifies version, bundle identity, and helper digest before launch', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-darwin-integrity-'))
+    const helperPath = join(directory, 'crosshands-computer-use-macos')
+    const manifestPath = join(directory, 'payload.json')
+    const helper = Buffer.from('fixture helper')
+    await writeFile(helperPath, helper)
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        productVersion: '0.1.0',
+        bundleIdentifier: 'ai.crosshands.ComputerUse',
+        files: {
+          'crosshands-computer-use-macos': createHash('sha256').update(helper).digest('hex')
+        }
+      })
+    )
+    await expect(verifyDarwinPayload(helperPath, manifestPath, false)).resolves.toBeUndefined()
+    await writeFile(helperPath, 'substituted helper')
+    await expect(verifyDarwinPayload(helperPath, manifestPath, false)).rejects.toMatchObject({
+      code: 'provider_unavailable'
+    })
+  })
+
   it('resolves the helper from the package asset directory', () => {
     expect(resolveHelperPath()).toMatch(
       /platform-darwin\/assets\/CrossHands Computer Use\.app\/Contents\/MacOS\/crosshands-computer-use-macos$/

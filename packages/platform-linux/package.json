@@ -1,9 +1,11 @@
 {
   "name": "@crosshands/platform-linux",
   "version": "0.1.0",
-  "private": true,
+  "description": "Linux x64 computer-use provider for CrossHands",
+  "license": "MIT",
   "files": [
     "dist",
+    "src",
     "assets",
     "README.md"
   ],

@@ -1,0 +1,198 @@
+name: Package smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.label }} / Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS arm64
+            runner: macos-15
+            os: macos
+            arch: arm64
+            node: '22'
+          - label: macOS arm64
+            runner: macos-15
+            os: macos
+            arch: arm64
+            node: '24'
+          - label: macOS x64
+            runner: macos-15-intel
+            os: macos
+            arch: x64
+            node: '22'
+          - label: macOS x64
+            runner: macos-15-intel
+            os: macos
+            arch: x64
+            node: '24'
+          - label: Windows x64
+            runner: windows-2022
+            os: windows
+            arch: x64
+            node: '22'
+          - label: Windows x64
+            runner: windows-2022
+            os: windows
+            arch: x64
+            node: '24'
+          - label: Ubuntu 24.04 x64
+            runner: ubuntu-24.04
+            os: linux
+            arch: x64
+            node: '22'
+          - label: Ubuntu 24.04 x64
+            runner: ubuntu-24.04
+            os: linux
+            arch: x64
+            node: '24'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Enable pinned pnpm
+        run: corepack enable
+
+      - name: Verify runner architecture
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          test "$(node -p 'process.arch')" = "$EXPECTED_ARCH"
+
+      - name: Install frozen dependency graph
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: corepack pnpm lint
+
+      - name: Typecheck
+        run: corepack pnpm typecheck
+
+      - name: Test
+        run: corepack pnpm test
+
+      - name: Build
+        run: corepack pnpm build
+
+      - name: Native provider tests
+        run: corepack pnpm test:native
+
+      - name: Pack and clean-install tests
+        run: corepack pnpm test:pack
+
+      - name: Security and tamper tests
+        run: corepack pnpm test:security
+
+      - name: Installed lifecycle tests
+        run: corepack pnpm test:lifecycle
+
+      - name: Prepare evidence directory
+        shell: bash
+        run: mkdir -p "artifacts/evidence/${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}"
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: artifacts/evidence/${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}/sbom.spdx.json
+          upload-artifact: false
+
+      - name: Record macOS signature evidence
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          evidence="artifacts/evidence/${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}/native-signatures.txt"
+          : > "$evidence"
+          while IFS= read -r -d '' app; do
+            printf '%s\n' "$app" >> "$evidence"
+            codesign --verify --deep --strict --verbose=2 "$app" 2>> "$evidence"
+            codesign --display --requirements - --verbose=4 "$app" 2>> "$evidence"
+            spctl --assess --type execute --verbose=4 "$app" >> "$evidence" 2>&1 || true
+          done < <(find artifacts packages/platform-darwin/assets -type d -name '*.app' -print0 2>/dev/null)
+
+      - name: Record Windows signature evidence
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $path = "artifacts/evidence/${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}/native-signatures.json"
+          $files = Get-ChildItem artifacts,packages/platform-windows/assets -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.exe', '.dll', '.ps1' }
+          @($files | ForEach-Object {
+            $signature = Get-AuthenticodeSignature -LiteralPath $_.FullName
+            [ordered]@{
+              path = $_.FullName
+              status = $signature.Status.ToString()
+              statusMessage = $signature.StatusMessage
+              signer = $signature.SignerCertificate.Subject
+              thumbprint = $signature.SignerCertificate.Thumbprint
+              timestamp = $signature.TimeStamperCertificate.Subject
+            }
+          }) | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 $path
+
+      - name: Record artifact digests
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { createHash } from "node:crypto";
+            import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+            import { join, relative } from "node:path";
+            const root = "artifacts";
+            const output = `artifacts/evidence/${process.env.EVIDENCE_CELL}/sha256.json`;
+            const files = [];
+            async function walk(directory) {
+              for (const entry of await readdir(directory, { withFileTypes: true })) {
+                const path = join(directory, entry.name);
+                if (entry.isDirectory()) await walk(path);
+                else if (path !== output) files.push(path);
+              }
+            }
+            await walk(root);
+            const records = [];
+            for (const path of files.sort()) {
+              const bytes = await readFile(path);
+              const info = await stat(path);
+              records.push({
+                path: relative(root, path).replaceAll("\\\\", "/"),
+                bytes: info.size,
+                sha256: createHash("sha256").update(bytes).digest("hex")
+              });
+            }
+            await writeFile(output, `${JSON.stringify(records, null, 2)}\n`);
+          '
+        env:
+          EVIDENCE_CELL: ${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}
+
+      - name: Upload package and verification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-smoke-${{ matrix.os }}-${{ matrix.arch }}-node${{ matrix.node }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

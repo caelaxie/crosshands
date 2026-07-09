@@ -3,7 +3,10 @@
   "source": "stablyai/orca@8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c",
   "license": "MIT",
   "copyright": "Copyright (c) 2026 Lovecast Inc.",
+  "authenticode": {
+    "required": false
+  },
   "files": {
-    "runtime.py": "11cb38044eff5a49526a0ec9b4b5287f6993886c859050ce811af4998c695f57"
+    "runtime.ps1": "a4f50faef69e7ddc2c47bf99becf4db276e0719f3242ac558a5fd6ccc6f31724"
   }
 }

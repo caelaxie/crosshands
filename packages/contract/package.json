@@ -1,7 +1,13 @@
 {
   "name": "@crosshands/contract",
   "version": "0.1.0",
-  "private": true,
+  "description": "Versioned computer-use contract shared by CrossHands adapters and providers",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "schemas"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -23,5 +29,8 @@
     "@types/node": "24.10.1",
     "typescript": "5.9.3",
     "vitest": "4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

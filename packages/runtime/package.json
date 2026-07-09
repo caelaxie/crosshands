@@ -1,7 +1,12 @@
 {
   "name": "@crosshands/runtime",
   "version": "0.1.0",
-  "private": true,
+  "description": "Local broker, policy, provider supervision, and protected IPC for CrossHands",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -22,5 +27,8 @@
     "@types/node": "24.10.1",
     "typescript": "5.9.3",
     "vitest": "4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

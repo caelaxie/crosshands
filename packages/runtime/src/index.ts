@@ -1,4 +1,5 @@
 export * from './broker/broker.js'
+export * from './bundle-lifecycle.js'
 export * from './ipc/endpoint.js'
 export * from './ipc/control-transport.js'
 export * from './ipc/framing.js'

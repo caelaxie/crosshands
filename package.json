@@ -12,13 +12,15 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run --config vitest.workspace.ts",
     "test:adapters": "vitest run --config vitest.workspace.ts tests/adapters",
-    "test:native": "vitest run --config vitest.workspace.ts tests/native",
+    "test:native": "node scripts/build-native/current.mjs",
     "test:pack": "vitest run --config vitest.workspace.ts tests/packaging",
-    "test:security": "vitest run --config vitest.workspace.ts tests/security",
+    "test:security": "vitest run --config vitest.workspace.ts tests/security tests/broker/policy.test.ts tests/broker/ipc.test.ts packages/platform-darwin/test/provider.test.ts packages/platform-linux/test/provider.test.ts packages/platform-windows/test",
     "test:lifecycle": "vitest run --config vitest.workspace.ts tests/lifecycle",
     "test:conformance": "vitest run --config vitest.workspace.ts tests/conformance",
     "benchmark:agents": "vitest run --config vitest.workspace.ts benchmarks/agents",
-    "release:validate": "vitest run --config vitest.workspace.ts tests/release"
+    "release:validate": "vitest run --config vitest.workspace.ts tests/release",
+    "package:candidate": "node scripts/package/candidate.mjs artifacts",
+    "package:smoke": "node scripts/package/smoke.mjs artifacts"
   },
   "dependencies": {
     "zod": "4.4.3"

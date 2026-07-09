@@ -5,6 +5,7 @@
   "license": "MIT",
   "files": [
     "dist",
+    "src",
     "assets",
     "NOTICE.md"
   ],

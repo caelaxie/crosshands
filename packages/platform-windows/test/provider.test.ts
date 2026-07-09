@@ -1,9 +1,14 @@
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import type { ProviderRequest, TargetReference } from '@crosshands/contract'
 
 import {
   WindowsComputerProvider,
+  verifyWindowsPayload,
   windowsPowerShellLaunchSpec,
   type NativeFrame,
   type NativeWindowsTransport
@@ -50,6 +55,24 @@ function request(operation: ProviderRequest['operation'], input: unknown): Provi
 }
 
 describe('WindowsComputerProvider', () => {
+  it('verifies the packaged payload and rejects a substituted script', async () => {
+    await expect(verifyWindowsPayload()).resolves.toBeUndefined()
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-integrity-'))
+    const scriptPath = join(directory, 'runtime.ps1')
+    const manifestPath = join(directory, 'payload.json')
+    await writeFile(
+      scriptPath,
+      `${await readFile(new URL('../assets/runtime.ps1', import.meta.url), 'utf8')}# tampered\n`
+    )
+    await writeFile(
+      manifestPath,
+      await readFile(new URL('../assets/payload.json', import.meta.url), 'utf8')
+    )
+    await expect(verifyWindowsPayload(scriptPath, manifestPath)).rejects.toMatchObject({
+      code: 'provider_unavailable'
+    })
+  })
+
   it('normalizes discovery and bounded snapshots while redaction stays native-side', async () => {
     const transport = new FakeTransport(
       {

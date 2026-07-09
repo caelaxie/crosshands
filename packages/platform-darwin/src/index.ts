@@ -1,9 +1,10 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { createHash, randomBytes } from 'node:crypto'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createConnection } from 'node:net'
 import { tmpdir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
+import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -20,6 +21,8 @@ import {
 } from '@crosshands/contract'
 
 type JsonObject = Record<string, unknown>
+
+export const packageVersion = '0.1.0'
 
 type NativeClient = {
   request(method: string, params?: JsonObject): Promise<unknown>
@@ -64,10 +67,88 @@ const HELPER_PATH = fileURLToPath(
     import.meta.url
   )
 )
+const MANIFEST_PATH = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
+const execFileAsync = promisify(execFile)
 
 export function resolveHelperPath(): string {
   if (!isAbsolute(HELPER_PATH)) throw new Error('CrossHands helper path must be absolute')
   return HELPER_PATH
+}
+
+export async function verifyDarwinPayload(
+  helperPath = HELPER_PATH,
+  manifestPath = MANIFEST_PATH,
+  verifySignature = process.platform === 'darwin'
+): Promise<void> {
+  if (!isAbsolute(helperPath) || !isAbsolute(manifestPath)) {
+    throw createComputerError('provider_unavailable', 'macOS payload paths must be absolute')
+  }
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+    productVersion?: unknown
+    bundleIdentifier?: unknown
+    files?: Record<string, unknown>
+    signing?: {
+      required?: unknown
+      authority?: unknown
+      teamIdentifier?: unknown
+      notarized?: unknown
+    }
+  }
+  if (manifest.productVersion !== packageVersion) {
+    throw createComputerError('version_incompatible', 'macOS payload product version mismatch')
+  }
+  if (manifest.bundleIdentifier !== 'ai.crosshands.ComputerUse') {
+    throw createComputerError('provider_unavailable', 'macOS helper bundle identity mismatch')
+  }
+  const expected = manifest.files?.['crosshands-computer-use-macos']
+  if (typeof expected !== 'string' || !/^[a-f0-9]{64}$/.test(expected)) {
+    throw createComputerError('provider_unavailable', 'macOS payload manifest is malformed')
+  }
+  const actual = createHash('sha256')
+    .update(await readFile(helperPath))
+    .digest('hex')
+  if (actual !== expected) {
+    throw createComputerError('provider_unavailable', 'macOS provider payload hash mismatch')
+  }
+  if (!verifySignature) return
+  const signing = manifest.signing
+  if (
+    signing?.required !== true ||
+    typeof signing.authority !== 'string' ||
+    signing.authority.length === 0 ||
+    typeof signing.teamIdentifier !== 'string' ||
+    !/^[A-Z0-9]{10}$/.test(signing.teamIdentifier) ||
+    signing.notarized !== true
+  ) {
+    throw createComputerError(
+      'provider_unavailable',
+      'macOS release payload has no valid signing and notarization policy'
+    )
+  }
+  const appPath = dirname(dirname(dirname(helperPath)))
+  try {
+    await execFileAsync('/usr/bin/codesign', ['--verify', '--strict', appPath])
+    const requirement = await execFileAsync('/usr/bin/codesign', ['-d', '-r-', appPath])
+    if (!requirement.stderr.includes('identifier "ai.crosshands.ComputerUse"')) {
+      throw new Error('designated requirement does not bind the stable bundle identifier')
+    }
+    const details = await execFileAsync('/usr/bin/codesign', ['-d', '--verbose=4', appPath])
+    if (
+      !details.stderr.includes(`Authority=${signing.authority}`) ||
+      !details.stderr.includes(`TeamIdentifier=${signing.teamIdentifier}`)
+    ) {
+      throw new Error('code-signing authority or team identifier does not match the manifest')
+    }
+    await execFileAsync('/usr/sbin/spctl', ['--assess', '--type', 'execute', appPath])
+  } catch (cause) {
+    throw createComputerError(
+      'provider_unavailable',
+      'macOS provider signature verification failed',
+      {
+        cause: cause instanceof Error ? cause.message : 'unknown'
+      }
+    )
+  }
 }
 
 function currentGraphicalSessionId(): string {
@@ -447,7 +528,8 @@ export class DarwinComputerProvider implements ComputerProvider {
 
   constructor(
     private readonly graphicalSessionId = currentGraphicalSessionId(),
-    private readonly clientFactory: NativeClientFactory = SocketNativeClient.start
+    private readonly clientFactory: NativeClientFactory = SocketNativeClient.start,
+    private readonly verifyPayload = clientFactory === SocketNativeClient.start
   ) {}
 
   get generation(): string {
@@ -456,6 +538,7 @@ export class DarwinComputerProvider implements ComputerProvider {
 
   async start(): Promise<ProviderHandshake> {
     if (this.#handshake !== undefined) return this.#handshake
+    if (this.verifyPayload) await verifyDarwinPayload()
     this.#client = await this.clientFactory(this.graphicalSessionId)
     const handshake = ProviderHandshakeSchema.parse(await this.#client.request('handshake'))
     this.#generation = handshake.generation

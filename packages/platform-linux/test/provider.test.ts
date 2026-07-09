@@ -67,7 +67,14 @@ describe('Linux provider boundary', () => {
     const runtime = join(directory, 'runtime.py')
     const manifest = join(directory, 'payload.json')
     await writeFile(runtime, 'print("changed")', 'utf8')
-    await writeFile(manifest, JSON.stringify({ files: { 'runtime.py': '0'.repeat(64) } }), 'utf8')
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        productVersion: '0.1.0',
+        files: { 'runtime.py': '0'.repeat(64) }
+      }),
+      'utf8'
+    )
     await expect(verifyLinuxPayload(runtime, manifest)).rejects.toMatchObject({
       code: 'provider_unavailable'
     })

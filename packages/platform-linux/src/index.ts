@@ -19,6 +19,7 @@ import {
 } from '@crosshands/contract'
 
 const FIXED_SYSTEM_PATH = '/usr/local/bin:/usr/bin:/bin'
+export const packageVersion = '0.1.0'
 const MAX_NATIVE_FRAME_BYTES = 1_048_576
 const PACKAGED_RUNTIME = fileURLToPath(new URL('../assets/runtime.py', import.meta.url))
 const PACKAGED_MANIFEST = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
@@ -220,8 +221,11 @@ export async function verifyLinuxPayload(
   if (!isAbsolute(runtimePath) || !isAbsolute(manifestPath))
     throw createComputerError('provider_unavailable', 'Linux payload paths must be absolute')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+    productVersion?: unknown
     files?: Record<string, unknown>
   }
+  if (manifest.productVersion !== packageVersion)
+    throw createComputerError('version_incompatible', 'Linux payload product version mismatch')
   const expected = manifest.files?.['runtime.py']
   if (typeof expected !== 'string' || !/^[a-f0-9]{64}$/.test(expected))
     throw createComputerError('provider_unavailable', 'Linux payload manifest is malformed')

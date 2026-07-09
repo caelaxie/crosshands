@@ -29,12 +29,16 @@ Operation envelopes—including typed or pasted text—travel only over the chil
 process stdin. They are never command-line arguments or temporary operation
 files. A timed-out or disconnected mutation is not replayed automatically.
 
-The broker's Windows named-pipe endpoint requires a native backend that creates
-an explicit current-logon-SID DACL and verifies a local client's PID, SID, logon
-session, and integrity while impersonating it. The TypeScript package exposes
-this backend boundary but intentionally fails closed when no native backend is
-installed; Node's named-pipe API alone is not treated as proof of those
-properties.
+The broker's Windows named-pipe endpoint is owned by the signed
+`crosshands-pipe-relay.exe` helper rather than Node. The helper creates an
+explicit current-logon-SID DACL, rejects remote pipe clients, and verifies a
+local client's PID, user SID, logon SID/authentication ID, Windows session,
+process start time, executable path, and integrity level while impersonating
+the client. Only after those checks does it relay framed bytes to the broker.
+The JavaScript host verifies the helper's package hash and Authenticode
+publisher before launch and still requires the versioned control handshake
+before parsing a request. A missing, unsigned, substituted, or unbuildable relay
+fails closed; Node's named-pipe API alone is not treated as proof.
 
 ## Verification status
 
@@ -44,6 +48,8 @@ runners to execute:
 
 - the native parser check in `native/windows/tests/verify-runtime.ps1` using
   Windows PowerShell 5.1;
+- the x64 relay build plus DACL, local-only, SID/logon-session, equal-integrity,
+  process-identity, handshake-before-dispatch, and Authenticode tests;
 - UI Automation fixture tests for discovery, duplicate names, multiple windows,
   pattern actions, redaction, and bounded trees;
 - Unicode/IME, modifier cleanup, clipboard restoration, multi-monitor and

@@ -1,9 +1,11 @@
 {
   "name": "@crosshands/platform-darwin",
   "version": "0.1.0",
-  "private": true,
+  "description": "macOS computer-use provider for CrossHands",
+  "license": "MIT",
   "files": [
     "dist",
+    "src",
     "assets",
     "NOTICE"
   ],
