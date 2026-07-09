@@ -1,0 +1,6 @@
+.agents/
+docs/plans/
+node_modules/
+dist/
+coverage/
+native/macos/.build/

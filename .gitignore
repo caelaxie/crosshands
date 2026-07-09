@@ -1,1 +1,12 @@
 .DS_Store
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+*.log
+.crosshands/
+artifacts/
+native/macos/.build/
+__pycache__/
+*.pyc
