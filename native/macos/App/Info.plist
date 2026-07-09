@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>CrossHands Computer Use</string>
+  <key>CFBundleExecutable</key>
+  <string>crosshands-computer-use-macos</string>
+  <key>CFBundleIdentifier</key>
+  <string>ai.crosshands.ComputerUse</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>CrossHands Computer Use</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSAccessibilityUsageDescription</key>
+  <string>CrossHands uses Accessibility to inspect and operate applications you direct it to control.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>CrossHands captures the selected application window so coding agents can verify desktop state.</string>
+</dict>
+</plist>

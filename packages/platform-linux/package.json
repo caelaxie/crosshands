@@ -1,0 +1,40 @@
+{
+  "name": "@crosshands/platform-linux",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@crosshands/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
