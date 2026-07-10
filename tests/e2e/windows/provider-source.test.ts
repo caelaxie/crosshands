@@ -86,8 +86,10 @@ describe('Windows native provider characterization', () => {
     expect(packaged).toEqual(source)
   })
 
-  it('discovers Visual Studio build tools from installer and hosted-runner locations', async () => {
+  it('discovers fixed Visual Studio editions before locator fallbacks', async () => {
     const source = await relayBuildSource
+    expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\2022\\Enterprise')
+    expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\2022\\BuildTools')
     expect(source).toContain('%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe')
     expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\Installer\\vswhere.exe')
     expect(source).toContain('%ChocolateyInstall%\\bin\\vswhere.exe')
