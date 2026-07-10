@@ -16,6 +16,7 @@ import {
   packOne,
   packages,
   run,
+  runPackageManager,
   sha256,
   workspaceRoot
 } from '../../scripts/package/lib.mjs'
@@ -29,7 +30,9 @@ beforeAll(async () => {
   const output = await mkdtemp(join(tmpdir(), 'CrossHands pack output '))
   outputDirectories.push(output)
   await buildAndTestCurrentNative()
-  await run('corepack', ['pnpm', '-r', '--if-present', 'build'], { cwd: workspaceRoot })
+  await runPackageManager('corepack', ['pnpm', '-r', '--if-present', 'build'], {
+    cwd: workspaceRoot
+  })
   const descriptors = [packages.contract, packages.runtime, packages.cli, currentPlatformPackage]
   for (const descriptor of descriptors) {
     // oxlint-disable-next-line no-await-in-loop -- avoid concurrent pnpm pack store races.

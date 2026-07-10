@@ -10,7 +10,7 @@ import {
   createReleaseManifest,
   enrichReleaseManifest,
   packCurrentCandidate,
-  run,
+  runPackageManager,
   workspaceRoot,
   writeSignedReleaseManifest
 } from './lib.mjs'
@@ -29,7 +29,9 @@ await Promise.all([
 ])
 try {
   await buildAndTestCurrentNative()
-  await run('corepack', ['pnpm', '-r', '--if-present', 'build'], { cwd: workspaceRoot })
+  await runPackageManager('corepack', ['pnpm', '-r', '--if-present', 'build'], {
+    cwd: workspaceRoot
+  })
   const packed = await packCurrentCandidate(packageDirectory)
   const { CONTRACT_VERSIONS } = await import('../../packages/contract/dist/index.js')
   const baseManifest = createReleaseManifest(packed, {

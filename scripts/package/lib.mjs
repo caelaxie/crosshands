@@ -106,6 +106,20 @@ export function run(command, args, options = {}) {
   })
 }
 
+export function packageManagerInvocation(command, args, platform = process.platform) {
+  if (platform !== 'win32') return { command, args }
+  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows'
+  return {
+    command: process.env.ComSpec ?? process.env.COMSPEC ?? join(systemRoot, 'System32', 'cmd.exe'),
+    args: ['/d', '/c', 'call', `${command}.cmd`, ...args]
+  }
+}
+
+export function runPackageManager(command, args, options = {}) {
+  const invocation = packageManagerInvocation(command, args)
+  return run(invocation.command, invocation.args, options)
+}
+
 export async function sha256(path) {
   return createHash('sha256')
     .update(await readFile(path))
@@ -185,7 +199,7 @@ export async function inspectPack(archive, descriptor) {
 
 export async function packOne(descriptor, outputDirectory) {
   await mkdir(outputDirectory, { recursive: true })
-  const { stdout } = await run(
+  const { stdout } = await runPackageManager(
     'corepack',
     [
       'pnpm',
@@ -426,7 +440,7 @@ export async function cleanInstallSmoke(packed, parentDirectory = tmpdir()) {
       join(installRoot, 'package.json'),
       `${JSON.stringify({ name: 'crosshands-clean-install-smoke', private: true, type: 'module' })}\n`
     )
-    await run(
+    await runPackageManager(
       'npm',
       [
         'install',

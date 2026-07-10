@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { validateRunnerManifests } from '../../scripts/package/aggregate.mjs'
+import { packageManagerInvocation } from '../../scripts/package/lib.mjs'
 
 const common = ['@crosshands/contract', '@crosshands/runtime', 'crosshands', '@crosshands/mcp']
 
@@ -26,6 +27,16 @@ function sources() {
 }
 
 describe('cross-platform no-rebuild aggregation', () => {
+  it('routes Windows package-manager shims through cmd without a shell string', () => {
+    expect(packageManagerInvocation('corepack', ['pnpm', 'build'], 'win32')).toMatchObject({
+      args: ['/d', '/c', 'call', 'corepack.cmd', 'pnpm', 'build']
+    })
+    expect(packageManagerInvocation('corepack', ['pnpm', 'build'], 'linux')).toEqual({
+      command: 'corepack',
+      args: ['pnpm', 'build']
+    })
+  })
+
   it('accepts exactly matched common packages and all three payloads', () => {
     expect(() => validateRunnerManifests(sources())).not.toThrow()
   })
