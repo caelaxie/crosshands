@@ -88,6 +88,9 @@ describe('Windows native provider characterization', () => {
 
   it('discovers fixed Visual Studio editions before locator fallbacks', async () => {
     const source = await relayBuildSource
+    expect(source).toContain('setlocal EnableExtensions EnableDelayedExpansion')
+    expect(source).toContain('if not exist "!VSINSTALL!\\VC\\Auxiliary\\Build\\vcvars64.bat"')
+    expect(source).toContain('for /f "usebackq delims=" %%I in (`"!VSWHERE!"')
     expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\2022\\Enterprise')
     expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\2022\\BuildTools')
     expect(source).toContain('%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe')
