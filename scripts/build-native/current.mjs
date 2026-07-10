@@ -181,7 +181,7 @@ async function buildWindows() {
     : ''
   await run(
     join(process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows', 'System32', 'cmd.exe'),
-    ['/d', '/s', '/c', `"${join(workspaceRoot, 'native/windows/security/build.cmd')}"`]
+    ['/d', '/c', 'call', join(workspaceRoot, 'native/windows/security/build.cmd')]
   )
   if (releaseBuild) {
     const timestampUrl = requiredEnvironment('CROSSHANDS_WINDOWS_TIMESTAMP_URL')

@@ -1,6 +1,9 @@
+import { win32 } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
+  isPathWithin,
   loadBenchmarkDefinition,
   mergeAgentEvidenceFragments,
   validateAgentEvidence
@@ -8,6 +11,18 @@ import {
 import { validAgentEvidence } from '../../tests/release/fixtures/evidence.mjs'
 
 describe('frozen reference-agent benchmark', () => {
+  it('contains frozen files on Windows without accepting sibling or cross-drive paths', () => {
+    const directory = 'C:\\repo\\benchmarks\\agents'
+    expect(isPathWithin(directory, `${directory}\\tasks.json`, win32)).toBe(true)
+    expect(isPathWithin(directory, 'C:\\repo\\benchmarks\\agents-evil\\tasks.json', win32)).toBe(
+      false
+    )
+    expect(isPathWithin(directory, 'C:\\repo\\benchmarks\\conformance\\tasks.json', win32)).toBe(
+      false
+    )
+    expect(isPathWithin(directory, 'D:\\repo\\benchmarks\\agents\\tasks.json', win32)).toBe(false)
+  })
+
   it('pins exact clients, models, configs, runners, network, prompt, task, and integration files', async () => {
     const definition = await loadBenchmarkDefinition()
     expect(definition.catalog.agents.map((agent) => agent.id)).toEqual(['codex', 'opencode', 'omp'])

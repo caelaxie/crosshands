@@ -1,6 +1,6 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
 import { describe, expect, test } from 'vitest'
 
@@ -124,30 +124,33 @@ describe('Linux provider boundary', () => {
 
   test('constructs with an absolute packaged runtime path', () => {
     const provider = new LinuxComputerProvider()
-    expect(provider.runtimePath.startsWith('/')).toBe(true)
+    expect(isAbsolute(provider.runtimePath)).toBe(true)
   })
 
-  test('starts the packaged persistent provider and reports headless readiness precisely', async () => {
-    const provider = new LinuxComputerProvider({ environment: {} })
-    try {
-      const handshake = await provider.start()
-      expect(handshake.provider).toBe('crosshands-computer-use-linux')
-      expect(handshake.publicContract).toBe('1.0.0')
-      expect(handshake.capabilities.operations.capabilities).toBe(true)
-      expect(handshake.capabilities.operations.getAppState).toBe(false)
-      const response = await provider.dispatch({
-        requestId: 'capabilities-1',
-        operation: 'capabilities',
-        input: {},
-        deadlineAt: Date.now() + 1_000
-      })
-      expect(response).toMatchObject({
-        requestId: 'capabilities-1',
-        dispatched: false,
-        result: { platform: 'linux' }
-      })
-    } finally {
-      await provider.close()
+  test.runIf(process.platform === 'linux')(
+    'starts the packaged persistent provider and reports headless readiness precisely',
+    async () => {
+      const provider = new LinuxComputerProvider({ environment: {} })
+      try {
+        const handshake = await provider.start()
+        expect(handshake.provider).toBe('crosshands-computer-use-linux')
+        expect(handshake.publicContract).toBe('1.0.0')
+        expect(handshake.capabilities.operations.capabilities).toBe(true)
+        expect(handshake.capabilities.operations.getAppState).toBe(false)
+        const response = await provider.dispatch({
+          requestId: 'capabilities-1',
+          operation: 'capabilities',
+          input: {},
+          deadlineAt: Date.now() + 1_000
+        })
+        expect(response).toMatchObject({
+          requestId: 'capabilities-1',
+          dispatched: false,
+          result: { platform: 'linux' }
+        })
+      } finally {
+        await provider.close()
+      }
     }
-  })
+  )
 })

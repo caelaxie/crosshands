@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -107,11 +107,21 @@ async function jsonFile(path) {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 
+export function isPathWithin(base, candidate, pathApi = { isAbsolute, relative, resolve, sep }) {
+  const relativePath = pathApi.relative(pathApi.resolve(base), pathApi.resolve(candidate))
+  return (
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${pathApi.sep}`) &&
+      !pathApi.isAbsolute(relativePath))
+  )
+}
+
 async function validateFrozenFile(base, relativePath, expectedDigest, label) {
   string(relativePath, `${label}.path`)
   digest(expectedDigest, `${label}.sha256`)
   const path = resolve(base, relativePath)
-  if (!path.startsWith(`${resolve(base)}/`) && path !== resolve(base)) {
+  if (!isPathWithin(base, path)) {
     fail(`${label}.path escapes its benchmark directory`)
   }
   const actual = await sha256(path)
@@ -241,7 +251,7 @@ export async function loadBenchmarkDefinition(root = workspaceRoot) {
   const configDigests = {}
   for (const agent of agents) {
     const configPath = resolve(directory, agent.config)
-    if (!configPath.startsWith(`${directory}/`))
+    if (!isPathWithin(directory, configPath))
       fail(`${agent.id}.config escapes the benchmark directory`)
     // The small fixed catalog is intentionally loaded serially to report the first invalid agent.
     // oxlint-disable-next-line no-await-in-loop -- deterministic validation order.

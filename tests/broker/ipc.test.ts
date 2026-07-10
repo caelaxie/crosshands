@@ -38,51 +38,54 @@ describe('restricted local IPC', () => {
     })
   })
 
-  it('rejects unsafe Unix directories and precreated endpoints while electing one lease owner', async () => {
-    const root = join(tmpdir(), `crosshands-ipc-${randomUUID()}`)
-    await mkdir(root, { mode: 0o700 })
-    await chmod(root, 0o777)
-    await expect(
-      validateUnixRuntimeDirectory(root, { uid: process.getuid!(), stopAt: root })
-    ).rejects.toThrow(/mode/)
-    await chmod(root, 0o700)
-    const socket = join(root, 'broker.sock')
-    await writeFile(socket, 'attacker')
-    await expect(
-      acquireUnixLease({
-        runtimeDirectory: root,
-        endpoint: socket,
-        owner: 'one',
-        isProcessAlive: () => true
-      })
-    ).rejects.toThrow(/endpoint/)
-    await (await import('node:fs/promises')).unlink(socket)
-    const [a, b] = await Promise.allSettled([
-      acquireUnixLease({
-        runtimeDirectory: root,
-        endpoint: socket,
-        owner: 'one',
-        isProcessAlive: () => true
-      }),
-      acquireUnixLease({
-        runtimeDirectory: root,
-        endpoint: socket,
-        owner: 'two',
-        isProcessAlive: () => true
-      })
-    ])
-    expect([a.status, b.status].toSorted()).toEqual(['fulfilled', 'rejected'])
-    const winner =
-      a.status === 'fulfilled' ? a.value : b.status === 'fulfilled' ? b.value : undefined
-    await winner?.release()
+  it.runIf(process.platform !== 'win32')(
+    'rejects unsafe Unix directories and precreated endpoints while electing one lease owner',
+    async () => {
+      const root = join(tmpdir(), `crosshands-ipc-${randomUUID()}`)
+      await mkdir(root, { mode: 0o700 })
+      await chmod(root, 0o777)
+      await expect(
+        validateUnixRuntimeDirectory(root, { uid: process.getuid!(), stopAt: root })
+      ).rejects.toThrow(/mode/)
+      await chmod(root, 0o700)
+      const socket = join(root, 'broker.sock')
+      await writeFile(socket, 'attacker')
+      await expect(
+        acquireUnixLease({
+          runtimeDirectory: root,
+          endpoint: socket,
+          owner: 'one',
+          isProcessAlive: () => true
+        })
+      ).rejects.toThrow(/endpoint/)
+      await (await import('node:fs/promises')).unlink(socket)
+      const [a, b] = await Promise.allSettled([
+        acquireUnixLease({
+          runtimeDirectory: root,
+          endpoint: socket,
+          owner: 'one',
+          isProcessAlive: () => true
+        }),
+        acquireUnixLease({
+          runtimeDirectory: root,
+          endpoint: socket,
+          owner: 'two',
+          isProcessAlive: () => true
+        })
+      ])
+      expect([a.status, b.status].toSorted()).toEqual(['fulfilled', 'rejected'])
+      const winner =
+        a.status === 'fulfilled' ? a.value : b.status === 'fulfilled' ? b.value : undefined
+      await winner?.release()
 
-    const link = join(root, 'link')
-    await symlink(root, link)
-    await expect(
-      validateUnixRuntimeDirectory(link, { uid: process.getuid!(), stopAt: link })
-    ).rejects.toThrow(/symbolic link/)
-    expect((await lstat(link)).isSymbolicLink()).toBe(true)
-  })
+      const link = join(root, 'link')
+      await symlink(root, link)
+      await expect(
+        validateUnixRuntimeDirectory(link, { uid: process.getuid!(), stopAt: link })
+      ).rejects.toThrow(/symbolic link/)
+      expect((await lstat(link)).isSymbolicLink()).toBe(true)
+    }
+  )
 
   it('bounds and rejects malformed frames', () => {
     const frame = encodeFrame({ type: 'cancel', requestId: 'r1' }, 1024)
@@ -91,29 +94,32 @@ describe('restricted local IPC', () => {
     expect(() => decodeFrames(Buffer.from([0, 0, 0, 8]), 1024)).toThrow(/incomplete/)
   })
 
-  it('recovers a user-owned socket only after proving its lease owner is dead', async () => {
-    const root = join(tmpdir(), `chs-${randomUUID().slice(0, 8)}`)
-    await mkdir(root, { mode: 0o700 })
-    const socket = join(root, 'broker.sock')
-    const staleServer = net.createServer()
-    await new Promise<void>((resolve, reject) => {
-      staleServer.once('error', reject)
-      staleServer.listen(socket, resolve)
-    })
-    await chmod(socket, 0o600)
-    await writeFile(`${socket}.lease`, JSON.stringify({ pid: 999_999, owner: 'stale' }), {
-      mode: 0o600
-    })
+  it.runIf(process.platform !== 'win32')(
+    'recovers a user-owned socket only after proving its lease owner is dead',
+    async () => {
+      const root = join(tmpdir(), `chs-${randomUUID().slice(0, 8)}`)
+      await mkdir(root, { mode: 0o700 })
+      const socket = join(root, 'broker.sock')
+      const staleServer = net.createServer()
+      await new Promise<void>((resolve, reject) => {
+        staleServer.once('error', reject)
+        staleServer.listen(socket, resolve)
+      })
+      await chmod(socket, 0o600)
+      await writeFile(`${socket}.lease`, JSON.stringify({ pid: 999_999, owner: 'stale' }), {
+        mode: 0o600
+      })
 
-    const lease = await acquireUnixLease({
-      runtimeDirectory: root,
-      endpoint: socket,
-      owner: 'replacement',
-      isProcessAlive: () => false
-    })
-    await lease.release()
-    await new Promise<void>((resolve) => staleServer.close(() => resolve()))
-  })
+      const lease = await acquireUnixLease({
+        runtimeDirectory: root,
+        endpoint: socket,
+        owner: 'replacement',
+        isProcessAlive: () => false
+      })
+      await lease.release()
+      await new Promise<void>((resolve) => staleServer.close(() => resolve()))
+    }
+  )
 
   it('does not pretend Windows DACL or peer guarantees exist on other platforms', () => {
     if (process.platform !== 'win32') expect(() => windowsPipeSecurity()).toThrow(/Windows/)

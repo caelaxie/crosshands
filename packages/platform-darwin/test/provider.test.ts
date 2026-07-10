@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -120,8 +121,13 @@ describe('@crosshands/platform-darwin', () => {
   })
 
   it('resolves the helper from the package asset directory', () => {
-    expect(resolveHelperPath()).toMatch(
-      /platform-darwin\/assets\/CrossHands Computer Use\.app\/Contents\/MacOS\/crosshands-computer-use-macos$/
+    expect(resolveHelperPath()).toBe(
+      fileURLToPath(
+        new URL(
+          '../assets/CrossHands%20Computer%20Use.app/Contents/MacOS/crosshands-computer-use-macos',
+          import.meta.url
+        )
+      )
     )
   })
 

@@ -62,7 +62,7 @@ function rawExchange(address: string, frame: unknown): Promise<unknown> {
   })
 }
 
-describe('local control transport', () => {
+describe.runIf(process.platform !== 'win32')('Unix local control transport', () => {
   it('rejects requests before handshake', async () => {
     const { options } = await fixture()
     const server = new LocalControlServer(options)

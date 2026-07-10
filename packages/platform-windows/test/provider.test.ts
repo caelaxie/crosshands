@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
@@ -90,7 +91,11 @@ describe('WindowsComputerProvider', () => {
   })
 
   it('verifies the packaged payload and rejects a substituted script', async () => {
-    await expect(verifyWindowsPayload()).resolves.toBeUndefined()
+    const packagedScript = fileURLToPath(new URL('../assets/runtime.ps1', import.meta.url))
+    const packagedManifest = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
+    await expect(
+      verifyWindowsPayload(packagedScript, packagedManifest, false)
+    ).resolves.toBeUndefined()
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-integrity-'))
     const scriptPath = join(directory, 'runtime.ps1')
     const manifestPath = join(directory, 'payload.json')
@@ -102,7 +107,7 @@ describe('WindowsComputerProvider', () => {
       manifestPath,
       await readFile(new URL('../assets/payload.json', import.meta.url), 'utf8')
     )
-    await expect(verifyWindowsPayload(scriptPath, manifestPath)).rejects.toMatchObject({
+    await expect(verifyWindowsPayload(scriptPath, manifestPath, false)).rejects.toMatchObject({
       code: 'provider_unavailable'
     })
   })

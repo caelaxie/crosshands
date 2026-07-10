@@ -266,7 +266,9 @@ describe('CrossHands JSON CLI', () => {
       )
     ).toBe(0)
     expect(await readFile(destination)).toEqual(screenshot)
-    expect((await stat(destination)).mode & 0o777).toBe(0o600)
+    if (process.platform !== 'win32') {
+      expect((await stat(destination)).mode & 0o777).toBe(0o600)
+    }
     expect(JSON.parse(state.stdout.join(''))).toMatchObject({
       result: { screenshot: { path: destination, bytes: screenshot.byteLength, dataOmitted: true } }
     })
@@ -360,90 +362,96 @@ describe('CrossHands JSON CLI', () => {
     expect(state.calls).toHaveLength(0)
   })
 
-  it('auto-starts the protected broker seam and reaches the fake provider', async () => {
-    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-autostart-'))
-    await chmod(runtimeDirectory, 0o700)
-    const identity = { osIdentity: 'uid:test', graphicalSessionId: 'session:test' }
-    const peer: BrokerPeer = { ...identity, verified: true, local: true }
-    const paths: LocalClientPaths = {
-      identity,
-      runtimeDirectory,
-      tokenFile: join(runtimeDirectory, 'control.token'),
-      endpoint: { transport: 'unix', address: join(runtimeDirectory, 'control.sock') }
-    }
-    const provider = new FakeComputerProvider({ graphicalSessionId: identity.graphicalSessionId })
-    provider.enqueue({
-      kind: 'result',
-      dispatched: false,
-      result: {
-        platform: 'linux',
-        provider: 'crosshands-fake',
-        providerVersion: '0.1.0',
-        operations: { capabilities: true },
-        permissions: { accessibility: 'granted', screenshots: 'granted' }
+  it.runIf(process.platform !== 'win32')(
+    'auto-starts the protected Unix broker seam and reaches the fake provider',
+    async () => {
+      const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-autostart-'))
+      await chmod(runtimeDirectory, 0o700)
+      const identity = { osIdentity: 'uid:test', graphicalSessionId: 'session:test' }
+      const peer: BrokerPeer = { ...identity, verified: true, local: true }
+      const paths: LocalClientPaths = {
+        identity,
+        runtimeDirectory,
+        tokenFile: join(runtimeDirectory, 'control.token'),
+        endpoint: { transport: 'unix', address: join(runtimeDirectory, 'control.sock') }
       }
-    })
-    const broker = new LocalBroker({ identity: peer, providerFactory: () => provider })
-    await broker.connect({ peer, versions: CONTRACT_VERSIONS })
-    const server = new LocalControlServer({
-      endpoint: paths.endpoint,
-      runtimeDirectory,
-      tokenFile: paths.tokenFile,
-      identity,
-      handler: ({ payload }) => {
-        const request = payload as { operation: 'capabilities'; input: unknown }
-        return broker.request(request)
-      }
-    })
-    let starts = 0
-    const client = await createProductionBrokerClient({
-      paths,
-      readinessMs: 1_000,
-      entrypoint: '/installed/crosshands',
-      spawnBroker: async () => {
-        starts += 1
-        await server.start()
-      }
-    })
-    await expect(client.request('capabilities', {})).resolves.toMatchObject({
-      result: { provider: 'crosshands-fake' }
-    })
-    expect(starts).toBe(1)
-    expect(provider.calls).toHaveLength(1)
-    await client.close()
-    await server.close()
-  })
-
-  it('does not replace an authenticated broker after a rejected handshake', async () => {
-    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-rejected-'))
-    await chmod(runtimeDirectory, 0o700)
-    const identity = { osIdentity: 'uid:test', graphicalSessionId: 'session:test' }
-    const paths: LocalClientPaths = {
-      identity,
-      runtimeDirectory,
-      tokenFile: join(runtimeDirectory, 'control.token'),
-      endpoint: { transport: 'unix', address: join(runtimeDirectory, 'control.sock') }
-    }
-    const server = new LocalControlServer({
-      endpoint: paths.endpoint,
-      runtimeDirectory,
-      tokenFile: paths.tokenFile,
-      identity: { ...identity, graphicalSessionId: 'different-session' },
-      handler: async () => ({})
-    })
-    await server.start()
-    let starts = 0
-
-    await expect(
-      createProductionBrokerClient({
+      const provider = new FakeComputerProvider({ graphicalSessionId: identity.graphicalSessionId })
+      provider.enqueue({
+        kind: 'result',
+        dispatched: false,
+        result: {
+          platform: 'linux',
+          provider: 'crosshands-fake',
+          providerVersion: '0.1.0',
+          operations: { capabilities: true },
+          permissions: { accessibility: 'granted', screenshots: 'granted' }
+        }
+      })
+      const broker = new LocalBroker({ identity: peer, providerFactory: () => provider })
+      await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+      const server = new LocalControlServer({
+        endpoint: paths.endpoint,
+        runtimeDirectory,
+        tokenFile: paths.tokenFile,
+        identity,
+        handler: ({ payload }) => {
+          const request = payload as { operation: 'capabilities'; input: unknown }
+          return broker.request(request)
+        }
+      })
+      let starts = 0
+      const client = await createProductionBrokerClient({
         paths,
+        readinessMs: 1_000,
         entrypoint: '/installed/crosshands',
         spawnBroker: async () => {
           starts += 1
+          await server.start()
         }
       })
-    ).rejects.toMatchObject({ code: 'peer_rejected' })
-    expect(starts).toBe(0)
-    await server.close()
-  })
+      await expect(client.request('capabilities', {})).resolves.toMatchObject({
+        result: { provider: 'crosshands-fake' }
+      })
+      expect(starts).toBe(1)
+      expect(provider.calls).toHaveLength(1)
+      await client.close()
+      await server.close()
+    }
+  )
+
+  it.runIf(process.platform !== 'win32')(
+    'does not replace an authenticated Unix broker after a rejected handshake',
+    async () => {
+      const runtimeDirectory = await mkdtemp(join(tmpdir(), 'crosshands-rejected-'))
+      await chmod(runtimeDirectory, 0o700)
+      const identity = { osIdentity: 'uid:test', graphicalSessionId: 'session:test' }
+      const paths: LocalClientPaths = {
+        identity,
+        runtimeDirectory,
+        tokenFile: join(runtimeDirectory, 'control.token'),
+        endpoint: { transport: 'unix', address: join(runtimeDirectory, 'control.sock') }
+      }
+      const server = new LocalControlServer({
+        endpoint: paths.endpoint,
+        runtimeDirectory,
+        tokenFile: paths.tokenFile,
+        identity: { ...identity, graphicalSessionId: 'different-session' },
+        handler: async () => ({})
+      })
+      await server.start()
+      let starts = 0
+
+      await expect(
+        createProductionBrokerClient({
+          paths,
+          entrypoint: '/installed/crosshands',
+          spawnBroker: async () => {
+            starts += 1
+          }
+        })
+      ).rejects.toMatchObject({ code: 'peer_rejected' })
+      expect(starts).toBe(0)
+      await server.close()
+    }
+  )
 })
