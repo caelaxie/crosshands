@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const runtimePath = resolve('native/windows/runtime.ps1')
 const runtimeSource = readFile(runtimePath, 'utf8')
+const relayBuildSource = readFile(resolve('native/windows/security/build.cmd'), 'utf8')
 
 describe('Windows native provider characterization', () => {
   it('uses persistent stdin frames and never accepts an operation path', async () => {
@@ -83,5 +84,12 @@ describe('Windows native provider characterization', () => {
       readFile(resolve('packages/platform-windows/assets/runtime.ps1'))
     ])
     expect(packaged).toEqual(source)
+  })
+
+  it('discovers Visual Studio build tools from installer and hosted-runner locations', async () => {
+    const source = await relayBuildSource
+    expect(source).toContain('%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe')
+    expect(source).toContain('%ProgramFiles%\\Microsoft Visual Studio\\Installer\\vswhere.exe')
+    expect(source).toContain('%ChocolateyInstall%\\bin\\vswhere.exe')
   })
 })

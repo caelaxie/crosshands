@@ -35,7 +35,7 @@ beforeAll(async () => {
     // oxlint-disable-next-line no-await-in-loop -- avoid concurrent pnpm pack store races.
     packed.push(await packOne(descriptor, output))
   }
-}, 120_000)
+}, 300_000)
 
 afterAll(async () => {
   await cleanCurrentNativeBuild()

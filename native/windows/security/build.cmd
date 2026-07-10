@@ -2,6 +2,8 @@
 setlocal
 if not defined VSCMD_VER (
   set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+  if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+  if not exist "%VSWHERE%" set "VSWHERE=%ChocolateyInstall%\bin\vswhere.exe"
   if not exist "%VSWHERE%" (
     echo Visual Studio Build Tools discovery is unavailable. 1>&2
     exit /b 2
