@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process'
 import { createHash, createPublicKey, sign, verify } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { create as createTar } from 'tar'
 
 export const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -219,12 +221,23 @@ export async function packOne(descriptor, outputDirectory) {
     const staging = await mkdtemp(join(tmpdir(), 'crosshands-pack-mode-'))
     try {
       await run('tar', ['-xzf', archive, '-C', staging])
-      for (const executable of descriptor.executable) {
-        // oxlint-disable-next-line no-await-in-loop -- chmod must finish before the archive is rebuilt.
-        await chmod(join(staging, 'package', executable), 0o755)
-      }
+      const executablePaths = new Set(
+        descriptor.executable.map((executable) => `package/${executable}`)
+      )
       await rm(archive, { force: true })
-      await run('tar', ['-czf', archive, '-C', staging, 'package'])
+      await createTar(
+        {
+          cwd: staging,
+          file: archive,
+          gzip: true,
+          portable: true,
+          onWriteEntry(entry) {
+            const normalizedPath = entry.path.replaceAll('\\', '/').replace(/^\.\//, '')
+            if (executablePaths.has(normalizedPath)) entry.stat.mode = 0o755
+          }
+        },
+        ['package']
+      )
     } finally {
       await rm(staging, { recursive: true, force: true })
     }
