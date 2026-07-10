@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "agentId": "codex",
+  "agentPackage": "@openai/codex",
+  "agentVersion": "0.143.0",
+  "binary": "codex",
+  "model": "gpt-5.1-codex",
+  "modelParameters": {
+    "reasoningEffort": "medium",
+    "temperature": null
+  },
+  "approvalMode": "never",
+  "sandboxMode": "workspace-write",
+  "network": {
+    "mode": "allowlist",
+    "endpoints": ["api.openai.com:443"],
+    "packageRegistryDuringRun": false
+  },
+  "runner": {
+    "os": "macos",
+    "osBuild": "macOS Tahoe 26.5.2",
+    "architecture": "arm64",
+    "desktop": "Aqua",
+    "display": "1440x900@2x",
+    "locale": "en-US",
+    "ime": "com.apple.keylayout.US",
+    "nodeVersions": ["22.17.0", "24.3.0"]
+  },
+  "integration": {
+    "cliSkill": {
+      "package": "crosshands@0.1.0",
+      "command": "crosshands computer",
+      "skill": "skills/computer-use/SKILL.md",
+      "skillSha256": "57da5046581aab22adace95f3d6491eb8ef3a2801e3472383699c53bbfd3eed2"
+    },
+    "mcp": {
+      "package": "@crosshands/mcp@0.1.0",
+      "transport": "stdio",
+      "command": "crosshands-mcp",
+      "args": []
+    }
+  }
+}

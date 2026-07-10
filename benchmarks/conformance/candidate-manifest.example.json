@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "crosshands.candidate-manifest/v1",
+  "candidateId": "0.1.0-rc.1:macos-26-arm64:node22",
+  "releaseCandidateId": "0.1.0-rc.1+sha256-REPLACE",
+  "matrixRole": "macos-26-arm64",
+  "platform": "macos",
+  "osVersion": "macOS Tahoe 26.5.2",
+  "osBuild": "macOS 26.5.2 build REPLACE_WITH_EXACT_BUILD",
+  "architecture": "arm64",
+  "nodeVersion": "22",
+  "desktopSession": "console:501:aqua",
+  "displayLayout": [
+    {
+      "id": "builtin",
+      "origin": { "x": 0, "y": 0 },
+      "size": { "width": 1512, "height": 982 },
+      "scale": 2
+    },
+    {
+      "id": "left",
+      "origin": { "x": -1920, "y": 0 },
+      "size": { "width": 1920, "height": 1080 },
+      "scale": 1
+    }
+  ],
+  "locale": "en-US",
+  "ime": "com.apple.keylayout.US",
+  "fixtureVersion": "1.0.0",
+  "fixtureResetDigest": "sha256:REPLACE_WITH_64_HEX_CHARACTERS",
+  "permissionBaseline": {
+    "accessibility": "granted-to-signed-candidate",
+    "screen-recording": "granted-to-signed-candidate"
+  },
+  "runnerImageSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+  "runnerBaselineSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+  "driverSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+  "candidatePackageSetSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+  "packageDigests": {
+    "crosshands": "sha256:REPLACE_WITH_64_HEX_CHARACTERS",
+    "crosshands-darwin-arm64": "sha256:REPLACE_WITH_64_HEX_CHARACTERS"
+  },
+  "signerFingerprints": {
+    "crosshands-darwin-arm64": "REPLACE_WITH_SIGNER_FINGERPRINT"
+  },
+  "sessionBaseline": {
+    "active": true,
+    "unlocked": true,
+    "local": true,
+    "competingInputAbsent": true
+  },
+  "exclusions": []
+}

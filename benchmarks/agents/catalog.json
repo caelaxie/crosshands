@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "freezeId": "crosshands-agent-benchmark-2026-07-10-v1",
+  "fixtureVersion": "crosshands-reference-fixture-1.0.0",
+  "taskCatalog": "tasks.json",
+  "taskCatalogSha256": "75835dc2f31b9408bdc870e390403483b6d92ca2d126e42cc0b0bceb0559ccad",
+  "prompt": "prompt.md",
+  "promptSha256": "a6638a052e9f7a79524d60817ee93bea86148c19dd98387c1fc9260fbe15dd46",
+  "releasePolicy": "release-policy.json",
+  "releasePolicySha256": "9a76642ecdc39fdd42713d17fdeb21ff3a68a066e402cfc772ae8031e37a123c",
+  "requiredRunsPerAdapter": 5,
+  "minimumPassesPerAdapter": 4,
+  "adapters": ["cli-skill", "mcp"],
+  "agents": [
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "cellId": "codex-macos-arm64",
+      "config": "configs/codex-macos.json",
+      "configSha256": "d14cdac920e17c6b053ead04ab76255f9c2b792e5ae7796b81632be6c0edab83"
+    },
+    {
+      "id": "opencode",
+      "displayName": "OpenCode",
+      "cellId": "opencode-windows11-x64",
+      "config": "configs/opencode-windows.json",
+      "configSha256": "75a9fe0120b8d9d8600259c54b98a0e67ca3ff6dadbba3f48ac7c5ba19531db9"
+    },
+    {
+      "id": "omp",
+      "displayName": "Oh My Pi",
+      "cellId": "omp-ubuntu-xorg-x64",
+      "config": "configs/omp-ubuntu.json",
+      "configSha256": "472630f28e00b429c7d4b39baea9f06885bfea2dd5536c5f978930595472d2d8"
+    }
+  ]
+}

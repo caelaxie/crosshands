@@ -1,1 +1,14 @@
 .DS_Store
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+*.log
+.crosshands/
+artifacts/
+native/macos/.build/
+packages/platform-darwin/assets/CrossHands Computer Use.app/
+packages/platform-darwin/assets/payload.json
+__pycache__/
+*.pyc

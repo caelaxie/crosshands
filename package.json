@@ -1,0 +1,41 @@
+{
+  "name": "crosshands-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone computer-use runtime for coding agents",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "format": "oxfmt --write .",
+    "lint": "oxlint . --ignore-path .oxlintignore && oxfmt --check --ignore-path .oxfmtignore .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run --config vitest.workspace.ts",
+    "test:adapters": "vitest run --config vitest.workspace.ts tests/adapters",
+    "test:native": "node scripts/build-native/current.mjs",
+    "test:pack": "vitest run --config vitest.workspace.ts tests/packaging",
+    "test:security": "vitest run --config vitest.workspace.ts tests/security tests/broker/policy.test.ts tests/broker/ipc.test.ts packages/platform-darwin/test/provider.test.ts packages/platform-linux/test/provider.test.ts packages/platform-windows/test",
+    "test:lifecycle": "vitest run --config vitest.workspace.ts tests/lifecycle",
+    "test:conformance": "vitest run --config vitest.workspace.ts tests/conformance",
+    "benchmark:agents": "vitest run --config vitest.workspace.ts benchmarks/agents",
+    "release:validate": "vitest run --config vitest.workspace.ts tests/release",
+    "package:candidate": "node scripts/package/candidate.mjs artifacts",
+    "package:smoke": "node scripts/package/smoke.mjs artifacts"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@types/node": "24.10.1",
+    "oxfmt": "0.52.0",
+    "oxlint": "1.71.0",
+    "tar": "7.5.19",
+    "typescript": "5.9.3",
+    "vitest": "4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
+}

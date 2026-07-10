@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crosshands.dev/schemas/conformance-evidence-v1.json",
+  "title": "CrossHands conformance run evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runId",
+    "candidateId",
+    "catalogDigest",
+    "fixtureVersion",
+    "platform",
+    "cellId",
+    "taskId",
+    "adapter",
+    "repetition",
+    "attempt",
+    "startedAt",
+    "durationMs",
+    "classification",
+    "automaticRetryCount",
+    "oracleMatched",
+    "normalizedResultDigest",
+    "normalizedErrorCode",
+    "verificationState",
+    "fixtureResetDigest",
+    "driverSha256",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "crosshands.conformance-run/v1" },
+    "runId": { "type": "string", "minLength": 1 },
+    "candidateId": { "type": "string", "minLength": 1 },
+    "catalogDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "fixtureVersion": { "type": "string", "const": "1.0.0" },
+    "platform": { "enum": ["macos", "windows", "linux-x11"] },
+    "cellId": { "type": "string", "minLength": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "adapter": { "enum": ["broker", "cli", "mcp"] },
+    "repetition": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "classification": {
+      "enum": ["pass", "product-failure", "infrastructure-invalidated"]
+    },
+    "failureClass": { "type": "string" },
+    "infrastructureCode": { "type": "string" },
+    "runnerEvidence": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "automaticRetryCount": { "type": "integer", "minimum": 0 },
+    "oracleMatched": { "type": "boolean" },
+    "normalizedResultDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "normalizedErrorCode": { "type": ["string", "null"] },
+    "verificationState": {
+      "enum": ["verified", "indeterminate", "failed", "not-attempted", "observation"]
+    },
+    "fixtureResetDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "driverSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rawAccessibilityRetained",
+        "screenshotRetained",
+        "clipboardRetained",
+        "literalInputRetained"
+      ],
+      "properties": {
+        "rawAccessibilityRetained": { "const": false },
+        "screenshotRetained": { "const": false },
+        "clipboardRetained": { "const": false },
+        "literalInputRetained": { "const": false }
+      }
+    }
+  },
+  "additionalProperties": false
+}

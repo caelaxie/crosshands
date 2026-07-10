@@ -1,0 +1,9 @@
+{
+  "productVersion": "0.1.0",
+  "source": "stablyai/orca@8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Lovecast Inc.",
+  "files": {
+    "runtime.py": "6e69db383b9988669616872ead4b28a642b859fa90bf0959044a651156756ece"
+  }
+}
