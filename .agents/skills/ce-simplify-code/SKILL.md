@@ -16,6 +16,10 @@ Resolve the simplification scope in this order:
 
 If none of the above produces a non-empty scope, stop and ask the user what to simplify rather than guessing. Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
 
+**Preflight — skip a no-yield scope before spending reviewers.** The three reviewers hunt for reuse, quality, and efficiency issues in *code*. If the resolved scope contains no substantive human-authored code — it is documentation- or Markdown-only, or only generated, vendored, dependency/lockfile, or purely mechanical (formatting, lint autofix, mass rename) churn — stop here with a one-line note that there is nothing to simplify, and do **not** dispatch the reviewers. On a mixed diff that includes both real code and these no-yield changes, narrow the scope to the code files and continue. This preflight gates on the *kind* of change only, never on size or count: an explicit user-named scope is authoritative and still runs even when small. (Callers that already gate on size — `ce-work`, `/lfg` — and any standing "run this automatically" instruction own the size/cost policy; this preflight is only the no-code safety net.)
+
+After this preflight passes, use the platform's task-tracking capability when available to show a short user-facing view derived from the remaining workflow. Track the meaningful review, apply, and verification outcomes rather than creating one task per reviewer or mirroring every step; add conditional work only when its gate fires. If no task-tracking capability is available, continue normally without simulating a task list in chat.
+
 ## Step 2: Launch 3 review agents in parallel
 
 Dispatch three generic subagents — code-reuse, code-quality, and efficiency reviewers — via the platform's subagent primitive (`Agent`/`Task` in Claude Code, `spawn_agent` in Codex) where available; otherwise run the reviews inline or serially. For each reviewer, read its prompt asset from this skill's directory and pass the **full file content** as the subagent's prompt, together with the resolved scope (the full diff or file set) so it has complete context:
@@ -28,7 +32,7 @@ Do not paraphrase these rubrics from memory — read each file and pass it verba
 
 **Bounded dispatch.** Queue the three reviewers and launch only as many as the harness accepts at once; treat a concurrency/active-agent-limit error as backpressure (leave the reviewer queued and retry after a slot frees), not as reviewer failure.
 
-**Model selection.** Use the platform's mid-tier model for these reviewers when the current harness exposes a known override. In Claude Code this is the Sonnet class; in Codex use the current mini/mid-tier model exposed by `spawn_agent` when known. On platforms where the model-override parameter is unavailable or the model name is unknown or unrecognized, omit the override -- a working pass on the parent model beats a broken dispatch.
+**Model selection.** Use the platform's balanced mid-tier model for these reviewers when the current harness exposes a known override. In Claude Code this is the Sonnet class. In Codex, apply this tier only when the active dispatch primitive exposes an explicit model or custom-agent selector; task wording alone does not select a different model. Otherwise omit the override and inherit the parent model -- a working pass on the parent model beats a broken dispatch.
 
 **Permission mode.** Omit the `mode` parameter on the dispatch call so the user's configured permission settings apply.
 
@@ -39,6 +43,8 @@ Wait for all three agents to complete. Aggregate their findings and fix each iss
 Before applying each fix, confirm it preserves behavior: same output for every input, same error behavior, and same side effects and ordering. If a fix can't clear that test, skip it — automated checks in Step 4 don't cover every behavior.
 
 **Never simplify away a safety check.** Input validation at trust boundaries, error handling that prevents data loss, security checks (authorization, escaping, sanitization), and accessibility affordances are not removable boilerplate — preserve them even when a finding frames them as redundant or inline-able. Code that drops one of these is not simpler, it is unfinished. If a proposed simplification would thin or remove one, skip it.
+
+**Honor caller-passed structure pins.** When the caller passes a plan path with the structure-pin constraint, that plan path is context, never the simplification scope; that plan's `session-settled:`-labeled Key Technical Decisions are structural constraints the simplification must preserve — deliberately duplicated files stay duplicated, deliberately separate implementations stay separate — even when consolidation would otherwise be the obvious simplification. Behavior preservation already governs every fix; this extends it to settled structure.
 
 ## Step 4: Verify behavior is preserved
 
