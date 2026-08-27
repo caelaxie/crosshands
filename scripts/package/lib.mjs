@@ -98,11 +98,12 @@ export function run(command, args, options = {}) {
     child.once('exit', (code, signal) => {
       if (code === 0) resolveRun({ stdout, stderr })
       else {
-        rejectRun(
-          new Error(
-            `${command} exited with ${code ?? signal ?? 'unknown status'}${stderr ? `: ${stderr.trim()}` : ''}`
-          )
+        const error = new Error(
+          `${command} exited with ${code ?? signal ?? 'unknown status'}${stderr ? `: ${stderr.trim()}` : ''}`
         )
+        error.stdout = stdout
+        error.stderr = stderr
+        rejectRun(error)
       }
     })
   })

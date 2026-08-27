@@ -10,7 +10,7 @@ Build a universal helper app with:
 native/macos/scripts/build-universal-app.sh
 ```
 
-The script builds `arm64` and `x86_64` release slices, verifies both with `lipo`, assembles the app bundle, and verifies its signature. Local builds use ad-hoc signing. Release candidates must set `CROSSHANDS_CODESIGN_IDENTITY` to the project's stable Developer ID identity before the immutable candidate is created; notarization is a release-pipeline responsibility.
+The script builds `arm64` and `x86_64` release slices, verifies both with `lipo`, assembles the app bundle, and verifies its signature. Local builds use ad-hoc signing. Release candidates must set `CROSSHANDS_CODESIGN_IDENTITY` to the project's stable Developer ID identity before the immutable candidate is created; that identity is signed with the hardened runtime and a secure timestamp, then notarized.
 
 ## Permissions
 
