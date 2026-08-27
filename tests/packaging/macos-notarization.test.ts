@@ -1,14 +1,16 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import { expect, it } from 'vitest'
 
-import { workspaceRoot } from '../../scripts/package/lib.mjs'
+import { assertNotaryAccepted } from '../../scripts/build-native/current.mjs'
 
-it('fetches the Apple notary log when a release build is not Accepted', async () => {
-  const source = await readFile(join(workspaceRoot, 'scripts/build-native/current.mjs'), 'utf8')
-  expect(source).toContain('notarytool')
-  expect(source).toContain("'log'")
-  expect(source).toContain("status === 'Accepted'")
-  expect(source).toContain('--output-format')
+it('accepts an Accepted notary report', () => {
+  expect(assertNotaryAccepted({ status: 'Accepted', id: 'ok' })).toEqual({
+    status: 'Accepted',
+    id: 'ok'
+  })
+})
+
+it('includes the Apple log when notarization is not Accepted', () => {
+  expect(() =>
+    assertNotaryAccepted({ status: 'Invalid', id: '42dc6bf1' }, 'The.HardenedRuntime')
+  ).toThrow(/Invalid \(42dc6bf1\):\nThe\.HardenedRuntime/)
 })

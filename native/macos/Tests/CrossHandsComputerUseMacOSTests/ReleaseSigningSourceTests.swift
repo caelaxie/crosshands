@@ -8,7 +8,6 @@ final class ReleaseSigningSourceTests: XCTestCase {
         XCTAssertTrue(script.contains("IDENTITY=${CROSSHANDS_CODESIGN_IDENTITY:--}"))
         XCTAssertTrue(script.contains("--options runtime"))
         XCTAssertTrue(script.contains("--timestamp"))
-        XCTAssertTrue(script.contains("[ \"$IDENTITY\" = \"-\" ]"))
     }
 
     private func packageRoot(file: StaticString = #filePath) -> URL {

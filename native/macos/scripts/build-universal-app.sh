@@ -24,13 +24,9 @@ cp "$BIN_DIR/crosshands-computer-use-macos" "$OUTPUT_APP/Contents/MacOS/crosshan
 chmod 0755 "$OUTPUT_APP/Contents/MacOS/crosshands-computer-use-macos"
 
 lipo "$OUTPUT_APP/Contents/MacOS/crosshands-computer-use-macos" -verify_arch arm64 x86_64
-if [ "$IDENTITY" = "-" ]; then
-  codesign --force --sign "$IDENTITY" --identifier ai.crosshands.ComputerUse "$OUTPUT_APP"
-else
-  codesign --force --sign "$IDENTITY" \
-    --identifier ai.crosshands.ComputerUse \
-    --options runtime \
-    --timestamp \
-    "$OUTPUT_APP"
+set -- --force --sign "$IDENTITY" --identifier ai.crosshands.ComputerUse --options runtime
+if [ "$IDENTITY" != "-" ]; then
+  set -- "$@" --timestamp
 fi
+codesign "$@" "$OUTPUT_APP"
 codesign --verify --strict --verbose=2 "$OUTPUT_APP"

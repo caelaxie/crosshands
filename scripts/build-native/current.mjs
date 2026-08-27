@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-import { run as runCommand, workspaceRoot } from '../package/lib.mjs'
+import { run as runCommand, runResult, workspaceRoot } from '../package/lib.mjs'
 
 export { workspaceRoot }
 const darwinApp = join(workspaceRoot, 'packages/platform-darwin/assets/CrossHands Computer Use.app')
@@ -82,67 +82,43 @@ function requiredEnvironment(name) {
   return value
 }
 
-function parseNotarytoolJSON(text) {
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end <= start) {
-    throw new Error(`notarytool output was not JSON: ${text}`)
-  }
-  return JSON.parse(text.slice(start, end + 1))
+export function assertNotaryAccepted(report, logText = '') {
+  if (report.status === 'Accepted') return report
+  const id = typeof report.id === 'string' && report.id.length > 0 ? ` (${report.id})` : ''
+  throw new Error(
+    `Apple notarization ${String(report.status)}${id}${logText ? `:\n${logText}` : ''}`
+  )
 }
 
 async function submitDarwinNotarization({ archive, appleId, password, teamIdentifier }) {
-  const args = [
+  const auth = ['--apple-id', appleId, '--password', password, '--team-id', teamIdentifier]
+  const submitted = await runResult('/usr/bin/xcrun', [
     'notarytool',
     'submit',
     archive,
-    '--apple-id',
-    appleId,
-    '--password',
-    password,
-    '--team-id',
-    teamIdentifier,
+    ...auth,
     '--wait',
     '--output-format',
     'json'
-  ]
-  let stdout = ''
-  let stderr = ''
+  ])
+  if (submitted.stdout) process.stdout.write(submitted.stdout)
+  if (submitted.stderr) process.stderr.write(submitted.stderr)
+  let report
   try {
-    const result = await runCommand('/usr/bin/xcrun', args)
-    stdout = result.stdout
-    stderr = result.stderr
-  } catch (error) {
-    stdout = error instanceof Error && 'stdout' in error ? String(error.stdout) : ''
-    stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : String(error)
+    report = JSON.parse(submitted.stdout)
+  } catch {
+    const detail = submitted.stderr.trim() || submitted.stdout.trim()
+    throw new Error(
+      `Apple notarization failed${submitted.code === 0 ? '' : ` (exit ${submitted.code})`}${detail ? `: ${detail}` : ''}`
+    )
   }
-  process.stdout.write(stdout)
-  if (stderr.length > 0) process.stderr.write(stderr)
-  const report = parseNotarytoolJSON(`${stdout}\n${stderr}`)
-  if (report.status === 'Accepted') return report
   let log = ''
-  if (typeof report.id === 'string' && report.id.length > 0) {
-    try {
-      const details = await runCommand('/usr/bin/xcrun', [
-        'notarytool',
-        'log',
-        report.id,
-        '--apple-id',
-        appleId,
-        '--password',
-        password,
-        '--team-id',
-        teamIdentifier
-      ])
-      log = details.stdout
-      process.stdout.write(log)
-    } catch (error) {
-      log = String(error)
-    }
+  if (report.status !== 'Accepted' && typeof report.id === 'string' && report.id.length > 0) {
+    const details = await runResult('/usr/bin/xcrun', ['notarytool', 'log', report.id, ...auth])
+    log = details.stdout
+    if (log) process.stdout.write(log)
   }
-  throw new Error(
-    `Apple notarization ${String(report.status)}${report.id ? ` (${report.id})` : ''}${log ? `:\n${log}` : ''}`
-  )
+  return assertNotaryAccepted(report, log)
 }
 
 async function buildDarwin() {
