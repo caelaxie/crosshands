@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-import { run as runCommand, workspaceRoot } from '../package/lib.mjs'
+import { run as runCommand, runResult, workspaceRoot } from '../package/lib.mjs'
 
 export { workspaceRoot }
 const darwinApp = join(workspaceRoot, 'packages/platform-darwin/assets/CrossHands Computer Use.app')
@@ -82,6 +82,45 @@ function requiredEnvironment(name) {
   return value
 }
 
+export function assertNotaryAccepted(report, logText = '') {
+  if (report.status === 'Accepted') return report
+  const id = typeof report.id === 'string' && report.id.length > 0 ? ` (${report.id})` : ''
+  throw new Error(
+    `Apple notarization ${String(report.status)}${id}${logText ? `:\n${logText}` : ''}`
+  )
+}
+
+async function submitDarwinNotarization({ archive, appleId, password, teamIdentifier }) {
+  const auth = ['--apple-id', appleId, '--password', password, '--team-id', teamIdentifier]
+  const submitted = await runResult('/usr/bin/xcrun', [
+    'notarytool',
+    'submit',
+    archive,
+    ...auth,
+    '--wait',
+    '--output-format',
+    'json'
+  ])
+  if (submitted.stdout) process.stdout.write(submitted.stdout)
+  if (submitted.stderr) process.stderr.write(submitted.stderr)
+  let report
+  try {
+    report = JSON.parse(submitted.stdout)
+  } catch {
+    const detail = submitted.stderr.trim() || submitted.stdout.trim()
+    throw new Error(
+      `Apple notarization failed${submitted.code === 0 ? '' : ` (exit ${submitted.code})`}${detail ? `: ${detail}` : ''}`
+    )
+  }
+  let log = ''
+  if (report.status !== 'Accepted' && typeof report.id === 'string' && report.id.length > 0) {
+    const details = await runResult('/usr/bin/xcrun', ['notarytool', 'log', report.id, ...auth])
+    log = details.stdout
+    if (log) process.stdout.write(log)
+  }
+  return assertNotaryAccepted(report, log)
+}
+
 async function buildDarwin() {
   await run(join(workspaceRoot, 'native/macos/scripts/build-universal-app.sh'), [])
   const helper = join(darwinApp, 'Contents/MacOS/crosshands-computer-use-macos')
@@ -99,18 +138,12 @@ async function buildDarwin() {
     try {
       const archive = join(staging, 'CrossHands Computer Use.zip')
       await run('/usr/bin/ditto', ['-c', '-k', '--keepParent', darwinApp, archive])
-      await run('/usr/bin/xcrun', [
-        'notarytool',
-        'submit',
+      await submitDarwinNotarization({
         archive,
-        '--apple-id',
         appleId,
-        '--password',
         password,
-        '--team-id',
-        teamIdentifier,
-        '--wait'
-      ])
+        teamIdentifier
+      })
       await run('/usr/bin/xcrun', ['stapler', 'staple', darwinApp])
       await run('/usr/bin/xcrun', ['stapler', 'validate', darwinApp])
       await run('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=4', darwinApp])

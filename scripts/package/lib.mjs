@@ -80,7 +80,7 @@ export const packages = Object.freeze({
 
 export const currentPlatformPackage = packages[process.platform]
 
-export function run(command, args, options = {}) {
+export function runResult(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
     const child = spawn(command, args, {
       cwd: workspaceRoot,
@@ -96,16 +96,22 @@ export function run(command, args, options = {}) {
     child.stderr?.on('data', (chunk) => (stderr += chunk))
     child.once('error', rejectRun)
     child.once('exit', (code, signal) => {
-      if (code === 0) resolveRun({ stdout, stderr })
-      else {
-        rejectRun(
-          new Error(
-            `${command} exited with ${code ?? signal ?? 'unknown status'}${stderr ? `: ${stderr.trim()}` : ''}`
-          )
-        )
-      }
+      resolveRun({
+        code: code ?? 1,
+        signal,
+        stdout,
+        stderr
+      })
     })
   })
+}
+
+export async function run(command, args, options = {}) {
+  const result = await runResult(command, args, options)
+  if (result.code === 0) return result
+  throw new Error(
+    `${command} exited with ${result.code ?? result.signal ?? 'unknown status'}${result.stderr ? `: ${result.stderr.trim()}` : ''}`
+  )
 }
 
 export function packageManagerInvocation(command, args, platform = process.platform) {
