@@ -158,10 +158,14 @@ release owners must configure:
   `MACOS_CERTIFICATE_PASSWORD`, `MACOS_TEAM_ID`, `MACOS_NOTARY_APPLE_ID`, and
   `MACOS_NOTARY_APP_PASSWORD` for Developer ID signing and notarization;
 - `COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD`, and `COSIGN_PUBLIC_KEY` for the
-  immutable registry-integrity evidence; and
+  immutable registry-integrity evidence;
 - `RELEASE_MANIFEST_PRIVATE_KEY_PEM` and `RELEASE_MANIFEST_PUBLIC_KEY_PEM` for
   the CrossHands signed release manifest consumed by installed-package
-  verification.
+  verification; and
+- `RELEASE_TAG_ALLOWED_SIGNERS` on the `release-candidate` environment, an
+  SSH `allowed_signers` line whose principal is the tagger email. Candidate
+  preflight verifies `vVERSION` with that file; GitHub's own "Verified" badge
+  is not enough.
 
 A candidate dispatch accepts only an exact signed `vVERSION` Git tag. Promotion
 or rollback requires the original candidate workflow run ID and expected

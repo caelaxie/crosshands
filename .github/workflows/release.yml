@@ -96,6 +96,7 @@ jobs:
           COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
           CROSSHANDS_RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_MANIFEST_PRIVATE_KEY_PEM }}
           CROSSHANDS_RELEASE_PUBLIC_KEY: ${{ secrets.RELEASE_MANIFEST_PUBLIC_KEY_PEM }}
+          RELEASE_TAG_ALLOWED_SIGNERS: ${{ vars.RELEASE_TAG_ALLOWED_SIGNERS }}
         run: |
           [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
           test "$RELEASE_GIT_REF" = "v$RELEASE_VERSION"
@@ -106,6 +107,7 @@ jobs:
           test -n "$COSIGN_PUBLIC_KEY"
           test -n "$CROSSHANDS_RELEASE_PRIVATE_KEY"
           test -n "$CROSSHANDS_RELEASE_PUBLIC_KEY"
+          test -n "$RELEASE_TAG_ALLOWED_SIGNERS"
 
       - name: Check out immutable candidate tag
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -115,9 +117,15 @@ jobs:
 
       - name: Verify signed tag
         shell: bash
+        env:
+          RELEASE_TAG_ALLOWED_SIGNERS: ${{ vars.RELEASE_TAG_ALLOWED_SIGNERS }}
         run: |
           test "$(git describe --tags --exact-match HEAD)" = "v$RELEASE_VERSION"
-          git verify-tag "v$RELEASE_VERSION"
+          signers="$RUNNER_TEMP/allowed_signers"
+          printf '%s\n' "$RELEASE_TAG_ALLOWED_SIGNERS" > "$signers"
+          git -c gpg.format=ssh \
+            -c gpg.ssh.allowedSignersFile="$signers" \
+            verify-tag "v$RELEASE_VERSION"
 
   candidate-build:
     if: inputs.operation == 'candidate'
