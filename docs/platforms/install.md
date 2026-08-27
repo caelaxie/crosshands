@@ -172,8 +172,5 @@ timestamp evidence, credential-expiry margin, SBOM and notice review,
 last-known-good version, and the named release, platform, signing, benchmark,
 rollback, and issue-intake owners.
 
-After promotion, clean-machine canaries verify delivered hashes, doctor,
-broker/CLI/MCP handshakes, and a fixture mutation on every claimed platform.
-Checks at promotion, 1 hour, 6 hours, and 24 hours remain part of the release
-record. Any signature, integrity, install, broker, adapter, safety, or
-silent-success failure triggers channel rollback and candidate deprecation.
+If a promoted install fails in the field, dispatch `rollback` against the
+last-known-good candidate digest.

@@ -29,7 +29,7 @@ The platform driver protocol is intentionally external to the package under test
 
 Any identity/peer boundary failure, canary leak, sensitive-target exposure, payload-integrity failure, unsigned required artifact, MCP stdout corruption, human-only boundary bypass, rollback failure, or claimed success without a matching oracle rejects the release regardless of score. Result, error, and verification-state digests must match between broker, CLI, and MCP for an equivalent reset repetition.
 
-The release coordinator retains access-controlled detailed privacy-safe fixture evidence for one year. The repository workflow artifact is a 90-day transport copy; signed manifests and aggregate reports are retained with the release. Release roles, approvals, package signatures, SBOM/notices, registry promotion identity, rollback drill, agent results, and post-promotion canaries belong in the immutable release manifest. Missing or inconsistent evidence is a no-go.
+The release coordinator retains access-controlled detailed privacy-safe fixture evidence for one year. The repository workflow artifact is a 90-day transport copy; signed manifests and aggregate reports are retained with the release. Release roles, approvals, package signatures, SBOM/notices, registry promotion identity, rollback drill, and agent results belong in the immutable release manifest. Missing or inconsistent evidence is a no-go.
 
 ## Running the workflow
 
@@ -43,4 +43,4 @@ Dispatch the workflow with the immutable candidate identifier. Each cell uploads
 
 After that real-evidence test passes, `evaluate.mjs` writes the promotion input `conformance-evidence.json`. It contains six release-policy cells and all 28 frozen task IDs. Each task's `passed` value is the worst count across broker, CLI, MCP, Node 22, and Node 24, so a stronger adapter or Node cell cannot conceal a weaker one. The artifact retains product-failure and infrastructure counts, zero automatic retries, immutable record digests, exact OS/runner/package identities, and an empty exclusion list.
 
-No interactive runner evidence exists in the repository by default. Until every declared cell, signing identity, registry-resolved artifact, rollback drill, and 24-hour canary has run, U10 and the v1 release claim remain incomplete.
+No interactive runner evidence exists in the repository by default. Until every declared cell, signing identity, registry-resolved artifact, and rollback drill has run, U10 and the v1 release claim remain incomplete. The GitHub release workflow does not wait for a post-promotion soak.
