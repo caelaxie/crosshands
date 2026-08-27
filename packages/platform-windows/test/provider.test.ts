@@ -93,9 +93,7 @@ describe('WindowsComputerProvider', () => {
   it('verifies the packaged payload and rejects a substituted script', async () => {
     const packagedScript = fileURLToPath(new URL('../assets/runtime.ps1', import.meta.url))
     const packagedManifest = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
-    await expect(
-      verifyWindowsPayload(packagedScript, packagedManifest)
-    ).resolves.toBeUndefined()
+    await expect(verifyWindowsPayload(packagedScript, packagedManifest)).resolves.toBeUndefined()
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-integrity-'))
     const scriptPath = join(directory, 'runtime.ps1')
     const manifestPath = join(directory, 'payload.json')
