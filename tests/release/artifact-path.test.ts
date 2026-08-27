@@ -68,7 +68,7 @@ async function artifactFixture() {
     },
     platformEvidence: {
       darwin: { signature: 'Developer ID', notarization: 'ticket' },
-      win32: { signature: 'CrossHands', timestamp: 'timestamp', chain: 'trusted' },
+      win32: { payloadHash: 'verified', unsigned: 'unsigned-payload' },
       linux: { payloadHash: 'verified', releaseManifestSignature: 'verified' }
     }
   }

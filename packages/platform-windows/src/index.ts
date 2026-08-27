@@ -13,7 +13,7 @@ import type {
   StableAppIdentity
 } from '@crosshands/runtime'
 
-import { verifyWindowsAuthenticode, WindowsComputerProvider } from './provider.js'
+import { WindowsComputerProvider } from './provider.js'
 import {
   createWindowsControlServer as createWindowsRelayControlServer,
   type WindowsRelayControlServer
@@ -42,40 +42,17 @@ export async function createControlServer(
   }
   const manifest = JSON.parse(await readFile(PAYLOAD_MANIFEST, 'utf8')) as {
     files?: Record<string, unknown>
-    authenticode?: {
-      required: boolean
-      publisher?: string
-      thumbprint?: string
-      timestampRequired?: boolean
-    }
   }
   const helperSha256 = manifest.files?.['crosshands-pipe-relay.exe']
-  const policy = manifest.authenticode
-  if (
-    typeof helperSha256 !== 'string' ||
-    policy?.required !== true ||
-    typeof policy.publisher !== 'string' ||
-    typeof policy.thumbprint !== 'string' ||
-    !/^[a-f0-9]{40,64}$/i.test(policy.thumbprint)
-  ) {
-    throw new Error('Windows control relay is missing signed release metadata')
+  if (typeof helperSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(helperSha256)) {
+    throw new Error('Windows control relay is missing payload hash metadata')
   }
   return createWindowsRelayControlServer({
     identity: options.identity,
     relay: {
       helperPath: CONTROL_RELAY,
       helperSha256,
-      expectedPublisher: policy.publisher,
-      expectedThumbprint: policy.thumbprint,
-      pipeName: options.endpoint.address,
-      verifyAuthenticode: async (helperPath) => {
-        const evidence = await verifyWindowsAuthenticode(helperPath, policy)
-        return {
-          trusted: evidence.trusted,
-          publisher: evidence.publisher,
-          thumbprint: evidence.thumbprint
-        }
-      }
+      pipeName: options.endpoint.address
     },
     handler: options.handler
   })

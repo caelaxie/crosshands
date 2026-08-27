@@ -17,9 +17,9 @@ a network listener and cannot operate a remote machine in the first release.
   target is Ubuntu 24.04 x64 with GNOME on Xorg.
 
 Release publishing requires project-specific registry configuration and the
-configured macOS Developer ID/notarization, Windows Authenticode/timestamp, and
-release-manifest signing credentials. A source build or ad-hoc signature is
-development evidence, not a releasable package.
+configured macOS Developer ID/notarization and release-manifest signing
+credentials. Windows payloads are unsigned. A source build or ad-hoc macOS
+signature is development evidence, not a releasable package.
 
 ## Install
 
@@ -123,7 +123,7 @@ artifact.
      Accessibility and Screen & System Audio Recording.
    - Windows: CrossHands creates no automation-permission database entry. Review
      any administrator-created application-control allowlist entry and remove
-     it only when its publisher/path matches the signed CrossHands evidence.
+     it only when its path matches the installed CrossHands helper.
    - Linux: no OS permission database entry is created; undo only accessibility
      settings the operator changed manually.
 
@@ -157,9 +157,6 @@ release owners must configure:
 - `MACOS_DEVELOPER_ID_APPLICATION`, `MACOS_CERTIFICATE_BASE64`,
   `MACOS_CERTIFICATE_PASSWORD`, `MACOS_TEAM_ID`, `MACOS_NOTARY_APPLE_ID`, and
   `MACOS_NOTARY_APP_PASSWORD` for Developer ID signing and notarization;
-- `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD`,
-  `WINDOWS_PUBLISHER`, and `WINDOWS_TIMESTAMP_URL` for Authenticode signing,
-  publisher pinning, and trusted timestamping;
 - `COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD`, and `COSIGN_PUBLIC_KEY` for the
   immutable registry-integrity evidence; and
 - `RELEASE_MANIFEST_PRIVATE_KEY_PEM` and `RELEASE_MANIFEST_PUBLIC_KEY_PEM` for
@@ -175,8 +172,5 @@ timestamp evidence, credential-expiry margin, SBOM and notice review,
 last-known-good version, and the named release, platform, signing, benchmark,
 rollback, and issue-intake owners.
 
-After promotion, clean-machine canaries verify delivered hashes, doctor,
-broker/CLI/MCP handshakes, and a fixture mutation on every claimed platform.
-Checks at promotion, 1 hour, 6 hours, and 24 hours remain part of the release
-record. Any signature, integrity, install, broker, adapter, safety, or
-silent-success failure triggers channel rollback and candidate deprecation.
+If a promoted install fails in the field, dispatch `rollback` against the
+last-known-good candidate digest.

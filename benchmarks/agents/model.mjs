@@ -663,7 +663,7 @@ export function validateReleaseEvidence(evidence, definition) {
   }
   for (const [platform, fields] of Object.entries({
     darwin: ['identity', 'fingerprint', 'notarizationTicket'],
-    win32: ['publisher', 'thumbprint', 'timestamp', 'chain'],
+    win32: ['payloadSha256', 'unsigned'],
     linux: ['payloadSha256', 'manifestSignature']
   })) {
     const record = object(

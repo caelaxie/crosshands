@@ -89,8 +89,7 @@ have passed. A release candidate must still run the final installed artifacts
 on the complete interactive matrix described in the
 [provider conformance guide](docs/platforms/conformance.md), then pass the
 [Codex, OpenCode, and OMP benchmark](docs/platforms/agent-benchmarks.md).
-Promotion requires those exact evidence artifacts, and v1 readiness is finalized
-only after the 24-hour canary gate.
+Promotion requires those exact evidence artifacts.
 
 ## License
 

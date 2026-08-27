@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Build, promote, roll back, or finalize 24-hour release evidence
+        description: Build, promote, or roll back
         required: true
         type: choice
         options:
           - candidate
           - promote
           - rollback
-          - finalize
       version:
         description: Exact package version, without a leading v
         required: true
@@ -21,15 +20,15 @@ on:
         required: false
         type: string
       evidence_run_id:
-        description: Workflow run containing signed candidate evidence for promotion, rollback, or finalization
+        description: Workflow run containing signed candidate evidence for promotion or rollback
         required: false
         type: string
       manifest_sha256:
-        description: Expected SHA-256 of the signed release manifest for promotion, rollback, or finalization
+        description: Expected SHA-256 of the signed release manifest for promotion or rollback
         required: false
         type: string
       conformance_evidence_run_id:
-        description: Promotion/finalize workflow run containing provider conformance evidence
+        description: Promotion workflow run containing provider conformance evidence
         required: false
         type: string
       conformance_evidence_artifact:
@@ -37,7 +36,7 @@ on:
         required: false
         type: string
       agent_evidence_run_id:
-        description: Promotion/finalize workflow run containing validated reference-agent evidence
+        description: Promotion workflow run containing validated reference-agent evidence
         required: false
         type: string
       agent_evidence_artifact:
@@ -45,7 +44,7 @@ on:
         required: false
         type: string
       release_evidence_run_id:
-        description: Promotion/finalize workflow run containing signed combined release evidence
+        description: Promotion workflow run containing signed combined release evidence
         required: false
         type: string
       release_evidence_artifact:
@@ -153,10 +152,6 @@ jobs:
       CROSSHANDS_MACOS_TEAM_IDENTIFIER: ${{ secrets.MACOS_TEAM_ID }}
       CROSSHANDS_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
       CROSSHANDS_APPLE_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
-      CROSSHANDS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-      CROSSHANDS_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-      CROSSHANDS_WINDOWS_PUBLISHER: ${{ secrets.WINDOWS_PUBLISHER }}
-      CROSSHANDS_WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
       CROSSHANDS_RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_MANIFEST_PRIVATE_KEY_PEM }}
       CROSSHANDS_RELEASE_PUBLIC_KEY: ${{ secrets.RELEASE_MANIFEST_PUBLIC_KEY_PEM }}
 
@@ -196,12 +191,6 @@ jobs:
             test -n "$CROSSHANDS_APPLE_ID"
             test -n "$CROSSHANDS_APPLE_APP_PASSWORD"
           fi
-          if [ "${{ matrix.os }}" = windows ]; then
-            test -n "$CROSSHANDS_WINDOWS_CERTIFICATE"
-            test -n "$CROSSHANDS_WINDOWS_CERTIFICATE_PASSWORD"
-            test -n "$CROSSHANDS_WINDOWS_PUBLISHER"
-            test -n "$CROSSHANDS_WINDOWS_TIMESTAMP_URL"
-          fi
 
       - name: Import macOS Developer ID certificate
         if: matrix.os == 'macos'
@@ -219,24 +208,6 @@ jobs:
             -s -k "$GITHUB_RUN_ID" "$keychain"
           security list-keychains -d user -s "$keychain"
           security find-identity -v -p codesigning "$keychain" | grep -F "$CROSSHANDS_CODESIGN_IDENTITY"
-
-      - name: Import Windows Authenticode certificate
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: |
-          $certificatePath = Join-Path $env:RUNNER_TEMP 'crosshands-signing.pfx'
-          [IO.File]::WriteAllBytes(
-            $certificatePath,
-            [Convert]::FromBase64String($env:CROSSHANDS_WINDOWS_CERTIFICATE)
-          )
-          $password = ConvertTo-SecureString $env:CROSSHANDS_WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
-          $certificate = Import-PfxCertificate -FilePath $certificatePath `
-            -CertStoreLocation Cert:\CurrentUser\My -Password $password
-          if (-not $certificate.HasPrivateKey) { throw 'Windows signing certificate has no private key' }
-          "CROSSHANDS_WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" | Out-File `
-            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CROSSHANDS_WINDOWS_THUMBPRINT=$($certificate.Thumbprint)" | Out-File `
-            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install frozen dependency graph
         run: corepack pnpm install --frozen-lockfile
@@ -268,7 +239,7 @@ jobs:
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
 
-      - name: Verify timestamped Windows payload before accepting its hash
+      - name: Verify Windows payload hashes
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
@@ -279,15 +250,13 @@ jobs:
           tar -xzf $archive.FullName -C $destination
           $assets = Join-Path $destination 'package/assets'
           $manifest = Get-Content (Join-Path $assets 'payload.json') -Raw | ConvertFrom-Json
+          if ($manifest.authenticode.required -eq $true) {
+            throw 'Windows payload must ship unsigned'
+          }
           foreach ($entry in $manifest.files.PSObject.Properties) {
             $payload = Join-Path $assets $entry.Name
-            $signature = Get-AuthenticodeSignature -LiteralPath $payload
-            if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature for $($entry.Name): $($signature.Status)" }
-            if (-not $signature.TimeStamperCertificate) { throw "Authenticode signature for $($entry.Name) has no trusted timestamp" }
-            if ($signature.SignerCertificate.Subject -ne $manifest.authenticode.publisher) { throw "Authenticode publisher mismatch for $($entry.Name)" }
-            if ($signature.SignerCertificate.Thumbprint -ne $manifest.authenticode.thumbprint) { throw "Authenticode thumbprint mismatch for $($entry.Name)" }
             $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $payload).Hash.ToLowerInvariant()
-            if ($digest -ne $entry.Value) { throw "Payload hash for $($entry.Name) was not recorded after signing" }
+            if ($digest -ne $entry.Value) { throw "Payload hash mismatch for $($entry.Name)" }
           }
 
       - name: Generate package SBOM
@@ -308,10 +277,6 @@ jobs:
           if [ "${{ matrix.os }}" = macos ]; then
             security delete-keychain "$RUNNER_TEMP/crosshands-signing.keychain-db" 2>/dev/null || true
             rm -f "$RUNNER_TEMP/crosshands-signing.p12"
-          fi
-          if [ "${{ matrix.os }}" = windows ]; then
-            powershell.exe -NoProfile -NonInteractive -Command \
-              'if ($env:CROSSHANDS_WINDOWS_CERTIFICATE_THUMBPRINT) { Remove-Item -LiteralPath ("Cert:\CurrentUser\My\" + $env:CROSSHANDS_WINDOWS_CERTIFICATE_THUMBPRINT) -Force -ErrorAction SilentlyContinue }; Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "crosshands-signing.pfx") -Force -ErrorAction SilentlyContinue'
           fi
 
       - name: Upload immutable candidate inputs
@@ -549,7 +514,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   load-existing-candidate:
-    if: inputs.operation == 'promote' || inputs.operation == 'rollback' || inputs.operation == 'finalize'
+    if: inputs.operation == 'promote' || inputs.operation == 'rollback'
     runs-on: ubuntu-24.04
     environment: release-production
     timeout-minutes: 15
@@ -568,8 +533,8 @@ jobs:
           test -n "$COSIGN_PUBLIC_KEY"
           test -n "$CROSSHANDS_RELEASE_PUBLIC_KEY"
 
-      - name: Require exact benchmark evidence coordinates for promotion or finalization
-        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+      - name: Require exact benchmark evidence coordinates for promotion
+        if: inputs.operation == 'promote'
         shell: bash
         run: |
           [[ "$CONFORMANCE_EVIDENCE_RUN_ID" =~ ^[0-9]+$ ]]
@@ -582,14 +547,14 @@ jobs:
           test -n "$CROSSHANDS_RELEASE_EVIDENCE_PUBLIC_KEY"
 
       - name: Check out the immutable release validator
-        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        if: inputs.operation == 'promote'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: v${{ inputs.version }}
           fetch-depth: 0
 
       - name: Set up the pinned validation runtime
-        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        if: inputs.operation == 'promote'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
@@ -632,7 +597,7 @@ jobs:
             artifacts/release/registry-integrity.json
 
       - name: Download exact conformance, agent, and combined evidence
-        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        if: inputs.operation == 'promote'
         shell: bash
         run: |
           mkdir -p external-evidence/conformance external-evidence/agents external-evidence/combined
@@ -654,53 +619,19 @@ jobs:
           test -f external-evidence/combined/release-evidence.sig
 
       - name: Verify signed pre-promotion evidence and candidate identity
-        if: inputs.operation == 'promote' || inputs.operation == 'finalize'
+        if: inputs.operation == 'promote'
         shell: bash
         run: |
           printf '%s' "$CROSSHANDS_RELEASE_EVIDENCE_PUBLIC_KEY" > release-evidence.pub
           node benchmarks/agents/validate-prepromotion.mjs
 
-      - name: Validate complete 24-hour release evidence without moving tags
-        if: inputs.operation == 'finalize'
-        shell: bash
-        run: |
-          printf '%s' "$CROSSHANDS_RELEASE_PUBLIC_KEY" > release-manifest.pub
-          node benchmarks/agents/validate-evidence.mjs \
-            --release-evidence external-evidence/combined/release-evidence.json \
-            --artifacts artifacts \
-            --public-key release-manifest.pub
-
       - name: Preserve verified evidence for the channel operation
-        if: inputs.operation == 'promote' || inputs.operation == 'rollback'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-${{ inputs.operation }}-${{ inputs.version }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 365
-
-      - name: Record immutable v1-ready evidence after the 24-hour gate
-        if: inputs.operation == 'finalize'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: v1-ready-${{ inputs.version }}
-          path: |
-            artifacts/
-            external-evidence/
-          if-no-files-found: error
-          retention-days: 365
-
-      - name: Publish finalization coordinates without rebuilding or moving tags
-        if: inputs.operation == 'finalize'
-        shell: bash
-        run: |
-          {
-            echo '### CrossHands v1 evidence declared ready'
-            echo "- version: $RELEASE_VERSION"
-            echo "- candidate evidence run: $EVIDENCE_RUN_ID"
-            echo "- release manifest SHA-256: \`$EXPECTED_MANIFEST_SHA256\`"
-            echo '- complete 0/1/6/24-hour evidence passed; this operation did not publish, rebuild, or move a registry tag'
-          } >> "$GITHUB_STEP_SUMMARY"
 
   move-default-channel:
     if: inputs.operation == 'promote' || inputs.operation == 'rollback'
@@ -775,5 +706,5 @@ jobs:
             echo "- version: $RELEASE_VERSION"
             echo "- evidence run: $EVIDENCE_RUN_ID"
             echo "- manifest SHA-256: \`$EXPECTED_MANIFEST_SHA256\`"
-            echo '- protected-environment approvers remain responsible for deprecation, canaries, and rollback monitoring'
+            echo '- protected-environment approvers remain responsible for deprecation and rollback monitoring'
           } >> "$GITHUB_STEP_SUMMARY"

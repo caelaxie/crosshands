@@ -56,7 +56,7 @@ describe('release artifact integrity', () => {
     const complete = {
       platformEvidence: {
         darwin: { signature: 'Developer ID Application: CrossHands', notarization: 'ticket-1' },
-        win32: { signature: 'CN=CrossHands', timestamp: 'tsa-1', chain: 'trusted-chain-1' },
+        win32: { payloadHash: 'verified', unsigned: 'unsigned-payload' },
         linux: { payloadHash: 'verified', releaseManifestSignature: 'verified' }
       }
     }
@@ -73,9 +73,9 @@ describe('release artifact integrity', () => {
     expect(() =>
       validateReleaseReadyManifest({
         ...complete,
-        platformEvidence: { ...complete.platformEvidence, win32: { signature: 'CN=CrossHands' } }
+        platformEvidence: { ...complete.platformEvidence, win32: { payloadHash: 'verified' } }
       })
-    ).toThrow(/win32 timestamp/)
+    ).toThrow(/win32 unsigned/)
   })
 
   it('rejects mixed package versions before producing a candidate', () => {

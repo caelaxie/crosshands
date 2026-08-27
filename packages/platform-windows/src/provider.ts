@@ -1,10 +1,9 @@
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { isAbsolute, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
 
 import {
   COMPUTER_OPERATIONS,
@@ -244,101 +243,10 @@ type WindowsProviderOptions = {
 
 const PACKAGED_SCRIPT = fileURLToPath(new URL('../assets/runtime.ps1', import.meta.url))
 const PACKAGED_MANIFEST = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
-const execFileAsync = promisify(execFile)
-
-type AuthenticodePolicy = {
-  required: boolean
-  publisher?: string
-  thumbprint?: string
-  timestampRequired?: boolean
-}
-
-export type WindowsAuthenticodeEvidence = {
-  trusted: true
-  publisher: string
-  thumbprint: string
-  timestamped: boolean
-}
-
-export async function verifyWindowsAuthenticode(
-  scriptPath: string,
-  policy: AuthenticodePolicy
-): Promise<WindowsAuthenticodeEvidence> {
-  if (
-    policy.required !== true ||
-    typeof policy.publisher !== 'string' ||
-    policy.publisher.length === 0 ||
-    typeof policy.thumbprint !== 'string' ||
-    !/^[a-f0-9]{40}$/i.test(policy.thumbprint)
-  ) {
-    throw createComputerError(
-      'provider_unavailable',
-      'Windows release payload has no valid Authenticode policy'
-    )
-  }
-  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows'
-  const executable = win32.join(
-    systemRoot,
-    'System32',
-    'WindowsPowerShell',
-    'v1.0',
-    'powershell.exe'
-  )
-  const command = [
-    '$ErrorActionPreference = "Stop"',
-    '$signature = Get-AuthenticodeSignature -LiteralPath $env:CROSSHANDS_VERIFY_PATH',
-    '$result = [ordered]@{',
-    '  status = $signature.Status.ToString()',
-    '  publisher = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "" }',
-    '  thumbprint = if ($signature.SignerCertificate) { $signature.SignerCertificate.Thumbprint } else { "" }',
-    '  timestamped = $null -ne $signature.TimeStamperCertificate',
-    '}',
-    '$result | ConvertTo-Json -Compress'
-  ].join('\n')
-  const encoded = Buffer.from(command, 'utf16le').toString('base64')
-  const { stdout } = await execFileAsync(
-    executable,
-    ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
-    {
-      env: {
-        SystemRoot: systemRoot,
-        WINDIR: process.env.WINDIR ?? systemRoot,
-        TEMP: process.env.TEMP ?? win32.join(systemRoot, 'Temp'),
-        TMP: process.env.TMP ?? process.env.TEMP ?? win32.join(systemRoot, 'Temp'),
-        CROSSHANDS_VERIFY_PATH: scriptPath
-      },
-      windowsHide: true
-    }
-  )
-  const result = JSON.parse(stdout) as {
-    status?: unknown
-    publisher?: unknown
-    thumbprint?: unknown
-    timestamped?: unknown
-  }
-  if (
-    result.status !== 'Valid' ||
-    result.publisher !== policy.publisher ||
-    String(result.thumbprint).toUpperCase() !== policy.thumbprint.toUpperCase() ||
-    (policy.timestampRequired === true && result.timestamped !== true)
-  ) {
-    throw createComputerError(
-      'provider_unavailable',
-      'Windows provider Authenticode signer or timestamp mismatch'
-    )
-  }
-  return {
-    trusted: true,
-    publisher: result.publisher,
-    thumbprint: String(result.thumbprint),
-    timestamped: result.timestamped === true
-  }
-}
 
 export async function verifyWindowsPayload(
   scriptPath = PACKAGED_SCRIPT,
-  manifestPath = PACKAGED_MANIFEST,
-  verifySignature = process.platform === 'win32'
+  manifestPath = PACKAGED_MANIFEST
 ): Promise<void> {
   if (!isAbsolute(scriptPath) || !isAbsolute(manifestPath)) {
     throw createComputerError('provider_unavailable', 'Windows payload paths must be absolute')
@@ -346,7 +254,6 @@ export async function verifyWindowsPayload(
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
     productVersion?: unknown
     files?: Record<string, unknown>
-    authenticode?: AuthenticodePolicy
   }
   if (manifest.productVersion !== CONTRACT_VERSIONS.product) {
     throw createComputerError('version_incompatible', 'Windows payload product version mismatch')
@@ -360,9 +267,6 @@ export async function verifyWindowsPayload(
     .digest('hex')
   if (actual !== expected) {
     throw createComputerError('provider_unavailable', 'Windows provider payload hash mismatch')
-  }
-  if (verifySignature) {
-    await verifyWindowsAuthenticode(scriptPath, manifest.authenticode ?? { required: false })
   }
 }
 
