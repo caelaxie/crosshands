@@ -378,7 +378,7 @@ export function validateReleaseReadyManifest(manifest) {
   }
   for (const [platform, fields] of Object.entries({
     darwin: ['signature', 'notarization'],
-    win32: ['signature', 'timestamp', 'chain'],
+    win32: ['payloadHash', 'unsigned'],
     linux: ['payloadHash', 'releaseManifestSignature']
   })) {
     const record = evidence[platform]

@@ -89,19 +89,10 @@ export function encodeWindowsControlRelayRecord(
   return frame
 }
 
-export type AuthenticodeEvidence = {
-  trusted: boolean
-  publisher: string
-  thumbprint: string
-}
-
 export type WindowsControlRelayOptions = {
   helperPath: string
   helperSha256: string
-  expectedPublisher: string
-  expectedThumbprint: string
   pipeName: string
-  verifyAuthenticode: (helperPath: string) => Promise<AuthenticodeEvidence>
   onConnection: (connection: WindowsControlConnection) => void
   spawnProcess?: typeof spawn
 }
@@ -166,9 +157,6 @@ export async function verifyWindowsControlRelay(
   if (!/^[a-f0-9]{64}$/.test(options.helperSha256)) {
     throw new Error('Windows relay SHA-256 is malformed')
   }
-  if (!/^[a-f0-9]{40,64}$/i.test(options.expectedThumbprint)) {
-    throw new Error('Windows relay signer thumbprint policy is malformed')
-  }
   const info = await lstat(options.helperPath)
   if (!info.isFile() || info.isSymbolicLink()) {
     throw new Error('Windows relay payload is not a regular package file')
@@ -176,13 +164,6 @@ export async function verifyWindowsControlRelay(
   const bytes = await readFile(options.helperPath)
   const actual = createHash('sha256').update(bytes).digest('hex')
   if (actual !== options.helperSha256) throw new Error('Windows relay payload hash mismatch')
-  const signature = await options.verifyAuthenticode(options.helperPath)
-  if (!signature.trusted || signature.publisher !== options.expectedPublisher) {
-    throw new Error('Windows relay Authenticode identity is not trusted')
-  }
-  if (signature.thumbprint.toUpperCase() !== options.expectedThumbprint.toUpperCase()) {
-    throw new Error('Windows relay Authenticode signer thumbprint does not match')
-  }
 }
 
 type ConnectionState = {

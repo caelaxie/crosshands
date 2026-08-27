@@ -54,11 +54,11 @@ describe('Windows native control relay protocol', () => {
     expect(() => new WindowsControlRelayDecoder().push(oversized)).toThrow('exceeds')
   })
 
-  it('requires absolute, hash-matched, publisher-matched Authenticode evidence', async () => {
+  it('requires an absolute, hash-matched relay payload', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-security-'))
     temporaryDirectories.push(directory)
     const helperPath = join(directory, 'crosshands-pipe-relay.exe')
-    await writeFile(helperPath, 'signed-relay-fixture')
+    await writeFile(helperPath, 'unsigned-relay-fixture')
     const { createHash } = await import('node:crypto')
     const helperSha256 = createHash('sha256')
       .update(await readFile(helperPath))
@@ -66,14 +66,7 @@ describe('Windows native control relay protocol', () => {
     const base = {
       helperPath,
       helperSha256,
-      expectedPublisher: 'CrossHands Project',
-      expectedThumbprint: '0123456789ABCDEF0123456789ABCDEF01234567',
       pipeName: '\\\\.\\pipe\\crosshands-0123456789abcdef01234567',
-      verifyAuthenticode: async () => ({
-        trusted: true,
-        publisher: 'CrossHands Project',
-        thumbprint: '0123456789ABCDEF0123456789ABCDEF01234567'
-      }),
       onConnection: () => undefined
     }
 
@@ -81,22 +74,6 @@ describe('Windows native control relay protocol', () => {
     await expect(
       verifyWindowsControlRelay({ ...base, helperSha256: '0'.repeat(64) })
     ).rejects.toThrow('hash mismatch')
-    await expect(
-      verifyWindowsControlRelay({
-        ...base,
-        verifyAuthenticode: async () => ({
-          trusted: true,
-          publisher: 'Lookalike Publisher',
-          thumbprint: '0123456789ABCDEF0123456789ABCDEF01234567'
-        })
-      })
-    ).rejects.toThrow('not trusted')
-    await expect(
-      verifyWindowsControlRelay({
-        ...base,
-        expectedThumbprint: 'F'.repeat(40)
-      })
-    ).rejects.toThrow('thumbprint does not match')
     await expect(
       verifyWindowsControlRelay({ ...base, helperPath: 'crosshands-pipe-relay.exe' })
     ).rejects.toThrow('absolute')
@@ -146,12 +123,9 @@ describe('Windows relay control server', () => {
     const requests: unknown[] = []
     const server = createWindowsControlServer({
       relay: {
-        helperPath: resolve('/signed/crosshands-pipe-relay.exe'),
+        helperPath: resolve('/unsigned/crosshands-pipe-relay.exe'),
         helperSha256: '0'.repeat(64),
-        expectedPublisher: 'CrossHands Project',
-        expectedThumbprint: '0123456789ABCDEF0123456789ABCDEF01234567',
-        pipeName: '\\\\.\\pipe\\crosshands-0123456789abcdef01234567',
-        verifyAuthenticode: async () => ({ trusted: true, publisher: '', thumbprint: '' })
+        pipeName: '\\\\.\\pipe\\crosshands-0123456789abcdef01234567'
       },
       identity: windowsControlIdentity(verifiedPeer),
       handler: async (request) => {
@@ -182,12 +156,9 @@ describe('Windows relay control server', () => {
     const requests: unknown[] = []
     const server = createWindowsControlServer({
       relay: {
-        helperPath: resolve('/signed/crosshands-pipe-relay.exe'),
+        helperPath: resolve('/unsigned/crosshands-pipe-relay.exe'),
         helperSha256: '0'.repeat(64),
-        expectedPublisher: 'CrossHands Project',
-        expectedThumbprint: '0123456789ABCDEF0123456789ABCDEF01234567',
-        pipeName: '\\\\.\\pipe\\crosshands-0123456789abcdef01234567',
-        verifyAuthenticode: async () => ({ trusted: true, publisher: '', thumbprint: '' })
+        pipeName: '\\\\.\\pipe\\crosshands-0123456789abcdef01234567'
       },
       identity: windowsControlIdentity(verifiedPeer),
       handler: async (request) => {

@@ -94,7 +94,7 @@ describe('WindowsComputerProvider', () => {
     const packagedScript = fileURLToPath(new URL('../assets/runtime.ps1', import.meta.url))
     const packagedManifest = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
     await expect(
-      verifyWindowsPayload(packagedScript, packagedManifest, false)
+      verifyWindowsPayload(packagedScript, packagedManifest)
     ).resolves.toBeUndefined()
     const directory = await mkdtemp(join(tmpdir(), 'crosshands-windows-integrity-'))
     const scriptPath = join(directory, 'runtime.ps1')
@@ -107,7 +107,7 @@ describe('WindowsComputerProvider', () => {
       manifestPath,
       await readFile(new URL('../assets/payload.json', import.meta.url), 'utf8')
     )
-    await expect(verifyWindowsPayload(scriptPath, manifestPath, false)).rejects.toMatchObject({
+    await expect(verifyWindowsPayload(scriptPath, manifestPath)).rejects.toMatchObject({
       code: 'provider_unavailable'
     })
   })

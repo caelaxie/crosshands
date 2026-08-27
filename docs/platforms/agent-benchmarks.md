@@ -33,7 +33,7 @@ The driver must not write accessibility text, screenshots, clipboard contents, l
 `tests/release/` exercises the same validator against synthetic fixtures. A real release evidence document is accepted only when it binds all of the following:
 
 - candidate and default-channel package sets with identical versioned SHA-256 digests;
-- the signed release manifest, signer fingerprint, macOS notarization, Windows Authenticode timestamp and chain, and Linux payload signature;
+- the signed release manifest, signer fingerprint, macOS notarization, unsigned Windows payload hashes, and Linux payload signature;
 - the SPDX SBOM and a legal-notice binding for every package;
 - exact runner baselines and package image digests for Sonoma 14.8.7 on Intel and Apple Silicon, Tahoe 26.5.2 on Apple Silicon, Windows 10 22H2, the adjudicated Windows 11 25H2/26H1 GA cell, and Ubuntu 24.04.4 GNOME Xorg;
 - 100 retained outcomes for each of the 28 exact task IDs in the cryptographically bound conformance catalog, in every cell, with at least 95 passes on macOS/Windows and 90 on Linux;

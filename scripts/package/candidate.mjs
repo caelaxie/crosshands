@@ -53,13 +53,7 @@ try {
           }
         }
       : process.platform === 'win32'
-        ? {
-            win32: {
-              signature: releaseBuild ? process.env.CROSSHANDS_WINDOWS_PUBLISHER : 'pending',
-              timestamp: releaseBuild ? 'timestamped-and-validated' : 'pending',
-              chain: releaseBuild ? 'valid-authenticode-chain' : 'pending'
-            }
-          }
+        ? { win32: { payloadHash: 'verified', unsigned: 'unsigned-payload' } }
         : { linux: { payloadHash: 'verified', releaseManifestSignature: 'verified' } }
   const manifest = await enrichReleaseManifest(
     baseManifest,

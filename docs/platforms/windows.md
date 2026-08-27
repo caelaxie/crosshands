@@ -15,8 +15,9 @@ boundary.
 
 Before a mutation, CrossHands re-resolves the target and compares PID, process
 start time, logon session, input desktop, absolute executable path, integrity
-level, Authenticode publisher, and SHA-256. It also verifies foreground
-activation before synthetic pointer or keyboard input. UI Automation patterns
+level, optional Authenticode publisher of the target executable, and SHA-256.
+It also verifies foreground activation before synthetic pointer or keyboard
+input. UI Automation patterns
 are preferred to synthetic input. Password-like fields are redacted in the
 native provider before data is serialized.
 
@@ -29,16 +30,17 @@ Operation envelopes—including typed or pasted text—travel only over the chil
 process stdin. They are never command-line arguments or temporary operation
 files. A timed-out or disconnected mutation is not replayed automatically.
 
-The broker's Windows named-pipe endpoint is owned by the signed
+The broker's Windows named-pipe endpoint is owned by the packaged
 `crosshands-pipe-relay.exe` helper rather than Node. The helper creates an
 explicit current-logon-SID DACL, rejects remote pipe clients, and verifies a
 local client's PID, user SID, logon SID/authentication ID, Windows session,
 process start time, executable path, and integrity level while impersonating
 the client. Only after those checks does it relay framed bytes to the broker.
-The JavaScript host verifies the helper's package hash and Authenticode
-publisher before launch and still requires the versioned control handshake
-before parsing a request. A missing, unsigned, substituted, or unbuildable relay
-fails closed; Node's named-pipe API alone is not treated as proof.
+The JavaScript host verifies the helper's package hash before launch and still
+requires the versioned control handshake before parsing a request. The Windows
+payload is unsigned. A missing, substituted, or unbuildable relay fails closed;
+Node's named-pipe API alone is not treated as proof. Windows may show an
+Unknown publisher or SmartScreen warning for the helper.
 
 ## Verification status
 
@@ -53,14 +55,14 @@ runners to execute:
 - the native parser check in `native/windows/tests/verify-runtime.ps1` using
   Windows PowerShell 5.1;
 - the x64 relay build plus DACL, local-only, SID/logon-session, equal-integrity,
-  process-identity, handshake-before-dispatch, and Authenticode tests;
+  process-identity, handshake-before-dispatch, and payload-hash tests;
 - UI Automation fixture tests for discovery, duplicate names, multiple windows,
   pattern actions, redaction, and bounded trees;
 - Unicode/IME, modifier cleanup, clipboard restoration, multi-monitor and
   mixed-DPI fixture tests;
 - lock/UAC/elevation/session/RDP transition tests and PID/publisher/hash swap
   tests;
-- installation from a path containing spaces, package hash and Authenticode
-  verification, and the repeated 95% conformance matrix.
+- installation from a path containing spaces, package hash verification, and
+  the repeated 95% conformance matrix.
 
 Passing static tests on macOS or Linux is not Windows runtime evidence.

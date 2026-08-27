@@ -101,10 +101,8 @@ export function validReleaseEvidence(definition, options = {}) {
           notarizationTicket: 'notary-ticket-2026-07-10'
         },
         win32: {
-          publisher: 'CN=CrossHands Project',
-          thumbprint: 'WINDOWS-CERTIFICATE-THUMBPRINT',
-          timestamp: '2026-07-10T00:00:00Z',
-          chain: 'trusted-authenticode-chain'
+          payloadSha256: 'b'.repeat(64),
+          unsigned: 'unsigned-payload'
         },
         linux: {
           payloadSha256: 'b'.repeat(64),

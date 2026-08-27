@@ -174,47 +174,17 @@ async function buildWindows() {
     'v1.0',
     'powershell.exe'
   )
-  const releaseBuild = process.env.CROSSHANDS_RELEASE_BUILD === '1'
-  const publisher = releaseBuild ? requiredEnvironment('CROSSHANDS_WINDOWS_PUBLISHER') : ''
-  const thumbprint = releaseBuild
-    ? requiredEnvironment('CROSSHANDS_WINDOWS_CERTIFICATE_THUMBPRINT')
-    : ''
   await run(
     join(process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows', 'System32', 'cmd.exe'),
     ['/d', '/c', 'call', join(workspaceRoot, 'native/windows/security/build.cmd')]
   )
-  if (releaseBuild) {
-    const timestampUrl = requiredEnvironment('CROSSHANDS_WINDOWS_TIMESTAMP_URL')
-    const signCommand = [
-      '$ErrorActionPreference = "Stop"',
-      '$certificate = Get-Item -LiteralPath ("Cert:\\CurrentUser\\My\\" + $env:CROSSHANDS_SIGN_THUMBPRINT)',
-      'foreach ($path in ($env:CROSSHANDS_SIGN_PATHS -split [IO.Path]::PathSeparator)) {',
-      '  $result = Set-AuthenticodeSignature -LiteralPath $path -Certificate $certificate -TimestampServer $env:CROSSHANDS_TIMESTAMP_URL -HashAlgorithm SHA256',
-      '  if ($result.Status -ne "Valid") { throw ("Authenticode signing failed: " + $result.StatusMessage) }',
-      '  if ($result.SignerCertificate.Subject -ne $env:CROSSHANDS_SIGN_PUBLISHER) { throw "Authenticode publisher mismatch" }',
-      '  if ($null -eq $result.TimeStamperCertificate) { throw "Authenticode timestamp is missing" }',
-      '}'
-    ].join('\n')
-    await run(executable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', signCommand], {
-      env: {
-        ...process.env,
-        CROSSHANDS_SIGN_PATHS: [destination, relay].join(';'),
-        CROSSHANDS_SIGN_THUMBPRINT: thumbprint,
-        CROSSHANDS_SIGN_PUBLISHER: publisher,
-        CROSSHANDS_TIMESTAMP_URL: timestampUrl
-      }
-    })
-  }
   const manifest = {
     productVersion: await packageVersion('packages/platform-windows'),
     source: 'stablyai/orca@8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c',
     license: 'MIT',
     copyright: 'Copyright (c) 2026 Lovecast Inc.',
     authenticode: {
-      required: releaseBuild,
-      publisher,
-      thumbprint,
-      timestampRequired: releaseBuild
+      required: false
     },
     files: {
       'runtime.ps1': createHash('sha256')
