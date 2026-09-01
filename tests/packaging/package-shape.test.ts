@@ -12,6 +12,7 @@ import {
   archiveManifest,
   cleanInstallSmoke,
   currentPlatformPackage,
+  extractArchive,
   inspectPack,
   packOne,
   packages,
@@ -73,7 +74,7 @@ describe('packed package shape', () => {
       if (platform === undefined) throw new Error('macOS platform pack is missing')
       const extracted = await mkdtemp(join(tmpdir(), 'CrossHands signed extraction '))
       outputDirectories.push(extracted)
-      await run('tar', ['-xzf', platform.archive, '-C', extracted])
+      await extractArchive(platform.archive, extracted)
       const app = join(extracted, 'package/assets/CrossHands Computer Use.app')
       const executable = join(app, 'Contents/MacOS/crosshands-computer-use-macos')
       const manifest = JSON.parse(

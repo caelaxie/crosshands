@@ -255,7 +255,12 @@ jobs:
           if (-not $archive) { throw 'Windows platform archive is missing' }
           $destination = Join-Path $env:RUNNER_TEMP 'crosshands-final-package'
           New-Item -ItemType Directory -Force -Path $destination | Out-Null
-          tar -xzf $archive.FullName -C $destination
+          Push-Location -LiteralPath $archive.DirectoryName
+          try {
+            tar -xzf $archive.Name -C $destination
+          } finally {
+            Pop-Location
+          }
           $assets = Join-Path $destination 'package/assets'
           $manifest = Get-Content (Join-Path $assets 'payload.json') -Raw | ConvertFrom-Json
           if ($manifest.authenticode.required -eq $true) {
