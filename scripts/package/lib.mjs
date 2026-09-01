@@ -466,6 +466,8 @@ export async function cleanInstallSmoke(packed, parentDirectory = tmpdir()) {
         '--ignore-scripts',
         '--no-audit',
         '--no-fund',
+        '--offline',
+        '--fetch-retries=0',
         ...packed.map((item) => item.archive)
       ],
       { cwd: installRoot }
