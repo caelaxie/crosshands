@@ -81,11 +81,22 @@ describe('packed package shape', () => {
       )
       expect(manifest.productVersion).toBe(platform.manifest.version)
       expect(manifest.bundleIdentifier).toBe('ai.crosshands.ComputerUse')
-      expect(manifest.signing).toMatchObject({
-        required: false,
-        authority: 'ad-hoc',
-        notarized: false
-      })
+      const releaseBuild = process.env.CROSSHANDS_RELEASE_BUILD === '1'
+      expect(manifest.signing).toEqual(
+        releaseBuild
+          ? {
+              required: true,
+              authority: process.env.CROSSHANDS_CODESIGN_IDENTITY,
+              teamIdentifier: process.env.CROSSHANDS_APPLE_TEAM_ID,
+              notarized: true
+            }
+          : {
+              required: false,
+              authority: 'ad-hoc',
+              teamIdentifier: '',
+              notarized: false
+            }
+      )
       expect(manifest.files['crosshands-computer-use-macos']).toBe(await sha256(executable))
       await run('codesign', ['--verify', '--strict', '--verbose=2', app])
       await run('lipo', [executable, '-verify_arch', 'arm64', 'x86_64'])
