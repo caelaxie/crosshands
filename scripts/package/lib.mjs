@@ -145,8 +145,14 @@ export function stableJson(value) {
   return JSON.stringify(value)
 }
 
+function runTar(archive, beforeFile, afterFile = []) {
+  return run('tar', [...beforeFile, basename(archive), ...afterFile], {
+    cwd: dirname(archive)
+  })
+}
+
 export async function archiveEntries(archive) {
-  const { stdout } = await run('tar', ['-tvzf', archive])
+  const { stdout } = await runTar(archive, ['-tvzf'])
   return stdout
     .split(/\r?\n/)
     .filter(Boolean)
@@ -158,13 +164,18 @@ export async function archiveEntries(archive) {
 }
 
 export async function archiveManifest(archive) {
-  const { stdout } = await run('tar', ['-xOzf', archive, 'package/package.json'])
+  const { stdout } = await runTar(archive, ['-xOzf'], ['package/package.json'])
   return JSON.parse(stdout)
 }
 
 export async function archiveTextFile(archive, path) {
-  const { stdout } = await run('tar', ['-xOzf', archive, `package/${path}`])
+  const { stdout } = await runTar(archive, ['-xOzf'], [`package/${path}`])
   return stdout
+}
+
+export async function extractArchive(archive, destination) {
+  await mkdir(destination, { recursive: true })
+  await runTar(archive, ['-xzf'], ['-C', destination])
 }
 
 export function assertVersionMatch(manifests) {
@@ -226,7 +237,7 @@ export async function packOne(descriptor, outputDirectory) {
   if ((descriptor.executable?.length ?? 0) > 0) {
     const staging = await mkdtemp(join(tmpdir(), 'crosshands-pack-mode-'))
     try {
-      await run('tar', ['-xzf', archive, '-C', staging])
+      await extractArchive(archive, staging)
       const executablePaths = new Set(
         descriptor.executable.map((executable) => `package/${executable}`)
       )
