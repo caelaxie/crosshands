@@ -168,6 +168,11 @@ class ContractBehaviorTests(unittest.TestCase):
         ):
             self.assertFalse(runtime.same_element_signature(node, saved))
 
+    def test_click_modifiers_map_cmdorctrl_to_ctrl(self):
+        self.assertEqual(runtime.click_modifier_keys(["Shift", "CmdOrCtrl"]), ["shift", "ctrl"])
+        with self.assertRaisesRegex(RuntimeError, "unsupported modifier"):
+            runtime.click_modifier_keys(["Hyper"])
+
     def test_native_dispatch_rejects_changed_process_identity(self):
         app = object()
         with mock.patch.object(runtime, "pid_of", return_value=42):

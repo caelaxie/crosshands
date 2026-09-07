@@ -66,6 +66,13 @@ describe('Linux provider boundary', () => {
         button: 'right'
       })
     ).toMatchObject({ tool: 'click', app: 'Editor', x: 12, y: 34, click_count: 2 })
+    expect(
+      mapNativeOperation('click', {
+        app: 'Editor',
+        target: { kind: 'coordinate', x: 12, y: 34 },
+        modifiers: ['Shift', 'CmdOrCtrl']
+      })
+    ).toMatchObject({ tool: 'click', modifiers: ['Shift', 'CmdOrCtrl'] })
 
     const process = {
       pid: 42,

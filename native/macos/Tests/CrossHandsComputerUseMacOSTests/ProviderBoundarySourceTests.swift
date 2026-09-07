@@ -34,6 +34,8 @@ final class ProviderBoundarySourceTests: XCTestCase {
         XCTAssertTrue(source.contains("down.postToPid(pid)"))
         XCTAssertTrue(source.contains("event.postToPid(pid)"))
         XCTAssertFalse(source.contains("post(tap: .cghidEventTap)"))
+        XCTAssertTrue(source.contains("if modifiers.isEmpty, count <= 1"))
+        XCTAssertFalse(source.contains("AgentSessionOwnership"))
     }
 
     func testHandshakeUsesCrossHandsVersionDomainsAndNoOrcaContextNames() throws {

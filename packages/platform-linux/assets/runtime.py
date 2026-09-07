@@ -73,7 +73,7 @@ CLIPBOARD_COMMAND_TIMEOUT_SECONDS = 2
 CLIPBOARD_OWNER_SETTLE_SECONDS = 0.05
 CLIPBOARD_PASTE_SETTLE_SECONDS = 0.15
 PROVIDER_PROTOCOL = 1
-PUBLIC_CONTRACT = "1.0.0"
+PUBLIC_CONTRACT = "1.1.0"
 PROVIDER_VERSION = "0.1.0"
 PROVIDER_GENERATION = "linux-" + str(uuid.uuid4())
 SYSTEM_SEARCH_PATH = "/usr/local/bin:/usr/bin:/bin"
@@ -1046,17 +1046,48 @@ def require_non_empty_string(value, name):
     return str(value)
 
 
-def click_at(x, y, button, count):
+def click_modifier_keys(modifiers):
+    keys = []
+    for raw in modifiers or []:
+        token = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw)).lower()
+        token = {"shift": "shift", "ctrl": "ctrl", "control": "ctrl", "alt": "alt", "option": "alt", "meta": "super", "cmd": "super", "command": "super", "super": "super", "win": "super"}.get(token)
+        if token is None:
+            raise RuntimeError(f"unsupported modifier: {raw}")
+        keys.append(token)
+    return keys
+
+
+def click_at(x, y, button, count, modifiers=None):
     button = (button or "left").lower()
     buttons = {"left": ("b1p", "b1r"), "right": ("b3p", "b3r"), "middle": ("b2p", "b2r")}
     if button not in buttons:
         raise RuntimeError(f"unsupported mouse button: {button}")
     down, up = buttons[button]
-    for _ in range(require_positive_integer(1 if count is None else count, "click_count")):
-        Atspi.generate_mouse_event(round(x), round(y), "abs")
-        Atspi.generate_mouse_event(round(x), round(y), down)
-        time.sleep(0.03)
-        Atspi.generate_mouse_event(round(x), round(y), up)
+    modifier_keys = click_modifier_keys(modifiers)
+    xdotool = utility("xdotool")
+    if modifier_keys:
+        if xdotool is None:
+            raise RuntimeError("click modifiers require xdotool")
+        for key in modifier_keys:
+            subprocess.run(
+                [xdotool, "keydown", key],
+                check=True,
+                env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
+            )
+    try:
+        for _ in range(require_positive_integer(1 if count is None else count, "click_count")):
+            Atspi.generate_mouse_event(round(x), round(y), "abs")
+            Atspi.generate_mouse_event(round(x), round(y), down)
+            time.sleep(0.03)
+            Atspi.generate_mouse_event(round(x), round(y), up)
+    finally:
+        if modifier_keys and xdotool is not None:
+            for key in reversed(modifier_keys):
+                subprocess.run(
+                    [xdotool, "keyup", key],
+                    check=True,
+                    env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
+                )
 
 
 def scroll_at(x, y, direction, pages):
@@ -1261,15 +1292,26 @@ def run_operation(operation):
             if operation.get("click_count") is not None
             else 1
         )
-        handled = operation.get("mouse_button", "left") == "left" and click_count <= 1 and perform_action(node, preferred)
+        modifiers = operation.get("modifiers") or []
+        handled = (
+            not modifiers
+            and operation.get("mouse_button", "left") == "left"
+            and click_count <= 1
+            and perform_action(node, preferred)
+        )
         if not handled:
             ensure_provider_available("syntheticPointer")
             click_at(
                 *screen_point(bounds, saved, operation.get("x"), operation.get("y"), node),
                 operation.get("mouse_button", "left"),
                 click_count,
+                modifiers,
             )
-            action = {"path": "synthetic", "actionName": None, "fallbackReason": "actionUnsupported"}
+            action = {
+                "path": "synthetic",
+                "actionName": None,
+                "fallbackReason": "modifiersRequireSynthetic" if modifiers else "actionUnsupported",
+            }
         else:
             labels = action_labels(node)
             action = {"path": "accessibility", "actionName": labels[preferred] if preferred is not None and preferred < len(labels) else "action", "fallbackReason": None}

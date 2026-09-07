@@ -502,6 +502,7 @@ export class WindowsComputerProvider implements ComputerProvider {
       duration_ms: input.durationMs,
       click_count: input.clickCount,
       mouse_button: input.button,
+      modifiers: input.modifiers,
       action: input.action,
       direction: input.direction,
       pages: input.pages,

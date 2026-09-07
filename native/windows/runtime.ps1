@@ -66,6 +66,9 @@ public static class CrossHandsDesktopWin32 {
     [DllImport("user32.dll")]
     public static extern void mouse_event(uint dwFlags, uint dx, uint dy, int dwData, UIntPtr dwExtraInfo);
 
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint desiredAccess);
 
@@ -164,6 +167,7 @@ $MouseEvents = @{
     MiddleDown = 0x0020
     MiddleUp = 0x0040
     Wheel = 0x0800
+    Hwheel = 0x1000
 }
 
 function Write-CrossHandsJson($Payload) {
@@ -1071,7 +1075,7 @@ function Get-CrossHandsElementScreenPoint($Element) {
     $null
 }
 
-function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count) {
+function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count, $Modifiers) {
     [void][CrossHandsDesktopWin32]::SetForegroundWindow($WindowHandle)
     if (-not (Wait-CrossHandsWindowFocused $WindowHandle 500)) {
         throw "window_not_focused: foreground activation could not be verified before mouse input"
@@ -1085,10 +1089,26 @@ function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$S
         default { throw "unsupported mouse button: $Button" }
     }
 
-    for ($i = 0; $i -lt (Get-CrossHandsPositiveInteger $Count "click_count"); $i++) {
-        [CrossHandsDesktopWin32]::mouse_event($down, 0, 0, 0, [UIntPtr]::Zero)
-        Start-Sleep -Milliseconds 35
-        [CrossHandsDesktopWin32]::mouse_event($up, 0, 0, 0, [UIntPtr]::Zero)
+    $modifierKeys = @()
+    foreach ($modifier in @($Modifiers)) {
+        if ($null -eq $modifier -or [string]::IsNullOrWhiteSpace([string]$modifier)) { continue }
+        $modifierKeys += [byte](Get-CrossHandsModifierVirtualKey ([string]$modifier))
+    }
+    try {
+        foreach ($virtualKey in $modifierKeys) {
+            [CrossHandsDesktopWin32]::keybd_event($virtualKey, 0, 0, [UIntPtr]::Zero)
+        }
+        for ($i = 0; $i -lt (Get-CrossHandsPositiveInteger $Count "click_count"); $i++) {
+            [CrossHandsDesktopWin32]::mouse_event($down, 0, 0, 0, [UIntPtr]::Zero)
+            Start-Sleep -Milliseconds 35
+            [CrossHandsDesktopWin32]::mouse_event($up, 0, 0, 0, [UIntPtr]::Zero)
+        }
+    } finally {
+        if ($modifierKeys.Count -gt 0) {
+            foreach ($virtualKey in ($modifierKeys[$modifierKeys.Count - 1..0])) {
+                [CrossHandsDesktopWin32]::keybd_event($virtualKey, 0, 2, [UIntPtr]::Zero)
+            }
+        }
     }
 }
 
@@ -1284,14 +1304,15 @@ function Invoke-CrossHandsOperation($Operation) {
             Restore-CrossHandsWindow $process
             $handledByPattern = $false
             $clickCount = Get-CrossHandsPositiveInteger $Operation.click_count "click_count"
-            if ($null -ne $element -and $Operation.mouse_button -ne "right" -and $Operation.mouse_button -ne "middle" -and $clickCount -le 1) {
+            $hasModifiers = @($Operation.modifiers).Count -gt 0 -and $null -ne $Operation.modifiers
+            if ($null -ne $element -and -not $hasModifiers -and $Operation.mouse_button -ne "right" -and $Operation.mouse_button -ne "middle" -and $clickCount -le 1) {
                 $handledByPattern = Invoke-CrossHandsPrimaryAction $element
             }
             if (-not $handledByPattern) {
                 $point = Get-CrossHandsElementScreenPoint $element
                 if ($null -eq $point) { $point = Get-CrossHandsScreenPoint $Operation $windowFrame }
-                Send-CrossHandsMouseClick $handle $point.x $point.y $Operation.mouse_button $clickCount
-                $action = [pscustomobject]@{ path = "synthetic"; actionName = $null; fallbackReason = "actionUnsupported" }
+                Send-CrossHandsMouseClick $handle $point.x $point.y $Operation.mouse_button $clickCount $Operation.modifiers
+                $action = [pscustomobject]@{ path = "synthetic"; actionName = $null; fallbackReason = $(if ($hasModifiers) { "modifiersRequireSynthetic" } else { "actionUnsupported" }) }
             } else {
                 $action = [pscustomobject]@{ path = "accessibility"; actionName = "primaryAction"; fallbackReason = $null }
             }
@@ -1314,7 +1335,8 @@ function Invoke-CrossHandsOperation($Operation) {
             if ($null -eq $point) { $point = Get-CrossHandsScreenPoint $Operation $windowFrame }
             [void][CrossHandsDesktopWin32]::SetForegroundWindow($handle)
             [void][CrossHandsDesktopWin32]::SetCursorPos([int]$point.x, [int]$point.y)
-            [CrossHandsDesktopWin32]::mouse_event($MouseEvents.Wheel, 0, 0, $delta, [UIntPtr]::Zero)
+            $wheel = if ($Operation.direction -eq "left" -or $Operation.direction -eq "right") { $MouseEvents.Hwheel } else { $MouseEvents.Wheel }
+            [CrossHandsDesktopWin32]::mouse_event($wheel, 0, 0, $delta, [UIntPtr]::Zero)
             $action = [pscustomobject]@{ path = "synthetic"; actionName = "scroll"; fallbackReason = $null }
         }
         "drag" {

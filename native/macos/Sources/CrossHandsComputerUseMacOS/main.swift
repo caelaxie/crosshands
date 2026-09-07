@@ -12,7 +12,7 @@ private let helperBundleId = "ai.crosshands.ComputerUse"
 private let providerName = "crosshands-darwin"
 private let providerVersion = "1.0.0"
 private let providerProtocolVersion = 1
-private let publicContractVersion = "1.0.0"
+private let publicContractVersion = "1.1.0"
 private let providerGeneration = "darwin-\(UUID().uuidString.lowercased())"
 private let graphicalSessionId = ProcessInfo.processInfo.environment["CROSSHANDS_GRAPHICAL_SESSION_ID"]
     ?? "aqua-\(getuid())"
@@ -61,6 +61,11 @@ enum JSONValue: Decodable {
 
     var bool: Bool? {
         if case let .bool(value) = self { return value }
+        return nil
+    }
+
+    var array: [JSONValue]? {
+        if case let .array(value) = self { return value }
         return nil
     }
 }
@@ -833,12 +838,13 @@ final class Provider {
         let snapshot = try currentSnapshot(params: params)
         let button = params["mouseButton"]?.string ?? "left"
         let count = try positiveInteger(params["clickCount"]?.number, defaultValue: 1, name: "clickCount")
+        let modifiers = try clickModifiers(params)
         // Why: agents expect a click into a target app to make the next
         // keyboard action safe, even when the click uses an AX action path.
         recoverWindow(snapshot.app)
         if let elementIndex = try optionalInteger(params, "elementIndex") {
             let record = try element(snapshot, elementIndex)
-            if count <= 1, let actionName = try performClickAction(record: record, mouseButton: button) {
+            if modifiers.isEmpty, count <= 1, let actionName = try performClickAction(record: record, mouseButton: button) {
                 return actionMetadata(path: "accessibility", actionName: actionName)
             }
             if let point = center(record.localFrame, in: snapshot.windowBounds) {
@@ -846,9 +852,10 @@ final class Provider {
                     pid: snapshot.app.pid,
                     at: point,
                     button: mouseButton(button),
-                    count: count
+                    count: count,
+                    modifiers: modifiers
                 )
-                return actionMetadata(path: "synthetic", fallbackReason: "actionUnsupported")
+                return actionMetadata(path: "synthetic", fallbackReason: modifiers.isEmpty ? "actionUnsupported" : "modifiersRequireSynthetic")
             }
             throw ProviderError.coded("element_not_clickable", "element \(record.index) has no clickable frame")
         }
@@ -857,9 +864,26 @@ final class Provider {
             pid: snapshot.app.pid,
             at: point,
             button: mouseButton(button),
-            count: count
+            count: count,
+            modifiers: modifiers
         )
         return actionMetadata(path: "synthetic")
+    }
+
+    private func clickModifiers(_ params: [String: JSONValue]) throws -> [KeyModifier] {
+        guard let raw = params["modifiers"] else { return [] }
+        guard let values = raw.array else {
+            throw ProviderError.coded("invalid_argument", "modifiers must be an array")
+        }
+        if values.isEmpty || values.count > 4 {
+            throw ProviderError.coded("invalid_argument", "modifiers must contain 1 to 4 tokens")
+        }
+        return try values.map { value in
+            guard let token = value.string else {
+                throw ProviderError.coded("invalid_argument", "modifiers must be strings")
+            }
+            return try KeyMap.parseModifier(token)
+        }
     }
 
     private func performClickAction(record: ElementRecord, mouseButton: String) throws -> String? {
@@ -2369,14 +2393,26 @@ private func resizePng(_ image: CGImage, scale: CGFloat) -> BoundedPNG? {
 }
 
 private enum Input {
-    static func click(pid: pid_t, at point: CGPoint, button: MouseButton, count: Int) throws {
+    static func click(pid: pid_t, at point: CGPoint, button: MouseButton, count: Int, modifiers: [KeyModifier] = []) throws {
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
             throw ProviderError.coded("accessibility_error", "failed to create event source")
         }
+        var flags = CGEventFlags()
+        for modifier in modifiers {
+            flags.insert(modifier.flag)
+            try keyEvent(modifier.keyCode, down: true, flags: flags, pid: pid)
+        }
+        defer {
+            var remaining = flags
+            for modifier in modifiers.reversed() {
+                try? keyEvent(modifier.keyCode, down: false, flags: remaining, pid: pid)
+                remaining.remove(modifier.flag)
+            }
+        }
         for _ in 0..<max(count, 1) {
-            try mouse(.mouseMoved, source: source, point: point, button: button.cgButton, pid: pid)
-            try mouse(button.downEvent, source: source, point: point, button: button.cgButton, pid: pid)
-            try mouse(button.upEvent, source: source, point: point, button: button.cgButton, pid: pid)
+            try mouse(.mouseMoved, source: source, point: point, button: button.cgButton, pid: pid, flags: flags)
+            try mouse(button.downEvent, source: source, point: point, button: button.cgButton, pid: pid, flags: flags)
+            try mouse(button.upEvent, source: source, point: point, button: button.cgButton, pid: pid, flags: flags)
         }
     }
 
@@ -2468,10 +2504,11 @@ private enum Input {
         try pressKey("cmd+v", pid: pid)
     }
 
-    private static func mouse(_ type: CGEventType, source: CGEventSource, point: CGPoint, button: CGMouseButton, pid: pid_t) throws {
+    private static func mouse(_ type: CGEventType, source: CGEventSource, point: CGPoint, button: CGMouseButton, pid: pid_t, flags: CGEventFlags = []) throws {
         guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: button) else {
             throw ProviderError.coded("accessibility_error", "failed to create mouse event")
         }
+        event.flags = flags
         event.postToPid(pid)
     }
 
@@ -2579,6 +2616,14 @@ private struct ParsedKey {
 }
 
 private enum KeyMap {
+    static func parseModifier(_ spec: String) throws -> KeyModifier {
+        let parsed = try parse("\(spec)+a")
+        guard let modifier = parsed.modifiers.first, parsed.modifiers.count == 1 else {
+            throw ProviderError.coded("invalid_argument", "unsupported modifier '\(spec)'")
+        }
+        return modifier
+    }
+
     static func parse(_ spec: String) throws -> ParsedKey {
         let parts = spec.split(separator: "+").map { String($0).lowercased() }
         var modifiers: [KeyModifier] = []
