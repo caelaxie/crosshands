@@ -57,6 +57,14 @@ describe('CrossHands MCP adapter', () => {
     ['getAppState', { app: 'fixture.app', window: { index: 0 } }],
     ['click', { contextToken, target: { kind: 'element', elementIndex: 1 } }],
     [
+      'click',
+      {
+        contextToken,
+        target: { kind: 'element', elementIndex: 1 },
+        modifiers: ['Shift', 'CmdOrCtrl']
+      }
+    ],
+    [
       'performSecondaryAction',
       { contextToken, target: { kind: 'element', elementIndex: 1 }, action: 'showMenu' }
     ],
@@ -79,6 +87,15 @@ describe('CrossHands MCP adapter', () => {
   it('derives exactly one tool for every shared computer operation', () => {
     expect(Object.keys(MCP_TOOL_CATALOG)).toEqual(Object.keys(COMPUTER_OPERATIONS))
     expect(Object.keys(MCP_TOOL_CATALOG)).toHaveLength(14)
+  })
+
+  it('exposes click modifiers on the derived click tool', () => {
+    const schema = MCP_TOOL_CATALOG.click.inputSchema as {
+      properties?: Record<string, unknown>
+    }
+    expect(schema.properties).toHaveProperty('modifiers')
+    expect(MCP_TOOL_CATALOG.click.metadata['crosshands.publicContractVersion']).toBe('1.1.0')
+    expect(MCP_TOOL_CATALOG).not.toHaveProperty('doctor')
   })
 
   it('initializes and lists all operation-derived typed tools with instructions', async () => {

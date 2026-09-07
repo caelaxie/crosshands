@@ -77,6 +77,23 @@ describe('CrossHands JSON CLI', () => {
       { contextToken: 'ctx_' + 'a'.repeat(32), target: { kind: 'element', elementIndex: 4 } }
     ],
     [
+      'click',
+      [
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--element-index',
+        '4',
+        '--modifiers',
+        'Shift+CmdOrCtrl'
+      ],
+      'click',
+      {
+        contextToken: 'ctx_' + 'a'.repeat(32),
+        target: { kind: 'element', elementIndex: 4 },
+        modifiers: ['Shift', 'CmdOrCtrl']
+      }
+    ],
+    [
       'perform-secondary-action',
       ['--context', 'ctx_' + 'a'.repeat(32), '--element-index', '4', '--action', 'showMenu'],
       'performSecondaryAction',
@@ -188,6 +205,17 @@ describe('CrossHands JSON CLI', () => {
     expect(JSON.parse(state.stdout.join(''))).toMatchObject({
       error: { code: 'invalid_argument', remediation: 'remove_orca_routing_flag' }
     })
+  })
+
+  it('rejects click modifiers on a non-click command', async () => {
+    const state = harness()
+    const code = await runCli(
+      ['computer', 'scroll', '--context', 'ctx_' + 'a'.repeat(32), '--x', '1', '--y', '2', '--direction', 'down', '--modifiers', 'Shift', '--json'],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(2)
+    expect(state.calls).toEqual([])
   })
 
   it('validates contradictory selectors before contacting the broker', async () => {
