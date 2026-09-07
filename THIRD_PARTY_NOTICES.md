@@ -4,7 +4,7 @@
 
 CrossHands is based on and may contain code substantially derived from the
 computer-use subsystem of `stablyai/orca`, pinned for compatibility at commit
-`8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c`.
+`9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4`.
 
 MIT License
 

@@ -110,7 +110,7 @@ describe('computer operation catalog', () => {
     ) as unknown
     const compatibility = JSON.parse(
       await readFile(
-        new URL('../../packages/contract/test/fixtures/orca-8adfef4.json', import.meta.url),
+        new URL('../../packages/contract/test/fixtures/orca-9c8f4c3.json', import.meta.url),
         'utf8'
       )
     ) as { crosshandsOperations: string[] }

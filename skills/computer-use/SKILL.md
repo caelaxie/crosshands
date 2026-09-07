@@ -109,5 +109,5 @@ changes, and disclosure of private data require explicit user authorization.
 - `provider_unavailable`, `session_unavailable`, or `version_incompatible`: run doctor and follow its operator action.
 
 This command surface is adapted from the MIT-licensed Orca computer-use skill
-at pinned commit `8adfef4`; CrossHands removes Orca app, worktree, session,
+at pinned commit `9c8f4c3`; CrossHands removes Orca app, worktree, session,
 Electron, and orchestration dependencies.

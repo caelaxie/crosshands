@@ -41,7 +41,7 @@ describe('workspace metadata', () => {
 
   it('enumerates every pinned Orca computer-use operation', async () => {
     const ledger = await readFile(
-      new URL('../../docs/compatibility/orca-8adfef4.md', import.meta.url),
+      new URL('../../docs/compatibility/orca-9c8f4c3.md', import.meta.url),
       'utf8'
     )
     const operations = [
@@ -64,7 +64,7 @@ describe('workspace metadata', () => {
     for (const operation of operations) {
       expect(ledger).toContain(`\`${operation}\``)
     }
-    expect(ledger).toContain('8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c')
+    expect(ledger).toContain('9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4')
     expect(ledger).toContain('All 14 pinned Orca computer-use operations remain represented.')
   })
 })

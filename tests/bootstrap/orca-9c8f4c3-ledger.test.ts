@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
 const SNAPSHOT = '9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4'
-const SHIPPED_PIN = '8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c'
+const PREVIOUS_PIN = '8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c'
 
 const operations = [
   'capabilities',
@@ -22,7 +22,7 @@ const operations = [
 ] as const
 
 describe('orca 9c8f4c3 snapshot ledger', () => {
-  it('classifies every inherited operation and keeps the shipped pin until pin-move', async () => {
+  it('classifies every inherited operation and ships the snapshot pin', async () => {
     const [ledger, readme] = await Promise.all([
       readFile(new URL('../../docs/compatibility/orca-9c8f4c3.md', import.meta.url), 'utf8'),
       readFile(new URL('../../README.md', import.meta.url), 'utf8')
@@ -33,8 +33,8 @@ describe('orca 9c8f4c3 snapshot ledger', () => {
     }
     expect(ledger).toContain(SNAPSHOT)
     expect(ledger).toContain('All 14 pinned Orca computer-use operations remain represented.')
-    expect(readme).toContain(SHIPPED_PIN)
-    expect(readme).not.toContain(SNAPSHOT)
+    expect(readme).toContain(SNAPSHOT)
+    expect(readme).not.toContain(PREVIOUS_PIN)
   })
 
   it('excludes app-only permission status and session ownership', async () => {
@@ -65,7 +65,7 @@ describe('orca 9c8f4c3 snapshot ledger', () => {
     }
 
     expect(fixture.commit).toBe(SNAPSHOT)
-    expect(fixture.pinMoved).toBe(false)
+    expect(fixture.pinMoved).toBe(true)
     expect(fixture.orcaCommands).toHaveLength(14)
     expect(fixture.crosshandsOperations).toHaveLength(14)
     expect(fixture.excludedConcepts).toEqual(

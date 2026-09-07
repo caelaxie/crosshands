@@ -10,7 +10,7 @@ CrossHands is based on the computer-use subsystem in
 [stablyai/orca](https://github.com/stablyai/orca) and is being separated so
 agents can use the capability without installing the Orca desktop application.
 The compatibility baseline is Orca commit
-`8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c`.
+`9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4`.
 
 ## First-release scope
 
@@ -75,7 +75,7 @@ corepack pnpm build
 ```
 
 The repository is under active development and is not yet a public release.
-See [the Orca compatibility ledger](docs/compatibility/orca-8adfef4.md) for the
+See [the Orca compatibility ledger](docs/compatibility/orca-9c8f4c3.md) for the
 extraction boundary and intentional deviations.
 
 Release workflows intentionally fail closed until the restricted registry,

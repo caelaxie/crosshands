@@ -210,7 +210,21 @@ describe('CrossHands JSON CLI', () => {
   it('rejects click modifiers on a non-click command', async () => {
     const state = harness()
     const code = await runCli(
-      ['computer', 'scroll', '--context', 'ctx_' + 'a'.repeat(32), '--x', '1', '--y', '2', '--direction', 'down', '--modifiers', 'Shift', '--json'],
+      [
+        'computer',
+        'scroll',
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--x',
+        '1',
+        '--y',
+        '2',
+        '--direction',
+        'down',
+        '--modifiers',
+        'Shift',
+        '--json'
+      ],
       state.io,
       state.client
     )
