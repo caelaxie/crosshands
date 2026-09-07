@@ -57,7 +57,7 @@ function harness() {
           generation: 'darwin-1',
           graphicalSessionId: 'session-1',
           providerProtocol: 1,
-          publicContract: '1.0.0',
+          publicContract: '1.1.0',
           capabilities: {
             platform: 'darwin',
             provider: 'crosshands-darwin',

@@ -105,6 +105,7 @@ export const COMPUTER_OPERATIONS = {
         target: ActionTargetSchema,
         clickCount: z.number().int().min(1).max(3).optional(),
         button: z.enum(['left', 'right', 'middle']).optional(),
+        modifiers: z.array(z.string().min(1).max(128)).min(1).max(4).optional(),
         ...CaptureOptionsShape
       })
       .strict(),

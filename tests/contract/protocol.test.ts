@@ -40,4 +40,14 @@ describe('outcomes, errors, and protocol negotiation', () => {
       })
     ).toMatchObject({ ok: false, error: { code: 'version_incompatible' } })
   })
+
+  it('rejects a previous public contract after the modifiers schema bump', () => {
+    expect(CONTRACT_VERSIONS.publicContract).toBe('1.1.0')
+    expect(
+      negotiateVersionHandshake({
+        ...CONTRACT_VERSIONS,
+        publicContract: '1.0.0'
+      })
+    ).toMatchObject({ ok: false, error: { code: 'version_incompatible' } })
+  })
 })
