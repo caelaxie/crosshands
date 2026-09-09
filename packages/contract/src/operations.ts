@@ -56,6 +56,35 @@ const ActionTargetSchema = z.union([
   ContextWindowTargetSchema
 ])
 
+export const CLICK_MODIFIER_TOKENS = [
+  'Shift',
+  'Ctrl',
+  'Control',
+  'Alt',
+  'Option',
+  'Meta',
+  'Cmd',
+  'Command',
+  'Super',
+  'Win',
+  'CmdOrCtrl',
+  'CommandOrControl',
+  'shift',
+  'ctrl',
+  'control',
+  'alt',
+  'option',
+  'meta',
+  'cmd',
+  'command',
+  'super',
+  'win',
+  'cmdorctrl',
+  'commandorcontrol'
+] as const
+
+const ClickModifierTokenSchema = z.enum(CLICK_MODIFIER_TOKENS)
+
 const PermissionsResultSchema = z
   .object({
     permissions: z.record(z.string(), z.enum(['granted', 'denied', 'unknown', 'not_required']))
@@ -105,7 +134,7 @@ export const COMPUTER_OPERATIONS = {
         target: ActionTargetSchema,
         clickCount: z.number().int().min(1).max(3).optional(),
         button: z.enum(['left', 'right', 'middle']).optional(),
-        modifiers: z.array(z.string().min(1).max(128)).min(1).max(4).optional(),
+        modifiers: z.array(ClickModifierTokenSchema).min(1).max(4).optional(),
         ...CaptureOptionsShape
       })
       .strict(),

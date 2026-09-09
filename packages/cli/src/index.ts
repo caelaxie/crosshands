@@ -258,10 +258,14 @@ function elementTarget(flags: Flags, name = 'element-index'): unknown {
   return { kind: 'element', elementIndex: index }
 }
 
+function chordTokens(raw: string): string[] {
+  return raw.split('+')
+}
+
 function parseClickModifiers(flags: Flags): string[] | undefined {
   const raw = stringFlag(flags, 'modifiers')
   if (raw === undefined) return undefined
-  const modifiers = raw.split('+').filter((token) => token.length > 0)
+  const modifiers = chordTokens(raw).filter((token) => token.length > 0)
   if (modifiers.length === 0 || modifiers.length > 4)
     throw new CliError('invalid_argument', 'Invalid --modifiers')
   return modifiers
@@ -391,7 +395,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
         key: stringFlag(flags, 'key', true)
       }
     case 'hotkey': {
-      const keys = stringFlag(flags, 'key', true)!.split('+')
+      const keys = chordTokens(stringFlag(flags, 'key', true)!)
       if (keys.length < 2 || keys.some((key) => key.length === 0))
         throw new CliError('invalid_argument', 'Hotkeys require a modifier and key')
       return { ...common(), target: { kind: 'context-window' }, keys }

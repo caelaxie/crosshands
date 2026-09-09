@@ -34,7 +34,8 @@ final class ProviderBoundarySourceTests: XCTestCase {
         XCTAssertTrue(source.contains("down.postToPid(pid)"))
         XCTAssertTrue(source.contains("event.postToPid(pid)"))
         XCTAssertFalse(source.contains("post(tap: .cghidEventTap)"))
-        XCTAssertTrue(source.contains("if modifiers.isEmpty, count <= 1"))
+        XCTAssertTrue(source.contains("withHeldModifiers"))
+        XCTAssertFalse(source.contains("parse(\"\\(spec)+a\")"))
         XCTAssertFalse(source.contains("AgentSessionOwnership"))
     }
 
@@ -82,9 +83,13 @@ final class ProviderBoundarySourceTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        return try String(
-            contentsOf: root.appendingPathComponent("Sources/CrossHandsComputerUseMacOS/main.swift"),
-            encoding: .utf8
+        let directory = root.appendingPathComponent("Sources/CrossHandsComputerUseMacOS")
+        let files = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
         )
+        .filter { $0.pathExtension == "swift" }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        return try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
     }
 }

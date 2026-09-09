@@ -1046,15 +1046,46 @@ def require_non_empty_string(value, name):
     return str(value)
 
 
+MODIFIER_XDOTOOL_NAMES = {
+    "shift": "shift",
+    "ctrl": "ctrl",
+    "control": "ctrl",
+    "cmdorctrl": "ctrl",
+    "commandorcontrol": "ctrl",
+    "alt": "alt",
+    "option": "alt",
+    "meta": "super",
+    "cmd": "super",
+    "command": "super",
+    "super": "super",
+    "win": "super",
+}
+XDOTOOL_ENV = {"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"}
+CLICK_XDOTOOL_BUTTONS = {"left": "1", "right": "3", "middle": "2"}
+
+
 def click_modifier_keys(modifiers):
     keys = []
     for raw in modifiers or []:
-        token = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw)).lower()
-        token = {"shift": "shift", "ctrl": "ctrl", "control": "ctrl", "alt": "alt", "option": "alt", "meta": "super", "cmd": "super", "command": "super", "super": "super", "win": "super"}.get(token)
+        token = MODIFIER_XDOTOOL_NAMES.get(str(raw).strip().lower())
         if token is None:
             raise RuntimeError(f"unsupported modifier: {raw}")
         keys.append(token)
     return keys
+
+
+def normalize_hotkey_spec(raw):
+    parts = [part.strip() for part in str(raw).split("+") if part.strip()]
+    if not parts:
+        raise RuntimeError("unsupported key: empty")
+    return "+".join(MODIFIER_XDOTOOL_NAMES.get(part.lower(), part) for part in parts)
+
+
+def run_xdotool(*args, check=True):
+    xdotool = utility("xdotool")
+    if xdotool is None:
+        return None
+    return subprocess.run([xdotool, *args], check=check, env=XDOTOOL_ENV)
 
 
 def click_at(x, y, button, count, modifiers=None):
@@ -1064,30 +1095,40 @@ def click_at(x, y, button, count, modifiers=None):
         raise RuntimeError(f"unsupported mouse button: {button}")
     down, up = buttons[button]
     modifier_keys = click_modifier_keys(modifiers)
-    xdotool = utility("xdotool")
-    if modifier_keys:
-        if xdotool is None:
-            raise RuntimeError("click modifiers require xdotool")
-        for key in modifier_keys:
-            subprocess.run(
-                [xdotool, "keydown", key],
-                check=True,
-                env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
-            )
-    try:
-        for _ in range(require_positive_integer(1 if count is None else count, "click_count")):
+    click_count = require_positive_integer(1 if count is None else count, "click_count")
+    if not modifier_keys:
+        for _ in range(click_count):
             Atspi.generate_mouse_event(round(x), round(y), "abs")
             Atspi.generate_mouse_event(round(x), round(y), down)
             time.sleep(0.03)
             Atspi.generate_mouse_event(round(x), round(y), up)
-    finally:
-        if modifier_keys and xdotool is not None:
-            for key in reversed(modifier_keys):
-                subprocess.run(
-                    [xdotool, "keyup", key],
-                    check=True,
-                    env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
-                )
+        return
+    xdotool = utility("xdotool")
+    if xdotool is None:
+        raise RuntimeError("click modifiers require xdotool")
+    args = []
+    for key in modifier_keys:
+        args.extend(("keydown", key))
+    args.extend(
+        (
+            "mousemove",
+            "--sync",
+            str(round(x)),
+            str(round(y)),
+            "click",
+            "--repeat",
+            str(click_count),
+            CLICK_XDOTOOL_BUTTONS[button],
+        )
+    )
+    for key in reversed(modifier_keys):
+        args.extend(("keyup", key))
+    try:
+        subprocess.run([xdotool, *args], check=True, env=XDOTOOL_ENV)
+    except Exception:
+        for key in reversed(modifier_keys):
+            subprocess.run([xdotool, "keyup", key], check=False, env=XDOTOOL_ENV)
+        raise
 
 
 def scroll_at(x, y, direction, pages):
@@ -1144,15 +1185,9 @@ def press_key(raw):
 
 
 def hotkey(raw):
-    key_spec = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw))
+    key_spec = normalize_hotkey_spec(raw)
     ensure_provider_available("hotkey")
-    xdotool = utility("xdotool")
-    if xdotool:
-        subprocess.run(
-            [xdotool, "key", key_spec],
-            check=True,
-            env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
-        )
+    if run_xdotool("key", key_spec) is not None:
         return
     if "+" in key_spec:
         raise RuntimeError("hotkey combinations require xdotool")

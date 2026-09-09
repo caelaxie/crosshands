@@ -905,8 +905,32 @@
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 128
+              "enum": [
+                "Shift",
+                "Ctrl",
+                "Control",
+                "Alt",
+                "Option",
+                "Meta",
+                "Cmd",
+                "Command",
+                "Super",
+                "Win",
+                "CmdOrCtrl",
+                "CommandOrControl",
+                "shift",
+                "ctrl",
+                "control",
+                "alt",
+                "option",
+                "meta",
+                "cmd",
+                "command",
+                "super",
+                "win",
+                "cmdorctrl",
+                "commandorcontrol"
+              ]
             }
           },
           "captureScreenshot": {

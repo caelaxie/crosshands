@@ -85,6 +85,12 @@ describe('computer operation catalog', () => {
     expect(() =>
       parseOperationInput('click', {
         ...validInputs.click,
+        modifiers: ['Hyper']
+      })
+    ).toThrow()
+    expect(() =>
+      parseOperationInput('click', {
+        ...validInputs.click,
         modifier: 'Shift'
       })
     ).toThrow()

@@ -1075,7 +1075,7 @@ function Get-CrossHandsElementScreenPoint($Element) {
     $null
 }
 
-function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count, $Modifiers) {
+function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count, $ModifierKeys) {
     [void][CrossHandsDesktopWin32]::SetForegroundWindow($WindowHandle)
     if (-not (Wait-CrossHandsWindowFocused $WindowHandle 500)) {
         throw "window_not_focused: foreground activation could not be verified before mouse input"
@@ -1089,11 +1089,7 @@ function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$S
         default { throw "unsupported mouse button: $Button" }
     }
 
-    $modifierKeys = @()
-    foreach ($modifier in @($Modifiers)) {
-        if ($null -eq $modifier -or [string]::IsNullOrWhiteSpace([string]$modifier)) { continue }
-        $modifierKeys += [byte](Get-CrossHandsModifierVirtualKey ([string]$modifier))
-    }
+    $modifierKeys = @($ModifierKeys)
     try {
         foreach ($virtualKey in $modifierKeys) {
             [CrossHandsDesktopWin32]::keybd_event($virtualKey, 0, 0, [UIntPtr]::Zero)
@@ -1104,10 +1100,8 @@ function Send-CrossHandsMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$S
             [CrossHandsDesktopWin32]::mouse_event($up, 0, 0, 0, [UIntPtr]::Zero)
         }
     } finally {
-        if ($modifierKeys.Count -gt 0) {
-            foreach ($virtualKey in ($modifierKeys[$modifierKeys.Count - 1..0])) {
-                [CrossHandsDesktopWin32]::keybd_event($virtualKey, 0, 2, [UIntPtr]::Zero)
-            }
+        for ($i = $modifierKeys.Count - 1; $i -ge 0; $i--) {
+            [CrossHandsDesktopWin32]::keybd_event($modifierKeys[$i], 0, 2, [UIntPtr]::Zero)
         }
     }
 }
@@ -1165,12 +1159,32 @@ function Send-CrossHandsKey([IntPtr]$WindowHandle, [string]$Key) {
     [System.Windows.Forms.SendKeys]::SendWait((ConvertTo-CrossHandsSendKeysKey $Key))
 }
 
-function Get-CrossHandsModifierVirtualKey([string]$Modifier) {
+function Get-CrossHandsModifierKind([string]$Modifier) {
     switch ($Modifier.ToLowerInvariant()) {
-        { $_ -in @("ctrl", "control", "cmdorctrl", "commandorcontrol") } { return 0x11 }
-        { $_ -in @("shift") } { return 0x10 }
-        { $_ -in @("alt", "option") } { return 0x12 }
-        { $_ -in @("meta", "super", "win", "cmd", "command") } { return 0x5B }
+        { $_ -in @("ctrl", "control", "cmdorctrl", "commandorcontrol") } { return "ctrl" }
+        { $_ -in @("shift") } { return "shift" }
+        { $_ -in @("alt", "option") } { return "alt" }
+        { $_ -in @("meta", "super", "win", "cmd", "command") } { return "win" }
+        default { throw "Unsupported modifier: $Modifier" }
+    }
+}
+
+function Get-CrossHandsClickModifierKeys($Modifiers) {
+    $keys = @()
+    if ($null -eq $Modifiers) { return $keys }
+    foreach ($modifier in @($Modifiers)) {
+        if ($null -eq $modifier -or [string]::IsNullOrWhiteSpace([string]$modifier)) { continue }
+        $keys += [byte](Get-CrossHandsModifierVirtualKey ([string]$modifier))
+    }
+    return $keys
+}
+
+function Get-CrossHandsModifierVirtualKey([string]$Modifier) {
+    switch (Get-CrossHandsModifierKind $Modifier) {
+        "ctrl" { return 0x11 }
+        "shift" { return 0x10 }
+        "alt" { return 0x12 }
+        "win" { return 0x5B }
         default { throw "Unsupported modifier: $Modifier" }
     }
 }
@@ -1229,10 +1243,10 @@ function ConvertTo-CrossHandsSendKeysKey([string]$Key) {
 }
 
 function ConvertTo-CrossHandsSendKeysModifier([string]$Modifier) {
-    switch ($Modifier.ToLowerInvariant()) {
-        { $_ -in @("ctrl", "control", "cmdorctrl", "commandorcontrol") } { return "^" }
+    switch (Get-CrossHandsModifierKind $Modifier) {
+        "ctrl" { return "^" }
         "shift" { return "+" }
-        { $_ -in @("alt", "option") } { return "%" }
+        "alt" { return "%" }
         default { throw "Unsupported modifier: $Modifier" }
     }
 }
@@ -1304,14 +1318,15 @@ function Invoke-CrossHandsOperation($Operation) {
             Restore-CrossHandsWindow $process
             $handledByPattern = $false
             $clickCount = Get-CrossHandsPositiveInteger $Operation.click_count "click_count"
-            $hasModifiers = @($Operation.modifiers).Count -gt 0 -and $null -ne $Operation.modifiers
+            $modifierKeys = @(Get-CrossHandsClickModifierKeys $Operation.modifiers)
+            $hasModifiers = $modifierKeys.Count -gt 0
             if ($null -ne $element -and -not $hasModifiers -and $Operation.mouse_button -ne "right" -and $Operation.mouse_button -ne "middle" -and $clickCount -le 1) {
                 $handledByPattern = Invoke-CrossHandsPrimaryAction $element
             }
             if (-not $handledByPattern) {
                 $point = Get-CrossHandsElementScreenPoint $element
                 if ($null -eq $point) { $point = Get-CrossHandsScreenPoint $Operation $windowFrame }
-                Send-CrossHandsMouseClick $handle $point.x $point.y $Operation.mouse_button $clickCount $Operation.modifiers
+                Send-CrossHandsMouseClick $handle $point.x $point.y $Operation.mouse_button $clickCount $modifierKeys
                 $action = [pscustomobject]@{ path = "synthetic"; actionName = $null; fallbackReason = $(if ($hasModifiers) { "modifiersRequireSynthetic" } else { "actionUnsupported" }) }
             } else {
                 $action = [pscustomobject]@{ path = "accessibility"; actionName = "primaryAction"; fallbackReason = $null }
