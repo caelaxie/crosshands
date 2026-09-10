@@ -512,7 +512,13 @@ function nativeInput(operation: ComputerOperationName, input: unknown): JsonObje
   const target = nativeTarget(value.target)
   switch (operation) {
     case 'click':
-      return { ...actionCommon, ...target, mouseButton: value.button, clickCount: value.clickCount }
+      return {
+        ...actionCommon,
+        ...target,
+        mouseButton: value.button,
+        clickCount: value.clickCount,
+        modifiers: value.modifiers
+      }
     case 'performSecondaryAction':
       return { ...actionCommon, ...target, action: value.action }
     case 'scroll':

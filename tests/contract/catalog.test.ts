@@ -66,6 +66,36 @@ describe('computer operation catalog', () => {
     ).toThrow()
   })
 
+  it('accepts click modifiers using hotkey tokens', () => {
+    expect(() =>
+      parseOperationInput('click', {
+        ...validInputs.click,
+        modifiers: ['Shift', 'CmdOrCtrl']
+      })
+    ).not.toThrow()
+  })
+
+  it('rejects empty or unknown click modifier fields', () => {
+    expect(() =>
+      parseOperationInput('click', {
+        ...validInputs.click,
+        modifiers: []
+      })
+    ).toThrow()
+    expect(() =>
+      parseOperationInput('click', {
+        ...validInputs.click,
+        modifiers: ['Hyper']
+      })
+    ).toThrow()
+    expect(() =>
+      parseOperationInput('click', {
+        ...validInputs.click,
+        modifier: 'Shift'
+      })
+    ).toThrow()
+  })
+
   it('exports JSON Schema from the same runtime definitions', () => {
     for (const [name, operation] of Object.entries(COMPUTER_OPERATIONS)) {
       expect(contractJsonSchemas.operations[name]?.input).toEqual(
@@ -86,7 +116,7 @@ describe('computer operation catalog', () => {
     ) as unknown
     const compatibility = JSON.parse(
       await readFile(
-        new URL('../../packages/contract/test/fixtures/orca-8adfef4.json', import.meta.url),
+        new URL('../../packages/contract/test/fixtures/orca-9c8f4c3.json', import.meta.url),
         'utf8'
       )
     ) as { crosshandsOperations: string[] }

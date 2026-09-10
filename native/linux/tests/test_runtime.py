@@ -168,6 +168,79 @@ class ContractBehaviorTests(unittest.TestCase):
         ):
             self.assertFalse(runtime.same_element_signature(node, saved))
 
+    def test_click_modifiers_map_cmdorctrl_to_ctrl(self):
+        self.assertEqual(runtime.click_modifier_keys(["Shift", "CmdOrCtrl"]), ["shift", "ctrl"])
+        self.assertEqual(runtime.click_modifier_keys(["Option"]), ["alt"])
+        with self.assertRaisesRegex(RuntimeError, "unsupported modifier"):
+            runtime.click_modifier_keys(["Hyper"])
+        with self.assertRaisesRegex(RuntimeError, "unsupported modifier"):
+            runtime.click_modifier_keys(["cmd+a"])
+
+    def test_hotkey_uses_the_same_modifier_aliases(self):
+        self.assertEqual(runtime.normalize_hotkey_spec("CmdOrCtrl+Shift+P"), "ctrl+shift+P")
+        self.assertEqual(runtime.normalize_hotkey_spec("Option+Tab"), "alt+Tab")
+
+    def test_click_with_modifiers_uses_xdotool_not_atspi(self):
+        calls = []
+        mouse = mock.Mock()
+
+        def fake_run(cmd, check=True, env=None):
+            calls.append(list(cmd))
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(runtime, "utility", return_value="/usr/bin/xdotool"), mock.patch.object(
+            runtime.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(runtime, "Atspi", mouse):
+            runtime.click_at(10, 20, "left", 1, ["Shift", "CmdOrCtrl"])
+        mouse.generate_mouse_event.assert_not_called()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            calls[0],
+            [
+                "/usr/bin/xdotool",
+                "keydown",
+                "shift",
+                "keydown",
+                "ctrl",
+                "mousemove",
+                "--sync",
+                "10",
+                "20",
+                "click",
+                "--repeat",
+                "1",
+                "1",
+                "keyup",
+                "ctrl",
+                "keyup",
+                "shift",
+            ],
+        )
+
+    def test_click_without_modifiers_stays_on_atspi(self):
+        atspi = mock.Mock()
+        with mock.patch.object(runtime, "utility") as util, mock.patch.object(runtime, "Atspi", atspi):
+            runtime.click_at(10, 20, "left", 1)
+        util.assert_not_called()
+        self.assertGreaterEqual(atspi.generate_mouse_event.call_count, 3)
+
+    def test_click_modifiers_release_keys_if_xdotool_fails(self):
+        calls = []
+
+        def fake_run(cmd, check=True, env=None):
+            calls.append(list(cmd))
+            if check:
+                raise subprocess.CalledProcessError(1, cmd)
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(runtime, "utility", return_value="/usr/bin/xdotool"), mock.patch.object(
+            runtime.subprocess, "run", side_effect=fake_run
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                runtime.click_at(10, 20, "left", 1, ["Shift"])
+        self.assertEqual(calls[0][1], "keydown")
+        self.assertEqual(calls[-1], ["/usr/bin/xdotool", "keyup", "shift"])
+
     def test_native_dispatch_rejects_changed_process_identity(self):
         app = object()
         with mock.patch.object(runtime, "pid_of", return_value=42):

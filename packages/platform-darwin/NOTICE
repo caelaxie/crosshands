@@ -1,5 +1,5 @@
 This package contains a CrossHands adaptation of the macOS computer-use helper
-from stablyai/orca at commit 8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c.
+from stablyai/orca at commit 9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4.
 
 Copyright (c) 2026 Lovecast Inc. Licensed under the MIT License. The complete
 notice is distributed with the native helper and in CrossHands third-party notices.

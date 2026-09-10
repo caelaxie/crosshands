@@ -67,6 +67,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'y',
     'click-count',
     'mouse-button',
+    'modifiers',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -257,6 +258,19 @@ function elementTarget(flags: Flags, name = 'element-index'): unknown {
   return { kind: 'element', elementIndex: index }
 }
 
+function chordTokens(raw: string): string[] {
+  return raw.split('+')
+}
+
+function parseClickModifiers(flags: Flags): string[] | undefined {
+  const raw = stringFlag(flags, 'modifiers')
+  if (raw === undefined) return undefined
+  const modifiers = chordTokens(raw).filter((token) => token.length > 0)
+  if (modifiers.length === 0 || modifiers.length > 4)
+    throw new CliError('invalid_argument', 'Invalid --modifiers')
+  return modifiers
+}
+
 function pointOrElement(flags: Flags): unknown {
   const element = numberFlag(flags, 'element-index', { integer: true, min: 0 })
   const x = numberFlag(flags, 'x')
@@ -312,11 +326,13 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const button = stringFlag(flags, 'mouse-button')
       if (button !== undefined && !['left', 'right', 'middle'].includes(button))
         throw new CliError('invalid_argument', 'Invalid --mouse-button')
+      const modifiers = parseClickModifiers(flags)
       return {
         ...common(),
         target: pointOrElement(flags),
         ...(clickCount === undefined ? {} : { clickCount }),
-        ...(button === undefined ? {} : { button })
+        ...(button === undefined ? {} : { button }),
+        ...(modifiers === undefined ? {} : { modifiers })
       }
     }
     case 'perform-secondary-action':
@@ -379,7 +395,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
         key: stringFlag(flags, 'key', true)
       }
     case 'hotkey': {
-      const keys = stringFlag(flags, 'key', true)!.split('+')
+      const keys = chordTokens(stringFlag(flags, 'key', true)!)
       if (keys.length < 2 || keys.some((key) => key.length === 0))
         throw new CliError('invalid_argument', 'Hotkeys require a modifier and key')
       return { ...common(), target: { kind: 'context-window' }, keys }

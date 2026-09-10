@@ -57,7 +57,7 @@ function harness() {
           generation: 'darwin-1',
           graphicalSessionId: 'session-1',
           providerProtocol: 1,
-          publicContract: '1.0.0',
+          publicContract: '1.1.0',
           capabilities: {
             platform: 'darwin',
             provider: 'crosshands-darwin',
@@ -179,6 +179,16 @@ describe('@crosshands/platform-darwin', () => {
       },
       deadlineAt: Date.now() + 1_000
     })
+    const modified = await provider.dispatch({
+      requestId: 'r2-modifiers',
+      operation: 'click',
+      input: {
+        contextToken: reference.contextToken,
+        target: { kind: 'element', ref: reference },
+        modifiers: ['Shift', 'CmdOrCtrl']
+      },
+      deadlineAt: Date.now() + 1_000
+    })
     expect(calls.at(-1)).toMatchObject({
       method: 'click',
       params: {
@@ -186,9 +196,11 @@ describe('@crosshands/platform-darwin', () => {
         elementIndex: 0,
         snapshotId: 'snapshot-1',
         expectedProcessStartedAt: app.processStartedAt,
-        expectedExecutableId: app.executableId
+        expectedExecutableId: app.executableId,
+        modifiers: ['Shift', 'CmdOrCtrl']
       }
     })
+    expect(modified).toMatchObject({ dispatched: true })
     expect(response).toMatchObject({
       dispatched: true,
       result: { outcome: { state: 'verified' }, freshState: { snapshot: { id: 'snapshot-1' } } }

@@ -2,7 +2,7 @@
 """CrossHands Linux computer-use provider.
 
 Substantially derived from stablyai/orca at commit
-8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c. Copyright (c) 2026 Lovecast Inc.
+9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4. Copyright (c) 2026 Lovecast Inc.
 Licensed under the MIT License; see ../../LICENSE and ../../THIRD_PARTY_NOTICES.md.
 
 This process speaks newline-delimited JSON over stdin/stdout.  It is deliberately
@@ -73,7 +73,7 @@ CLIPBOARD_COMMAND_TIMEOUT_SECONDS = 2
 CLIPBOARD_OWNER_SETTLE_SECONDS = 0.05
 CLIPBOARD_PASTE_SETTLE_SECONDS = 0.15
 PROVIDER_PROTOCOL = 1
-PUBLIC_CONTRACT = "1.0.0"
+PUBLIC_CONTRACT = "1.1.0"
 PROVIDER_VERSION = "0.1.0"
 PROVIDER_GENERATION = "linux-" + str(uuid.uuid4())
 SYSTEM_SEARCH_PATH = "/usr/local/bin:/usr/bin:/bin"
@@ -1046,17 +1046,89 @@ def require_non_empty_string(value, name):
     return str(value)
 
 
-def click_at(x, y, button, count):
+MODIFIER_XDOTOOL_NAMES = {
+    "shift": "shift",
+    "ctrl": "ctrl",
+    "control": "ctrl",
+    "cmdorctrl": "ctrl",
+    "commandorcontrol": "ctrl",
+    "alt": "alt",
+    "option": "alt",
+    "meta": "super",
+    "cmd": "super",
+    "command": "super",
+    "super": "super",
+    "win": "super",
+}
+XDOTOOL_ENV = {"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"}
+CLICK_XDOTOOL_BUTTONS = {"left": "1", "right": "3", "middle": "2"}
+
+
+def click_modifier_keys(modifiers):
+    keys = []
+    for raw in modifiers or []:
+        token = MODIFIER_XDOTOOL_NAMES.get(str(raw).strip().lower())
+        if token is None:
+            raise RuntimeError(f"unsupported modifier: {raw}")
+        keys.append(token)
+    return keys
+
+
+def normalize_hotkey_spec(raw):
+    parts = [part.strip() for part in str(raw).split("+") if part.strip()]
+    if not parts:
+        raise RuntimeError("unsupported key: empty")
+    return "+".join(MODIFIER_XDOTOOL_NAMES.get(part.lower(), part) for part in parts)
+
+
+def run_xdotool(*args, check=True):
+    xdotool = utility("xdotool")
+    if xdotool is None:
+        return None
+    return subprocess.run([xdotool, *args], check=check, env=XDOTOOL_ENV)
+
+
+def click_at(x, y, button, count, modifiers=None):
     button = (button or "left").lower()
     buttons = {"left": ("b1p", "b1r"), "right": ("b3p", "b3r"), "middle": ("b2p", "b2r")}
     if button not in buttons:
         raise RuntimeError(f"unsupported mouse button: {button}")
     down, up = buttons[button]
-    for _ in range(require_positive_integer(1 if count is None else count, "click_count")):
-        Atspi.generate_mouse_event(round(x), round(y), "abs")
-        Atspi.generate_mouse_event(round(x), round(y), down)
-        time.sleep(0.03)
-        Atspi.generate_mouse_event(round(x), round(y), up)
+    modifier_keys = click_modifier_keys(modifiers)
+    click_count = require_positive_integer(1 if count is None else count, "click_count")
+    if not modifier_keys:
+        for _ in range(click_count):
+            Atspi.generate_mouse_event(round(x), round(y), "abs")
+            Atspi.generate_mouse_event(round(x), round(y), down)
+            time.sleep(0.03)
+            Atspi.generate_mouse_event(round(x), round(y), up)
+        return
+    xdotool = utility("xdotool")
+    if xdotool is None:
+        raise RuntimeError("click modifiers require xdotool")
+    args = []
+    for key in modifier_keys:
+        args.extend(("keydown", key))
+    args.extend(
+        (
+            "mousemove",
+            "--sync",
+            str(round(x)),
+            str(round(y)),
+            "click",
+            "--repeat",
+            str(click_count),
+            CLICK_XDOTOOL_BUTTONS[button],
+        )
+    )
+    for key in reversed(modifier_keys):
+        args.extend(("keyup", key))
+    try:
+        subprocess.run([xdotool, *args], check=True, env=XDOTOOL_ENV)
+    except Exception:
+        for key in reversed(modifier_keys):
+            subprocess.run([xdotool, "keyup", key], check=False, env=XDOTOOL_ENV)
+        raise
 
 
 def scroll_at(x, y, direction, pages):
@@ -1113,15 +1185,9 @@ def press_key(raw):
 
 
 def hotkey(raw):
-    key_spec = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw))
+    key_spec = normalize_hotkey_spec(raw)
     ensure_provider_available("hotkey")
-    xdotool = utility("xdotool")
-    if xdotool:
-        subprocess.run(
-            [xdotool, "key", key_spec],
-            check=True,
-            env={"PATH": SYSTEM_SEARCH_PATH, "LANG": "C.UTF-8"},
-        )
+    if run_xdotool("key", key_spec) is not None:
         return
     if "+" in key_spec:
         raise RuntimeError("hotkey combinations require xdotool")
@@ -1261,15 +1327,26 @@ def run_operation(operation):
             if operation.get("click_count") is not None
             else 1
         )
-        handled = operation.get("mouse_button", "left") == "left" and click_count <= 1 and perform_action(node, preferred)
+        modifiers = operation.get("modifiers") or []
+        handled = (
+            not modifiers
+            and operation.get("mouse_button", "left") == "left"
+            and click_count <= 1
+            and perform_action(node, preferred)
+        )
         if not handled:
             ensure_provider_available("syntheticPointer")
             click_at(
                 *screen_point(bounds, saved, operation.get("x"), operation.get("y"), node),
                 operation.get("mouse_button", "left"),
                 click_count,
+                modifiers,
             )
-            action = {"path": "synthetic", "actionName": None, "fallbackReason": "actionUnsupported"}
+            action = {
+                "path": "synthetic",
+                "actionName": None,
+                "fallbackReason": "modifiersRequireSynthetic" if modifiers else "actionUnsupported",
+            }
         else:
             labels = action_labels(node)
             action = {"path": "accessibility", "actionName": labels[preferred] if preferred is not None and preferred < len(labels) else "action", "fallbackReason": None}

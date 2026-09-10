@@ -160,6 +160,7 @@ export function mapNativeOperation(
         ...targetFields(input.target),
         ...(typeof input.clickCount === 'number' ? { click_count: input.clickCount } : {}),
         ...(typeof input.button === 'string' ? { mouse_button: input.button } : {}),
+        ...(Array.isArray(input.modifiers) ? { modifiers: input.modifiers } : {}),
         ...captureOptions(input)
       }
     case 'performSecondaryAction':

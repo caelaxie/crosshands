@@ -66,6 +66,13 @@ describe('Linux provider boundary', () => {
         button: 'right'
       })
     ).toMatchObject({ tool: 'click', app: 'Editor', x: 12, y: 34, click_count: 2 })
+    expect(
+      mapNativeOperation('click', {
+        app: 'Editor',
+        target: { kind: 'coordinate', x: 12, y: 34 },
+        modifiers: ['Shift', 'CmdOrCtrl']
+      })
+    ).toMatchObject({ tool: 'click', modifiers: ['Shift', 'CmdOrCtrl'] })
 
     const process = {
       pid: 42,
@@ -134,7 +141,7 @@ describe('Linux provider boundary', () => {
       try {
         const handshake = await provider.start()
         expect(handshake.provider).toBe('crosshands-computer-use-linux')
-        expect(handshake.publicContract).toBe('1.0.0')
+        expect(handshake.publicContract).toBe('1.1.0')
         expect(handshake.capabilities.operations.capabilities).toBe(true)
         expect(handshake.capabilities.operations.getAppState).toBe(false)
         const response = await provider.dispatch({

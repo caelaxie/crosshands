@@ -12,7 +12,7 @@ private let helperBundleId = "ai.crosshands.ComputerUse"
 private let providerName = "crosshands-darwin"
 private let providerVersion = "1.0.0"
 private let providerProtocolVersion = 1
-private let publicContractVersion = "1.0.0"
+private let publicContractVersion = "1.1.0"
 private let providerGeneration = "darwin-\(UUID().uuidString.lowercased())"
 private let graphicalSessionId = ProcessInfo.processInfo.environment["CROSSHANDS_GRAPHICAL_SESSION_ID"]
     ?? "aqua-\(getuid())"
@@ -61,6 +61,11 @@ enum JSONValue: Decodable {
 
     var bool: Bool? {
         if case let .bool(value) = self { return value }
+        return nil
+    }
+
+    var array: [JSONValue]? {
+        if case let .array(value) = self { return value }
         return nil
     }
 }
@@ -833,12 +838,13 @@ final class Provider {
         let snapshot = try currentSnapshot(params: params)
         let button = params["mouseButton"]?.string ?? "left"
         let count = try positiveInteger(params["clickCount"]?.number, defaultValue: 1, name: "clickCount")
+        let modifiers = try clickModifiers(params)
         // Why: agents expect a click into a target app to make the next
         // keyboard action safe, even when the click uses an AX action path.
         recoverWindow(snapshot.app)
         if let elementIndex = try optionalInteger(params, "elementIndex") {
             let record = try element(snapshot, elementIndex)
-            if count <= 1, let actionName = try performClickAction(record: record, mouseButton: button) {
+            if modifiers.isEmpty, count <= 1, let actionName = try performClickAction(record: record, mouseButton: button) {
                 return actionMetadata(path: "accessibility", actionName: actionName)
             }
             if let point = center(record.localFrame, in: snapshot.windowBounds) {
@@ -846,9 +852,10 @@ final class Provider {
                     pid: snapshot.app.pid,
                     at: point,
                     button: mouseButton(button),
-                    count: count
+                    count: count,
+                    modifiers: modifiers
                 )
-                return actionMetadata(path: "synthetic", fallbackReason: "actionUnsupported")
+                return actionMetadata(path: "synthetic", fallbackReason: modifiers.isEmpty ? "actionUnsupported" : "modifiersRequireSynthetic")
             }
             throw ProviderError.coded("element_not_clickable", "element \(record.index) has no clickable frame")
         }
@@ -857,9 +864,26 @@ final class Provider {
             pid: snapshot.app.pid,
             at: point,
             button: mouseButton(button),
-            count: count
+            count: count,
+            modifiers: modifiers
         )
         return actionMetadata(path: "synthetic")
+    }
+
+    private func clickModifiers(_ params: [String: JSONValue]) throws -> [KeyModifier] {
+        guard let raw = params["modifiers"] else { return [] }
+        guard let values = raw.array else {
+            throw ProviderError.coded("invalid_argument", "modifiers must be an array")
+        }
+        if values.isEmpty || values.count > 4 {
+            throw ProviderError.coded("invalid_argument", "modifiers must contain 1 to 4 tokens")
+        }
+        return try values.map { value in
+            guard let token = value.string else {
+                throw ProviderError.coded("invalid_argument", "modifiers must be strings")
+            }
+            return try KeyMap.parseModifier(token)
+        }
     }
 
     private func performClickAction(record: ElementRecord, mouseButton: String) throws -> String? {
@@ -1522,51 +1546,6 @@ private func screenshotScale(screenshot: ScreenshotPayload?, bounds: CGRect) -> 
         width: CGFloat(screenshot.width) / bounds.width,
         height: CGFloat(screenshot.height) / bounds.height
     )
-}
-
-private enum MouseButton {
-    case left
-    case right
-
-    var cgButton: CGMouseButton {
-        switch self {
-        case .left:
-            return .left
-        case .right:
-            return .right
-        }
-    }
-
-    var downEvent: CGEventType {
-        switch self {
-        case .left:
-            return .leftMouseDown
-        case .right:
-            return .rightMouseDown
-        }
-    }
-
-    var upEvent: CGEventType {
-        switch self {
-        case .left:
-            return .leftMouseUp
-        case .right:
-            return .rightMouseUp
-        }
-    }
-}
-
-private func mouseButton(_ raw: String?) throws -> MouseButton {
-    switch raw ?? "left" {
-    case "left":
-        return .left
-    case "right":
-        return .right
-    case "middle":
-        throw ProviderError.coded("invalid_argument", "middle-click is not yet supported")
-    case let value:
-        throw ProviderError.coded("invalid_argument", "unsupported mouse button '\(value)'")
-    }
 }
 
 private func renderTreeText(app: AppDescriptor, title: String, bounds: CGRect, lines: [String], focused: String?) -> String {
@@ -2368,122 +2347,6 @@ private func resizePng(_ image: CGImage, scale: CGFloat) -> BoundedPNG? {
     return BoundedPNG(data: data, width: width, height: height)
 }
 
-private enum Input {
-    static func click(pid: pid_t, at point: CGPoint, button: MouseButton, count: Int) throws {
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
-            throw ProviderError.coded("accessibility_error", "failed to create event source")
-        }
-        for _ in 0..<max(count, 1) {
-            try mouse(.mouseMoved, source: source, point: point, button: button.cgButton, pid: pid)
-            try mouse(button.downEvent, source: source, point: point, button: button.cgButton, pid: pid)
-            try mouse(button.upEvent, source: source, point: point, button: button.cgButton, pid: pid)
-        }
-    }
-
-    static func scroll(pid: pid_t, at point: CGPoint, direction: String, pages: Double) throws {
-        guard let delta = boundedInteger(max(1, (12 * pages).rounded()), as: Int32.self) else {
-            throw ProviderError.coded("invalid_argument", "pages is out of range")
-        }
-        let wheel1: Int32 = direction == "up" ? delta : direction == "down" ? -delta : 0
-        let wheel2: Int32 = direction == "left" ? delta : direction == "right" ? -delta : 0
-        guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0) else {
-            throw ProviderError.coded("accessibility_error", "failed to create scroll event")
-        }
-        event.location = point
-        event.postToPid(pid)
-    }
-
-    static func drag(pid: pid_t, from start: CGPoint, to end: CGPoint, durationMs: Double) throws {
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
-            throw ProviderError.coded("accessibility_error", "failed to create event source")
-        }
-        try mouse(.mouseMoved, source: source, point: start, button: .left, pid: pid)
-        try mouse(.leftMouseDown, source: source, point: start, button: .left, pid: pid)
-        for step in 1...10 {
-            let progress = CGFloat(step) / 10
-            try mouse(
-                .leftMouseDragged,
-                source: source,
-                point: CGPoint(x: start.x + (end.x - start.x) * progress, y: start.y + (end.y - start.y) * progress),
-                button: .left,
-                pid: pid
-            )
-            Thread.sleep(forTimeInterval: durationMs / 10_000)
-        }
-        try mouse(.leftMouseUp, source: source, point: end, button: .left, pid: pid)
-    }
-
-    static func typeText(_ text: String, pid: pid_t) throws {
-        for character in text {
-            let units = Array(String(character).utf16)
-            guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-                  let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-            else {
-                throw ProviderError.coded("accessibility_error", "failed to create keyboard event")
-            }
-            units.withUnsafeBufferPointer { buffer in
-                guard let baseAddress = buffer.baseAddress else { return }
-                down.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
-                up.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: baseAddress)
-            }
-            down.postToPid(pid)
-            up.postToPid(pid)
-        }
-    }
-
-    static func pressKey(_ key: String, pid: pid_t) throws {
-        let parsed = try KeyMap.parse(key)
-        var flags = CGEventFlags()
-        for modifier in parsed.modifiers {
-            flags.insert(modifier.flag)
-            try keyEvent(modifier.keyCode, down: true, flags: flags, pid: pid)
-        }
-        try keyEvent(parsed.keyCode, down: true, flags: flags, pid: pid)
-        try keyEvent(parsed.keyCode, down: false, flags: flags, pid: pid)
-        for modifier in parsed.modifiers.reversed() {
-            try keyEvent(modifier.keyCode, down: false, flags: flags, pid: pid)
-            flags.remove(modifier.flag)
-        }
-    }
-
-    static func pasteText(_ text: String, pid: pid_t) throws {
-        let pasteboard = NSPasteboard.general
-        let previousItems: [NSPasteboardItem] = pasteboard.pasteboardItems?.map { item in
-            let copy = NSPasteboardItem()
-            for type in item.types {
-                if let data = item.data(forType: type) {
-                    copy.setData(data, forType: type)
-                }
-            }
-            return copy
-        } ?? []
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        defer {
-            pasteboard.clearContents()
-            if !previousItems.isEmpty {
-                pasteboard.writeObjects(previousItems)
-            }
-        }
-        try pressKey("cmd+v", pid: pid)
-    }
-
-    private static func mouse(_ type: CGEventType, source: CGEventSource, point: CGPoint, button: CGMouseButton, pid: pid_t) throws {
-        guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: button) else {
-            throw ProviderError.coded("accessibility_error", "failed to create mouse event")
-        }
-        event.postToPid(pid)
-    }
-
-    private static func keyEvent(_ keyCode: CGKeyCode, down: Bool, flags: CGEventFlags, pid: pid_t) throws {
-        guard let event = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: down) else {
-            throw ProviderError.coded("accessibility_error", "failed to create key event")
-        }
-        event.flags = flags
-        event.postToPid(pid)
-    }
-}
-
 private enum TextInput {
     static func replaceSelection(_ element: AXUIElement, with text: String) -> [String: Any]? {
         guard isSettable(element, kAXValueAttribute as String),
@@ -2566,54 +2429,6 @@ private func isSelectAllHotkey(_ key: String) -> Bool {
         modifiers.contains("meta") ||
         modifiers.contains("cmdorctrl") ||
         modifiers.contains("commandorcontrol")
-}
-
-private struct KeyModifier {
-    let keyCode: CGKeyCode
-    let flag: CGEventFlags
-}
-
-private struct ParsedKey {
-    let keyCode: CGKeyCode
-    let modifiers: [KeyModifier]
-}
-
-private enum KeyMap {
-    static func parse(_ spec: String) throws -> ParsedKey {
-        let parts = spec.split(separator: "+").map { String($0).lowercased() }
-        var modifiers: [KeyModifier] = []
-        var keyName: String?
-        for part in parts {
-            switch part {
-            case "cmd", "command", "meta", "super", "cmdorctrl", "commandorcontrol":
-                modifiers.append(KeyModifier(keyCode: 55, flag: .maskCommand))
-            case "ctrl", "control":
-                modifiers.append(KeyModifier(keyCode: 59, flag: .maskControl))
-            case "alt", "option":
-                modifiers.append(KeyModifier(keyCode: 58, flag: .maskAlternate))
-            case "shift":
-                modifiers.append(KeyModifier(keyCode: 56, flag: .maskShift))
-            default:
-                keyName = part
-            }
-        }
-        guard let keyName, let keyCode = codes[keyName] else {
-            throw ProviderError.coded("invalid_argument", "unsupported key '\(spec)'")
-        }
-        return ParsedKey(keyCode: keyCode, modifiers: modifiers)
-    }
-
-    private static let codes: [String: CGKeyCode] = [
-        "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9,
-        "b": 11, "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "1": 18, "2": 19,
-        "3": 20, "4": 21, "6": 22, "5": 23, "=": 24, "9": 25, "7": 26, "-": 27, "8": 28,
-        "0": 29, "]": 30, "o": 31, "u": 32, "[": 33, "i": 34, "p": 35, "return": 36,
-        "enter": 36, "l": 37, "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42, ",": 43,
-        "/": 44, "n": 45, "m": 46, ".": 47, "tab": 48, "space": 49, "`": 50,
-        "backspace": 51, "delete": 51, "escape": 53, "esc": 53, "left": 123, "right": 124,
-        "down": 125, "up": 126, "insert": 114, "home": 115, "pageup": 116, "page_up": 116,
-        "forwarddelete": 117, "end": 119, "pagedown": 121, "page_down": 121,
-    ]
 }
 
 private final class AgentRuntime: NSObject, NSApplicationDelegate {

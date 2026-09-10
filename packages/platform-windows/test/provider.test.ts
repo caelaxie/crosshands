@@ -211,6 +211,18 @@ describe('WindowsComputerProvider', () => {
       expectedIdentity: identity,
       windowId: '7'
     })
+    await expect(
+      provider.dispatch(
+        request('click', {
+          ...input,
+          modifiers: ['Shift', 'CmdOrCtrl']
+        })
+      )
+    ).resolves.toMatchObject({ dispatched: true })
+    expect(transport.requests.at(-1)).toMatchObject({
+      tool: 'click',
+      modifiers: ['Shift', 'CmdOrCtrl']
+    })
   })
 
   it('labels preflight security failures non-dispatched and never retries them', async () => {
