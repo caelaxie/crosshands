@@ -90,6 +90,34 @@ describe('local broker', () => {
     expect(provider.calls).toHaveLength(0)
   })
 
+  it('surfaces provider observation errors with their contract code', async () => {
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'error',
+      code: 'app_not_found',
+      message: "app 'fixture.app' is not running",
+      dispatched: false
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-1',
+      providerFactory: () => provider
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+
+    await expect(
+      client.request({ operation: 'getAppState', input: { app: 'fixture.app' } })
+    ).rejects.toMatchObject({
+      code: 'app_not_found',
+      message: "app 'fixture.app' is not running",
+      retry: true,
+      remediation: 'refresh_apps'
+    })
+    expect(provider.calls).toHaveLength(1)
+  })
+
   it('shares a session broker while issuing portable bearer contexts', async () => {
     const provider = new FakeComputerProvider({
       generation: 'provider-1',
