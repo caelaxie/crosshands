@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { chmod, lstat, mkdir, readFile } from 'node:fs/promises'
+import { lstat, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
@@ -7,6 +7,7 @@ import { CONTRACT_VERSIONS, createComputerError } from '@crosshands/contract'
 import {
   LocalControlClient,
   brokerEndpoint,
+  ensurePrivateDirectory,
   graphicalSessionKey,
   type LocalControlIdentity
 } from '@crosshands/runtime'
@@ -73,14 +74,15 @@ function defaultRuntimeDirectory(sessionKey: string): string {
   return join(localAppData, 'CrossHands', 'runtime', sessionKey)
 }
 
-async function prepareRuntimeDirectory(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 })
-  const info = await lstat(path)
-  if (!info.isDirectory() || info.isSymbolicLink())
-    throw createComputerError('provider_unavailable', 'CrossHands runtime path is unsafe')
-  if (process.getuid !== undefined && info.uid !== process.getuid())
-    throw createComputerError('provider_unavailable', 'CrossHands runtime path has another owner')
-  await chmod(path, 0o700)
+function prepareRuntimeDirectory(path: string): void {
+  try {
+    ensurePrivateDirectory(path)
+  } catch (cause) {
+    throw createComputerError(
+      'provider_unavailable',
+      cause instanceof Error ? cause.message : 'CrossHands directory is unsafe'
+    )
+  }
 }
 
 async function readSecureToken(path: string): Promise<string> {
@@ -129,7 +131,7 @@ export async function createProductionBrokerClient(
   options: ProductionClientOptions = {}
 ): Promise<CliBrokerClient> {
   const paths = options.paths ?? localClientPaths()
-  await prepareRuntimeDirectory(paths.runtimeDirectory)
+  prepareRuntimeDirectory(paths.runtimeDirectory)
   try {
     const control = await connect(paths)
     return controlAdapter(control)

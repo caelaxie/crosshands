@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import {
   CONTRACT_VERSIONS,
   createComputerError,
@@ -7,10 +9,13 @@ import {
   type ReferenceBindings
 } from '@crosshands/contract'
 import {
+  JsonlDiagnosticsWriter,
   LocalBroker,
   LocalControlServer,
   diagnosticsDirectory,
+  emitDiagnostic,
   type BrokerEndpoint,
+  type ControlHandshakeEvent,
   type LocalControlIdentity,
   type LocalControlRequest,
   type StableAppIdentity,
@@ -26,6 +31,7 @@ type ProviderModule = {
     endpoint: BrokerEndpoint
     identity: LocalControlIdentity
     handler: (request: LocalControlRequest) => Promise<unknown>
+    onHandshake?: (event: ControlHandshakeEvent) => void
   }) => Promise<{ start(): Promise<void>; close(): Promise<void> }>
   inspectTarget?: (
     operation: ComputerOperationName,
@@ -77,10 +83,16 @@ export async function runBrokerHost(): Promise<void> {
   const providerModule = await loadProviderModule()
   const paths = localClientPaths()
   const peer = { ...paths.identity, verified: true, local: true }
+  const generation = `broker-${randomUUID()}`
+  const diagnostics = new JsonlDiagnosticsWriter({
+    directory: diagnosticsDirectory(paths.identity.graphicalSessionId),
+    generation
+  })
   const broker = new LocalBroker({
     identity: peer,
+    generation,
     providerFactory: () => providerModule.createProvider(),
-    diagnosticsDirectory: diagnosticsDirectory(paths.identity.graphicalSessionId),
+    diagnostics,
     ...(providerModule.inspectTarget === undefined
       ? {}
       : {
@@ -108,15 +120,22 @@ export async function runBrokerHost(): Promise<void> {
       }
       return broker.request({ operation, input, deadlineMs: Math.max(1, deadlineAt - Date.now()) })
     }
-    const onHandshake = (event: { accepted: boolean; requestId: string; code?: string }): void => {
-      broker.noteHandshake(event)
+    const onHandshake = (event: ControlHandshakeEvent): void => {
+      emitDiagnostic(diagnostics, {
+        kind: 'client.handshake',
+        ...broker.diagnosticEnvelope(),
+        accepted: event.accepted,
+        requestId: event.requestId,
+        ...(event.code === undefined ? {} : { code: event.code })
+      })
     }
     const server =
       paths.endpoint.transport === 'named-pipe'
         ? await (providerModule.createControlServer?.({
             endpoint: paths.endpoint,
             identity: paths.identity,
-            handler
+            handler,
+            onHandshake
           }) ??
             Promise.reject(
               new Error('The Windows payload has no native DACL and peer-token control relay')
@@ -130,7 +149,7 @@ export async function runBrokerHost(): Promise<void> {
             onHandshake
           })
     await server.start()
-    broker.markListening()
+    emitDiagnostic(diagnostics, { kind: 'broker.start', ...broker.diagnosticEnvelope() })
     await new Promise<void>((resolve) => {
       const stop = (): void => resolve()
       process.once('SIGINT', stop)
@@ -138,6 +157,6 @@ export async function runBrokerHost(): Promise<void> {
     })
     await server.close()
   } finally {
-    await broker.close()
+    await broker.close('signal')
   }
 }

@@ -42,6 +42,12 @@ export type LocalControlRequest = {
   deadlineAt: number
 }
 
+export type ControlHandshakeEvent = {
+  accepted: boolean
+  requestId: string
+  code?: string
+}
+
 export type LocalControlServerOptions = {
   endpoint: BrokerEndpoint
   runtimeDirectory?: string
@@ -53,7 +59,7 @@ export type LocalControlServerOptions = {
   maxFrameBytes?: number
   maxFramesPerConnection?: number
   now?: () => number
-  onHandshake?: (event: { accepted: boolean; requestId: string; code?: string }) => void
+  onHandshake?: (event: ControlHandshakeEvent) => void
 }
 
 type ControlMessage = Record<string, unknown> & { type: string; requestId?: string }

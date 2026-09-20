@@ -4,17 +4,22 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CONTRACT_VERSIONS, type ReferenceBindings } from '../../packages/contract/src/index.js'
+import {
+  CONTRACT_VERSIONS,
+  createComputerError,
+  type ReferenceBindings
+} from '../../packages/contract/src/index.js'
 import { FakeComputerProvider } from '../../packages/provider-testkit/src/index.js'
 import {
   JsonlDiagnosticsWriter,
   LocalBroker,
+  diagnosticError,
   diagnosticsDirectory,
-  diagnosticsResource,
+  emitDiagnostic,
   graphicalSessionKey,
-  omitForbidden,
   type BrokerPeer,
-  type DiagnosticRecord
+  type DiagnosticRecord,
+  type DiagnosticsSink
 } from '../../packages/runtime/src/index.js'
 
 const peer: BrokerPeer = {
@@ -93,6 +98,10 @@ function tempDir(): string {
   return directory
 }
 
+function listening(broker: LocalBroker, sink: DiagnosticsSink): void {
+  emitDiagnostic(sink, { kind: 'broker.start', ...broker.diagnosticEnvelope() })
+}
+
 afterEach(() => {
   while (directories.length > 0) {
     const directory = directories.pop()
@@ -123,12 +132,11 @@ describe('diagnostics paths', () => {
     expect(
       diagnosticsDirectory(session, { env: { CROSSHANDS_DIAGNOSTICS_DIR: '/tmp/diag-override' } })
     ).toBe('/tmp/diag-override')
-    expect(diagnosticsResource('/tmp/diag').kind).toBe('log')
   })
 })
 
 describe('jsonl diagnostics writer', () => {
-  it('appends one JSON object per line, rotates, and keeps the directory private', () => {
+  it('appends one JSON object per line, rotates, and keeps the directory private', async () => {
     const directory = tempDir()
     const writer = new JsonlDiagnosticsWriter({
       directory,
@@ -169,24 +177,34 @@ describe('jsonl diagnostics writer', () => {
     if (process.platform !== 'win32') {
       expect(statSync(directory).mode & 0o777).toBe(0o700)
     }
+    await writer.close()
   })
 })
 
-describe('omitForbidden', () => {
-  it('drops payloads that must not land on disk', () => {
-    expect(
-      omitForbidden({
-        operation: 'typeText',
-        text: canary,
-        nested: { treeText: canary, value: canary, code: 'ok' }
-      })
-    ).toEqual({ operation: 'typeText', nested: { code: 'ok' } })
+describe('diagnosticError', () => {
+  it('keeps allow-listed scalar details and drops payloads', () => {
+    const error = createComputerError('stale_target', 'Target reference is no longer fresh', {
+      mismatches: ['context token'],
+      treeText: canary
+    })
+    expect(diagnosticError(error)).toEqual({
+      code: 'stale_target',
+      message: 'Target reference is no longer fresh',
+      retry: true,
+      remediation: 'refresh_state',
+      details: { mismatches: ['context token'] }
+    })
+    expect(JSON.stringify(diagnosticError(error))).not.toContain(canary)
   })
 })
 
 describe('local broker diagnostics file', () => {
   it('writes helper, request, and stop lines without desktop payloads', async () => {
     const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({
+      directory,
+      generation: 'broker-diag'
+    })
     const provider = new FakeComputerProvider({
       generation: 'provider-1',
       graphicalSessionId: peer.graphicalSessionId
@@ -205,10 +223,10 @@ describe('local broker diagnostics file', () => {
       identity: peer,
       generation: 'broker-diag',
       providerFactory: () => provider,
-      diagnosticsDirectory: directory
+      diagnostics
     })
     const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
-    broker.markListening()
+    listening(broker, diagnostics)
     const response = await client.request({
       operation: 'getAppState',
       input: { app: 'fixture.app' }
@@ -219,6 +237,9 @@ describe('local broker diagnostics file', () => {
     const records = readJsonl(directory, 'broker-diag')
     const kinds = records.map((record) => record.kind)
     expect(kinds).toEqual(['helper.start', 'broker.start', 'request', 'broker.stop'])
+    expect(records.find((record) => record.kind === 'broker.stop')).toMatchObject({
+      reason: 'closed'
+    })
     const serialized = JSON.stringify(records)
     expect(serialized).not.toContain(canary)
     expect(serialized).not.toContain('treeText')
@@ -244,6 +265,10 @@ describe('local broker diagnostics file', () => {
 
   it('records a helper crash and restart on a retried observation', async () => {
     const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({
+      directory,
+      generation: 'broker-crash'
+    })
     const crashed = new FakeComputerProvider({
       generation: 'provider-1',
       graphicalSessionId: peer.graphicalSessionId
@@ -261,7 +286,7 @@ describe('local broker diagnostics file', () => {
       identity: peer,
       generation: 'broker-crash',
       providerFactory: () => providers.shift()!,
-      diagnosticsDirectory: directory
+      diagnostics
     })
     const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
     await client.request({ operation: 'getAppState', input: { app: 'fixture.app' } })
@@ -277,6 +302,10 @@ describe('local broker diagnostics file', () => {
 
   it('records typeText without the typed payload', async () => {
     const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({
+      directory,
+      generation: 'broker-type'
+    })
     const bound = bindings('broker-type')
     const provider = new FakeComputerProvider({
       generation: 'provider-1',
@@ -286,7 +315,7 @@ describe('local broker diagnostics file', () => {
       identity: peer,
       generation: 'broker-type',
       providerFactory: () => provider,
-      diagnosticsDirectory: directory,
+      diagnostics,
       inspectTarget: async () => ({
         bindings: bound,
         appIdentity: { appId: 'fixture.app', executableId: 'fixture' }

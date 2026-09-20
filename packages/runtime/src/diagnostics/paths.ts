@@ -1,12 +1,7 @@
-import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import type { InstalledResource } from '../bundle-lifecycle.js'
-
-export function graphicalSessionKey(graphicalSessionId: string): string {
-  return createHash('sha256').update(graphicalSessionId).digest('hex').slice(0, 12)
-}
+import { graphicalSessionKey } from '../ipc/endpoint.js'
 
 export function diagnosticsDirectory(
   graphicalSessionId: string,
@@ -32,8 +27,4 @@ export function diagnosticsDirectory(
       ? env.LOCALAPPDATA
       : join(homedir(), 'AppData', 'Local')
   return join(localAppData, 'CrossHands', 'logs', sessionKey)
-}
-
-export function diagnosticsResource(directory: string): InstalledResource {
-  return { id: directory, kind: 'log', owner: 'crosshands' }
 }

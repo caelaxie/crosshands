@@ -12,6 +12,10 @@ export type BrokerEndpointOptions = {
   runtimeDirectory?: string
 }
 
+export function graphicalSessionKey(graphicalSessionId: string): string {
+  return createHash('sha256').update(graphicalSessionId).digest('hex').slice(0, 12)
+}
+
 export function brokerEndpoint(options: BrokerEndpointOptions): BrokerEndpoint {
   const key = createHash('sha256')
     .update(`${options.osIdentity}\0${options.graphicalSessionId}`)

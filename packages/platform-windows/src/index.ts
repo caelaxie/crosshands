@@ -8,6 +8,7 @@ import {
 } from '@crosshands/contract'
 import type {
   BrokerEndpoint,
+  ControlHandshakeEvent,
   LocalControlIdentity,
   LocalControlRequest,
   StableAppIdentity
@@ -32,6 +33,7 @@ type PlatformControlServerOptions = {
   endpoint: BrokerEndpoint
   identity: LocalControlIdentity
   handler: (request: LocalControlRequest) => Promise<unknown>
+  onHandshake?: (event: ControlHandshakeEvent) => void
 }
 
 export async function createControlServer(
@@ -54,7 +56,8 @@ export async function createControlServer(
       helperSha256,
       pipeName: options.endpoint.address
     },
-    handler: options.handler
+    handler: options.handler,
+    ...(options.onHandshake === undefined ? {} : { onHandshake: options.onHandshake })
   })
 }
 

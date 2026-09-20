@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import {
+  COMPUTER_OPERATIONS,
   InteractionContextStore,
   createComputerError,
   negotiateVersionHandshake,
@@ -18,12 +19,12 @@ import {
   diagnosticPlatform,
   diagnosticRequestResult,
   diagnosticTarget,
-  isMutationOperation,
+  emitDiagnostic,
+  type DiagnosticEnvelope,
   type DiagnosticRecord,
   type DiagnosticsSink
 } from '../diagnostics/record.js'
-import { graphicalSessionKey } from '../diagnostics/paths.js'
-import { JsonlDiagnosticsWriter } from '../diagnostics/writer.js'
+import { graphicalSessionKey } from '../ipc/endpoint.js'
 import { assertAppAllowed, type StableAppIdentity } from '../policy/policy.js'
 import { ProviderSupervisor } from '../providers/supervisor.js'
 
@@ -63,7 +64,6 @@ export type LocalBrokerOptions = {
   ) => Promise<TargetInspection | null>
   publish?: (response: BrokerResponse) => Promise<void>
   diagnostics?: DiagnosticsSink
-  diagnosticsDirectory?: string
   contextTtlMs?: number
   now?: () => number
 }
@@ -84,10 +84,6 @@ class SerialQueue {
       release()
     }
   }
-}
-
-function isMutation(operation: ComputerOperationName): boolean {
-  return isMutationOperation(operation)
 }
 
 function assertedInputApp(input: unknown): void {
@@ -257,14 +253,7 @@ export class LocalBroker {
     this.#inspectTarget = options.inspectTarget
     this.#publish = options.publish
     this.#now = options.now ?? Date.now
-    this.#diagnostics =
-      options.diagnostics ??
-      (options.diagnosticsDirectory === undefined
-        ? undefined
-        : new JsonlDiagnosticsWriter({
-            directory: options.diagnosticsDirectory,
-            generation: this.generation
-          }))
+    this.#diagnostics = options.diagnostics
     this.#contexts = new InteractionContextStore({
       ...(options.contextTtlMs === undefined ? {} : { ttlMs: options.contextTtlMs }),
       now: this.#now
@@ -277,6 +266,20 @@ export class LocalBroker {
 
   get desktopEpoch(): number {
     return this.#desktopEpoch
+  }
+
+  diagnosticEnvelope(): DiagnosticEnvelope {
+    return {
+      v: DIAGNOSTIC_RECORD_VERSION,
+      ts: new Date(this.#now()).toISOString(),
+      session: this.#session,
+      brokerGeneration: this.generation,
+      ...(this.#supervisor.generation === undefined
+        ? {}
+        : { providerGeneration: this.#supervisor.generation }),
+      desktopEpoch: this.#desktopEpoch,
+      platform: diagnosticPlatform()
+    }
   }
 
   async connect(handshake: {
@@ -299,29 +302,15 @@ export class LocalBroker {
     const versions = negotiateVersionHandshake(handshake.versions)
     if (!versions.ok) throw versions.error
     await this.#supervisor.start()
-    this.#emit({ kind: 'helper.start', ...this.#envelope() })
+    this.#emit({ kind: 'helper.start', ...this.diagnosticEnvelope() })
     return new BrokerClient(this)
   }
 
-  markListening(): void {
-    this.#emit({ kind: 'broker.start', ...this.#envelope() })
-  }
-
-  noteHandshake(event: { accepted: boolean; requestId: string; code?: string }): void {
-    this.#emit({
-      kind: 'client.handshake',
-      ...this.#envelope(),
-      accepted: event.accepted,
-      requestId: event.requestId,
-      ...(event.code === undefined ? {} : { code: event.code })
-    })
-  }
-
-  async close(): Promise<void> {
+  async close(reason = 'closed'): Promise<void> {
     if (this.#closed) return
     this.#closed = true
     await this.#supervisor.close()
-    this.#emit({ kind: 'broker.stop', reason: 'signal', ...this.#envelope() })
+    this.#emit({ kind: 'broker.stop', reason, ...this.diagnosticEnvelope() })
     await this.#diagnostics?.close()
   }
 
@@ -348,11 +337,13 @@ export class LocalBroker {
     const startedAt = this.#now()
     const requestId = `broker-${++this.#requestSequence}`
     const deadlineAt = this.#now() + (request.deadlineMs ?? 30_000)
-    const mutation = isMutation(request.operation)
+    const mutation = COMPUTER_OPERATIONS[request.operation].mutation
     let inspectMs = 0
     let dispatchMs = 0
     let bindings: ReferenceBindings | undefined
     let dispatched: boolean | undefined
+    let result: unknown
+    let cause: unknown
     assertedInputApp(request.input)
     let context: InteractionContext | undefined
     let inspectionInput = request.input
@@ -405,7 +396,7 @@ export class LocalBroker {
       dispatched = providerResponse.dispatched
       if (mutation) {
         if (dispatched) this.#desktopEpoch += 1
-        const result =
+        const mutationResult =
           'error' in providerResponse
             ? {
                 outcome: dispatched
@@ -415,21 +406,11 @@ export class LocalBroker {
             : providerResponse.result
         const response = {
           requestId,
-          result: this.#publicResult(request.operation, result),
+          result: this.#publicResult(request.operation, mutationResult),
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
-        this.#emitRequest(
-          request,
-          requestId,
-          enqueuedAt,
-          startedAt,
-          inspectMs,
-          dispatchMs,
-          bindings,
-          dispatched,
-          response.result
-        )
+        result = response.result
         await this.#publish?.(response)
         return response
       }
@@ -438,34 +419,25 @@ export class LocalBroker {
         request.operation,
         providerResponse.result
       )
-      this.#emitRequest(
-        request,
-        requestId,
-        enqueuedAt,
-        startedAt,
-        inspectMs,
-        dispatchMs,
-        bindings,
-        dispatched,
-        response.result
-      )
+      result = response.result
       return response
-    } catch (cause) {
-      const error = computerError(cause)
-      if (!mutation && error.code === 'provider_crashed') {
+    } catch (error) {
+      cause = error
+      const failed = computerError(error)
+      if (!mutation && failed.code === 'provider_crashed') {
         this.#emit({
           kind: 'helper.crash',
-          ...this.#envelope(),
+          ...this.diagnosticEnvelope(),
           requestId,
           operation: request.operation,
-          error: diagnosticError(cause)
+          error: diagnosticError(error)
         })
         const previousGeneration = this.#supervisor.generation
         await this.#supervisor.restart()
         this.#contexts.invalidateAll()
         this.#emit({
           kind: 'helper.restart',
-          ...this.#envelope(),
+          ...this.diagnosticEnvelope(),
           ...(previousGeneration === undefined ? {} : { previousGeneration })
         })
         const retryStarted = this.#now()
@@ -477,70 +449,44 @@ export class LocalBroker {
         })
         dispatchMs += this.#now() - retryStarted
         if ('error' in retry) {
-          const failure = Object.assign(new Error(retry.error.message), retry.error)
-          this.#emitRequest(
-            request,
-            requestId,
-            enqueuedAt,
-            startedAt,
-            inspectMs,
-            dispatchMs,
-            bindings,
-            retry.dispatched,
-            undefined,
-            failure
-          )
-          throw failure
+          cause = createComputerError(retry.error.code, retry.error.message, retry.error.details)
+          throw cause
         }
+        dispatched = retry.dispatched
         const response = this.#observationResponse(requestId, request.operation, retry.result)
-        this.#emitRequest(
-          request,
-          requestId,
-          enqueuedAt,
-          startedAt,
-          inspectMs,
-          dispatchMs,
-          bindings,
-          retry.dispatched,
-          response.result
-        )
+        cause = undefined
+        result = response.result
         return response
       }
-      if (mutation && (error.code === 'provider_crashed' || error.code === 'timeout')) {
-        if (error.code === 'provider_crashed') {
+      if (mutation && (failed.code === 'provider_crashed' || failed.code === 'timeout')) {
+        if (failed.code === 'provider_crashed') {
           this.#emit({
             kind: 'helper.crash',
-            ...this.#envelope(),
+            ...this.diagnosticEnvelope(),
             requestId,
             operation: request.operation,
-            error: diagnosticError(cause)
+            error: diagnosticError(error)
           })
         }
         this.#desktopEpoch += 1
         this.#contexts.invalidateAll()
+        dispatched = true
         const response = {
           requestId,
           result: this.#publicResult(request.operation, {
-            outcome: { state: 'indeterminate', reason: error.message }
+            outcome: { state: 'indeterminate', reason: failed.message }
           }),
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
-        this.#emitRequest(
-          request,
-          requestId,
-          enqueuedAt,
-          startedAt,
-          inspectMs,
-          dispatchMs,
-          bindings,
-          true,
-          response.result
-        )
+        cause = undefined
+        result = response.result
         await this.#publish?.(response)
         return response
       }
-      this.#emitRequest(
+      throw error
+    } finally {
+      this.#emitRequest({
         request,
         requestId,
         enqueuedAt,
@@ -549,10 +495,9 @@ export class LocalBroker {
         dispatchMs,
         bindings,
         dispatched,
-        undefined,
+        result,
         cause
-      )
-      throw cause
+      })
     }
   }
 
@@ -599,66 +544,40 @@ export class LocalBroker {
     return parseOperationOutput(operation, publicResult)
   }
 
-  #envelope(): {
-    v: typeof DIAGNOSTIC_RECORD_VERSION
-    ts: string
-    session: string
-    brokerGeneration: string
-    providerGeneration?: string
-    desktopEpoch: number
-    platform: ReturnType<typeof diagnosticPlatform>
-  } {
-    return {
-      v: DIAGNOSTIC_RECORD_VERSION,
-      ts: new Date(this.#now()).toISOString(),
-      session: this.#session,
-      brokerGeneration: this.generation,
-      ...(this.#supervisor.generation === undefined
-        ? {}
-        : { providerGeneration: this.#supervisor.generation }),
-      desktopEpoch: this.#desktopEpoch,
-      platform: diagnosticPlatform()
-    }
-  }
-
   #emit(record: DiagnosticRecord): void {
-    try {
-      this.#diagnostics?.emit(record)
-    } catch {
-      // Diagnostics must not fail computer-use.
-    }
+    emitDiagnostic(this.#diagnostics, record)
   }
 
-  #emitRequest(
-    request: BrokerRequest,
-    requestId: string,
-    enqueuedAt: number,
-    startedAt: number,
-    inspectMs: number,
-    dispatchMs: number,
-    bindings: ReferenceBindings | undefined,
-    dispatched: boolean | undefined,
-    result: unknown,
-    cause?: unknown
-  ): void {
-    const target = diagnosticTarget(request.input, bindings)
+  #emitRequest(entry: {
+    request: BrokerRequest
+    requestId: string
+    enqueuedAt: number
+    startedAt: number
+    inspectMs: number
+    dispatchMs: number
+    bindings: ReferenceBindings | undefined
+    dispatched: boolean | undefined
+    result: unknown
+    cause: unknown
+  }): void {
+    const target = diagnosticTarget(entry.request.input, entry.bindings)
     this.#emit({
       kind: 'request',
-      ...this.#envelope(),
-      requestId,
-      operation: request.operation,
-      mutation: isMutation(request.operation),
+      ...this.diagnosticEnvelope(),
+      requestId: entry.requestId,
+      operation: entry.request.operation,
+      mutation: COMPUTER_OPERATIONS[entry.request.operation].mutation,
       ms: {
-        queue: Math.max(0, startedAt - enqueuedAt),
-        inspect: inspectMs,
-        dispatch: dispatchMs,
-        total: Math.max(0, this.#now() - enqueuedAt)
+        queue: Math.max(0, entry.startedAt - entry.enqueuedAt),
+        inspect: entry.inspectMs,
+        dispatch: entry.dispatchMs,
+        total: Math.max(0, this.#now() - entry.enqueuedAt)
       },
       ...(target === undefined ? {} : { target }),
       result:
-        cause !== undefined
-          ? { type: 'error', ...diagnosticError(cause) }
-          : diagnosticRequestResult(request.operation, result, dispatched)
+        entry.cause !== undefined
+          ? { type: 'error', ...diagnosticError(entry.cause) }
+          : diagnosticRequestResult(entry.request.operation, entry.result, entry.dispatched)
     })
   }
 }
