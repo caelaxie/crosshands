@@ -42,6 +42,12 @@ export type LocalControlRequest = {
   deadlineAt: number
 }
 
+export type ControlHandshakeEvent = {
+  accepted: boolean
+  requestId: string
+  code?: string
+}
+
 export type LocalControlServerOptions = {
   endpoint: BrokerEndpoint
   runtimeDirectory?: string
@@ -53,6 +59,7 @@ export type LocalControlServerOptions = {
   maxFrameBytes?: number
   maxFramesPerConnection?: number
   now?: () => number
+  onHandshake?: (event: ControlHandshakeEvent) => void
 }
 
 type ControlMessage = Record<string, unknown> & { type: string; requestId?: string }
@@ -254,6 +261,13 @@ export class LocalControlServer {
 
   async #authenticate(message: ControlMessage, socket: Socket): Promise<boolean> {
     const handshake = message as unknown as LocalControlHandshake
+    const note = (accepted: boolean, code?: string): void => {
+      this.#options.onHandshake?.({
+        accepted,
+        requestId: typeof handshake.requestId === 'string' ? handshake.requestId : '',
+        ...(code === undefined ? {} : { code })
+      })
+    }
     if (
       typeof handshake.requestId !== 'string' ||
       typeof handshake.token !== 'string' ||
@@ -265,6 +279,7 @@ export class LocalControlServer {
         socket,
         errorMessage(handshake.requestId, 'peer_rejected', 'Peer identity was rejected')
       )
+      note(false, 'peer_rejected')
       return false
     }
     const versions = negotiateVersionHandshake(handshake.versions)
@@ -278,6 +293,7 @@ export class LocalControlServer {
           versions.error
         )
       )
+      note(false, versions.error.code)
       return false
     }
     let accepted: boolean
@@ -297,8 +313,11 @@ export class LocalControlServer {
         socket,
         errorMessage(handshake.requestId, 'peer_rejected', 'Peer authentication failed')
       )
+      note(false, 'peer_rejected')
+      return false
     }
-    return accepted
+    note(true)
+    return true
   }
 
   async #handleRequest(socket: Socket, message: ControlMessage): Promise<void> {

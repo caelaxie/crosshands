@@ -82,7 +82,11 @@ describe.runIf(process.platform !== 'win32')('Unix local control transport', () 
 
   it('rejects a bad broker token and incompatible version before handling requests', async () => {
     const { options, tokenFile } = await fixture()
-    const server = new LocalControlServer(options)
+    const handshakes: Array<{ accepted: boolean; requestId: string; code?: string }> = []
+    const server = new LocalControlServer({
+      ...options,
+      onHandshake: (event) => handshakes.push(event)
+    })
     servers.push(server)
     await server.start()
     const token = await readFile(tokenFile, 'utf8')
@@ -106,6 +110,10 @@ describe.runIf(process.platform !== 'win32')('Unix local control transport', () 
       })
     ).resolves.toMatchObject({ type: 'error', code: 'version_incompatible' })
     expect(server.requestCount).toBe(0)
+    expect(handshakes).toEqual([
+      { accepted: false, requestId: 'h1', code: 'peer_rejected' },
+      { accepted: false, requestId: 'h2', code: 'version_incompatible' }
+    ])
   })
 
   it('serves a handshaken request with reserved IDs and restrictive files', async () => {

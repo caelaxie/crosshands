@@ -154,6 +154,7 @@ describe('Windows relay control server', () => {
   it('binds the claimed identity to the native peer and enforces request deadlines', async () => {
     let relayOptions: WindowsControlRelayOptions | undefined
     const requests: unknown[] = []
+    const handshakes: Array<{ accepted: boolean; requestId: string; code?: string }> = []
     const server = createWindowsControlServer({
       relay: {
         helperPath: resolve('/unsigned/crosshands-pipe-relay.exe'),
@@ -165,6 +166,7 @@ describe('Windows relay control server', () => {
         requests.push(request)
         return { ok: true }
       },
+      onHandshake: (event) => handshakes.push(event),
       createRelay: (options) => {
         relayOptions = options
         return { start: async () => undefined, close: async () => undefined }
@@ -216,6 +218,10 @@ describe('Windows relay control server', () => {
     )
     await nextTurn()
 
+    expect(handshakes).toEqual([
+      { accepted: false, requestId: 'wrong-peer', code: 'peer_rejected' },
+      { accepted: true, requestId: 'hello' }
+    ])
     expect(requests).toHaveLength(1)
     expect(requests[0]).toMatchObject({ requestId: 'fresh', peer: verifiedPeer })
     expect(decodeFrames(Buffer.concat(accepted.output))).toEqual([

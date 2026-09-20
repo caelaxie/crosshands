@@ -111,6 +111,9 @@ artifact.
    - macOS: `~/Library/Caches/CrossHands/runtime/`
    - Windows: `%LOCALAPPDATA%\CrossHands\runtime\`
    - Linux: `$XDG_RUNTIME_DIR/crosshands/`
+   - macOS diagnostics: `~/Library/Logs/CrossHands/`
+   - Windows diagnostics: `%LOCALAPPDATA%\CrossHands\logs\`
+   - Linux diagnostics: `${XDG_STATE_HOME:-$HOME/.local/state}/crosshands/`
 
    Release packages may add CrossHands-owned cache, log, or temporary-capture
    directories. Their exact locations must be listed in that release's signed

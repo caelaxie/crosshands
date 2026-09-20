@@ -3,3 +3,4 @@ dist/
 coverage/
 native/macos/.build/
 pnpm-lock.yaml
+packages/contract/schemas/contract.json

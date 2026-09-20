@@ -132,12 +132,16 @@ export const SnapshotResultSchema = z
   })
   .strict()
 
+export type SnapshotResult = z.infer<typeof SnapshotResultSchema>
+
 export const MutationResultSchema = z
   .object({
     outcome: MutationOutcomeSchema,
     freshState: SnapshotResultSchema.optional()
   })
   .strict()
+
+export type MutationResult = z.infer<typeof MutationResultSchema>
 
 const BooleanFlagMapSchema = z.record(z.string(), z.boolean())
 

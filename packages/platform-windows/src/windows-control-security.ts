@@ -4,7 +4,11 @@ import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
 
 import { negotiateVersionHandshake, type ContractVersions } from '@crosshands/contract'
-import { DEFAULT_MAX_CONTROL_MESSAGE_BYTES, encodeFrame } from '@crosshands/runtime'
+import {
+  DEFAULT_MAX_CONTROL_MESSAGE_BYTES,
+  encodeFrame,
+  type ControlHandshakeEvent
+} from '@crosshands/runtime'
 
 const RELAY_MAGIC = 0x53504858
 const RELAY_VERSION = 1
@@ -112,6 +116,7 @@ export type WindowsRelayControlServerOptions = {
   maxFrameBytes?: number
   maxFramesPerConnection?: number
   now?: () => number
+  onHandshake?: (event: ControlHandshakeEvent) => void
 }
 
 export interface WindowsControlRelay {
@@ -439,11 +444,19 @@ export class WindowsRelayControlServer {
                 )
                 return
               }
+              const note = (accepted: boolean, code?: string): void => {
+                this.#options.onHandshake?.({
+                  accepted,
+                  requestId: typeof message.requestId === 'string' ? message.requestId : '',
+                  ...(code === undefined ? {} : { code })
+                })
+              }
               authenticated = this.#authenticate(message)
               if (!authenticated) {
                 sendAndClose(
                   controlError(message.requestId, 'peer_rejected', 'Peer authentication failed')
                 )
+                note(false, 'peer_rejected')
                 return
               }
               const offeredVersions = (message as Record<string, unknown>).versions
@@ -452,6 +465,7 @@ export class WindowsRelayControlServer {
                 sendAndClose(
                   controlError(message.requestId, 'version_incompatible', 'Versions are required')
                 )
+                note(false, 'version_incompatible')
                 return
               }
               const negotiation = negotiateVersionHandshake(offeredVersions as ContractVersions)
@@ -460,9 +474,11 @@ export class WindowsRelayControlServer {
                 sendAndClose(
                   controlError(message.requestId, negotiation.error.code, negotiation.error.message)
                 )
+                note(false, negotiation.error.code)
                 return
               }
               send({ type: 'handshake-ok', requestId: message.requestId })
+              note(true)
               continue
             }
             if (message.type !== 'request') {

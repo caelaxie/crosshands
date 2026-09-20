@@ -10,10 +10,7 @@
   "releasePolicySha256": "9a76642ecdc39fdd42713d17fdeb21ff3a68a066e402cfc772ae8031e37a123c",
   "requiredRunsPerAdapter": 5,
   "minimumPassesPerAdapter": 4,
-  "adapters": [
-    "cli-skill",
-    "mcp"
-  ],
+  "adapters": ["cli-skill", "mcp"],
   "agents": [
     {
       "id": "codex",
