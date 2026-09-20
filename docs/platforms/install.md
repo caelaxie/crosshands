@@ -17,8 +17,9 @@ a network listener and cannot operate a remote machine in the first release.
   Windows 10 22H2 or a supported Windows 11 x64 build. On Linux, the full v1
   target is Ubuntu 24.04 x64 with GNOME on Xorg.
 
-Pushing a signed `vVERSION` tag creates a GitHub Release and publishes the
-package set to npm. That path still requires the configured macOS Developer
+Pushing a signed `vVERSION` tag sets the product version on main and in the
+packed packages. It creates a GitHub Release and publishes the package set to
+npm. That path still requires the configured macOS Developer
 ID/notarization and release-manifest signing credentials. Windows payloads are
 unsigned. A source build or ad-hoc macOS signature is development evidence, not
 a releasable package.
@@ -149,8 +150,9 @@ exist.
 
 ### Release workflow configuration
 
-A signed `vVERSION` tag runs `Tag GitHub Release and npm`. That workflow creates
-the GitHub Release first, then publishes the assembled package set to
+A signed `vVERSION` tag runs `Tag GitHub Release and npm`. That workflow sets
+the product version on main and in the packed packages. It creates the GitHub
+Release first, then publishes the assembled package set to
 `https://registry.npmjs.org`. Dispatch it with `git_ref` to publish an existing
 tag. `NPM_TOKEN` must be able to publish public packages on the `crosshands`
 npm org.
