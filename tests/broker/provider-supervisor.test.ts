@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CONTRACT_VERSIONS } from '../../packages/contract/src/index.js'
+import { CONTRACT_VERSIONS, createComputerError } from '../../packages/contract/src/index.js'
 import { FakeComputerProvider } from '../../packages/provider-testkit/src/index.js'
 import { ProviderSupervisor } from '../../packages/runtime/src/index.js'
 
@@ -42,6 +42,25 @@ describe('provider supervision', () => {
     await supervisor.cancel('r1')
     provider.release('blocked')
     await expect(blocked).resolves.toMatchObject({ requestId: 'r1' })
+  })
+
+  it('rethrows a ComputerError from provider start instead of wrapping it', async () => {
+    class FailingProvider extends FakeComputerProvider {
+      override async start(): Promise<never> {
+        throw createComputerError(
+          'provider_unavailable',
+          'macOS provider signature verification failed'
+        )
+      }
+    }
+    const supervisor = new ProviderSupervisor({
+      providerFactory: () => new FailingProvider({ graphicalSessionId: 'session-1' }),
+      graphicalSessionId: 'session-1'
+    })
+    await expect(supervisor.start()).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      message: 'macOS provider signature verification failed'
+    })
   })
 
   it('rejects provider protocol mismatch with remediation', async () => {

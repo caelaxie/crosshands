@@ -1,5 +1,6 @@
 import {
   CONTRACT_VERSIONS,
+  ComputerError,
   ProviderHandshakeSchema,
   createComputerError,
   type ComputerProvider,
@@ -43,6 +44,7 @@ export class ProviderSupervisor {
       handshake = ProviderHandshakeSchema.parse(await provider.start())
     } catch (cause) {
       await provider.close().catch(() => undefined)
+      if (cause instanceof ComputerError) throw cause
       throw createComputerError('provider_unavailable', 'Provider handshake was malformed', {
         cause: cause instanceof Error ? cause.name : 'unknown'
       })
