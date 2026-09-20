@@ -16,6 +16,9 @@
       "default": "./dist/index.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "generate:schemas": "pnpm build && node dist/generate-schemas.js",

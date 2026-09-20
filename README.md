@@ -25,10 +25,8 @@ general-purpose desktop UI are intentionally outside the first release.
 
 ## Installation and readiness
 
-CrossHands is not published to the public npm registry yet. Release candidates
-are installed from the project's configured restricted npm-compatible registry;
-do not install similarly named packages from an unverified registry. Once a
-stable release is published, the supported global installation is:
+Version tags (`vX.Y.Z`) create a GitHub Release and publish the package set to
+the public npm registry. Install the CLI and MCP adapter together:
 
 ```sh
 npm install --global crosshands @crosshands/mcp
@@ -74,14 +72,15 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-The repository is under active development and is not yet a public release.
-See [the Orca compatibility ledger](docs/compatibility/orca-9c8f4c3.md) for the
+The repository is under active development. See
+[the Orca compatibility ledger](docs/compatibility/orca-9c8f4c3.md) for the
 extraction boundary and intentional deviations.
 
-Release workflows intentionally fail closed until the restricted registry,
-signing identities, notarization/timestamp services, protected environments,
-and backup release owners are configured. A candidate is built once and
-promoted by digest without rebuilding it.
+A version tag opens a GitHub Release immediately, then builds the notarized
+platform payloads and publishes them to npm. The candidate/promote workflow
+still fail-closes until signing identities, notarization, protected
+environments, and backup release owners are configured; that path builds a
+candidate once and promotes it by digest without rebuilding.
 
 The checked-in conformance and release tests validate catalogs, schemas, and
 evidence policy; they are not a claim that live desktops or reference agents

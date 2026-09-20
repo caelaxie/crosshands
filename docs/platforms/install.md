@@ -7,36 +7,37 @@ a network listener and cannot operate a remote machine in the first release.
 ## Before installing
 
 - Use Node.js 22 or 24 on a supported OS and architecture.
-- Use the project-configured restricted npm-compatible registry until a public
-  release is announced. CrossHands is not currently published publicly.
+- Install from the public npm registry unless a candidate evidence document
+  names a different registry.
 - Verify the release version, signed manifest digest, signer identity, SBOM,
-  notices, and registry shown in the release evidence. Never copy credentials
-  into a package, command argument, or interactive runner.
+  notices, and registry shown in the GitHub Release and release evidence.
+  Never copy credentials into a package, command argument, or interactive
+  runner.
 - On macOS, use macOS 14 or later on Apple silicon or Intel. On Windows, use
   Windows 10 22H2 or a supported Windows 11 x64 build. On Linux, the full v1
   target is Ubuntu 24.04 x64 with GNOME on Xorg.
 
-Release publishing requires project-specific registry configuration and the
-configured macOS Developer ID/notarization and release-manifest signing
-credentials. Windows payloads are unsigned. A source build or ad-hoc macOS
-signature is development evidence, not a releasable package.
+Pushing a signed `vVERSION` tag creates a GitHub Release and publishes the
+package set to npm. That path still requires the configured macOS Developer
+ID/notarization and release-manifest signing credentials. Windows payloads are
+unsigned. A source build or ad-hoc macOS signature is development evidence, not
+a releasable package.
 
 ## Install
 
-Once the registry and release channel are available, install the CLI and MCP
-adapter together. The main package installs only the compatible, exact-version
-platform payload through OS/CPU-constrained optional dependencies.
+Install the CLI and MCP adapter together. The main package installs only the
+compatible, exact-version platform payload through OS/CPU-constrained optional
+dependencies.
 
 ```sh
-npm install --global crosshands@VERSION @crosshands/mcp@VERSION \
-  --registry=https://REGISTRY.example.invalid
+npm install --global crosshands@VERSION @crosshands/mcp@VERSION
 crosshands computer doctor --json
 ```
 
-Replace the example registry and `VERSION` with values from signed release
-evidence. Do not install `@crosshands/platform-*` directly. A missing payload,
-wrong CPU, mixed version, changed payload, or unexpected signer is a hard
-provider-integrity/readiness failure.
+Replace `VERSION` with the GitHub Release tag without the leading `v`, or omit
+it to take `latest`. Do not install `@crosshands/platform-*` directly. A missing
+payload, wrong CPU, mixed version, changed payload, or unexpected signer is a
+hard provider-integrity/readiness failure.
 
 For a candidate, use only the candidate channel named in its evidence and
 compare the registry-resolved package integrity with the signed manifest. The
@@ -75,8 +76,7 @@ the two public entry packages at the same exact version so the package manager
 resolves a matching complete bundle:
 
 ```sh
-npm install --global crosshands@NEW_VERSION @crosshands/mcp@NEW_VERSION \
-  --registry=https://REGISTRY.example.invalid
+npm install --global crosshands@NEW_VERSION @crosshands/mcp@NEW_VERSION
 crosshands computer doctor --json
 ```
 
@@ -149,11 +149,18 @@ exist.
 
 ### Release workflow configuration
 
-The repository workflow expects protected `release-candidate` and
+A signed `vVERSION` tag runs `Tag GitHub Release and npm`. That workflow creates
+the GitHub Release first, then publishes the assembled package set to
+`https://registry.npmjs.org`. Dispatch it with `git_ref` to publish an existing
+tag. `NPM_TOKEN` must be able to publish public packages on the `crosshands`
+npm org.
+
+The candidate/promote workflow expects protected `release-candidate` and
 `release-production` environments with required reviewers. Before enabling it,
 release owners must configure:
 
-- `NPM_REGISTRY_URL` and `NPM_TOKEN` for a restricted npm-compatible registry;
+- `NPM_TOKEN` with publish rights on the public `crosshands` npm org;
+- `NPM_REGISTRY_URL` for the candidate/promote restricted registry;
 - `MACOS_DEVELOPER_ID_APPLICATION`, `MACOS_CERTIFICATE_BASE64`,
   `MACOS_CERTIFICATE_PASSWORD`, `MACOS_TEAM_ID`, `MACOS_NOTARY_APPLE_ID`, and
   `MACOS_NOTARY_APP_PASSWORD` for Developer ID signing and notarization;
