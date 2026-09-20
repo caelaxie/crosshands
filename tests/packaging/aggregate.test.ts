@@ -41,10 +41,33 @@ describe('cross-platform no-rebuild aggregation', () => {
     expect(() => validateRunnerManifests(sources())).not.toThrow()
   })
 
-  it('rejects a rebuilt common package even when versions match', () => {
+  it('accepts common packages packed only on the Linux runner', () => {
+    const candidates = sources()
+    candidates[0]!.manifest.packages = candidates[0]!.manifest.packages.filter((item) =>
+      item.name.startsWith('@crosshands/platform-')
+    )
+    candidates[1]!.manifest.packages = candidates[1]!.manifest.packages.filter((item) =>
+      item.name.startsWith('@crosshands/platform-')
+    )
+    expect(() => validateRunnerManifests(candidates)).not.toThrow()
+  })
+
+  it('ignores rebuilt Windows common packages when Linux packed them', () => {
     const candidates = sources()
     candidates[1]!.manifest.packages[0]!.sha256 = 'rebuilt-on-windows'
-    expect(() => validateRunnerManifests(candidates)).toThrow(/digests disagree/)
+    expect(() => validateRunnerManifests(candidates)).not.toThrow()
+  })
+
+  it('rejects a release with no common packages on any runner', () => {
+    const candidates = sources()
+    for (const candidate of candidates) {
+      candidate.manifest.packages = candidate.manifest.packages.filter((item) =>
+        item.name.startsWith('@crosshands/platform-')
+      )
+    }
+    expect(() => validateRunnerManifests(candidates)).toThrow(
+      /No runner packed the common packages/
+    )
   })
 
   it('rejects missing platforms and version-domain disagreement', () => {

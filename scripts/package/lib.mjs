@@ -262,16 +262,20 @@ export async function packOne(descriptor, outputDirectory) {
   return inspectPack(archive, descriptor)
 }
 
+export const commonPackageDescriptors = Object.freeze([
+  packages.contract,
+  packages.runtime,
+  packages.cli,
+  packages.mcp
+])
+
 export async function packCurrentCandidate(outputDirectory) {
   if (currentPlatformPackage === undefined)
     throw new Error(`CrossHands does not support packaging on ${process.platform}`)
-  const descriptors = [
-    packages.contract,
-    packages.runtime,
-    packages.cli,
-    packages.mcp,
-    currentPlatformPackage
-  ]
+  const descriptors =
+    process.platform === 'linux'
+      ? [...commonPackageDescriptors, currentPlatformPackage]
+      : [currentPlatformPackage]
   const packed = []
   for (const descriptor of descriptors) {
     // Sequential packing makes output deterministic and prevents pnpm store races on Windows.

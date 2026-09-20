@@ -31,6 +31,19 @@ const commonNames = new Set([
   packages.cli.name,
   packages.mcp.name
 ])
+const commonSourceOrder = ['linux', 'darwin', 'win32']
+
+function runnerWithCommonPackages(sources) {
+  return commonSourceOrder
+    .map((platform) => sources.find((source) => source.platform === platform))
+    .find(
+      (source) =>
+        source !== undefined &&
+        [...commonNames].every((name) =>
+          source.manifest.packages.some((item) => item.name === name)
+        )
+    )
+}
 
 async function sourceCandidate(platform, root, publicKey) {
   const releaseDirectory = join(root, 'release')
@@ -76,14 +89,8 @@ export function validateRunnerManifests(sources) {
     const values = new Set(sources.map((source) => source.manifest[domain]))
     if (values.size !== 1) throw new Error(`Runner manifests disagree on ${domain}`)
   }
-  for (const name of commonNames) {
-    const artifacts = sources.map((source) =>
-      source.manifest.packages.find((item) => item.name === name)
-    )
-    if (artifacts.some((item) => item === undefined)) throw new Error(`Runner is missing ${name}`)
-    if (new Set(artifacts.map((item) => item.sha256)).size !== 1) {
-      throw new Error(`Runner artifact digests disagree for ${name}`)
-    }
+  if (runnerWithCommonPackages(sources) === undefined) {
+    throw new Error('No runner packed the common packages')
   }
 }
 
@@ -107,11 +114,12 @@ export async function aggregateCandidates({
   validateRunnerManifests(sources)
 
   const selected = []
-  const first = sources[0]
+  const commonSource = runnerWithCommonPackages(sources)
+  if (commonSource === undefined) throw new Error('No runner packed the common packages')
   for (const name of commonNames) {
     selected.push({
-      source: first,
-      artifact: first.manifest.packages.find((item) => item.name === name)
+      source: commonSource,
+      artifact: commonSource.manifest.packages.find((item) => item.name === name)
     })
   }
   for (const source of sources) {
