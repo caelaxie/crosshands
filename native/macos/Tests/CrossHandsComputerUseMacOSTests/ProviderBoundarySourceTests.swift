@@ -39,6 +39,14 @@ final class ProviderBoundarySourceTests: XCTestCase {
         XCTAssertFalse(source.contains("AgentSessionOwnership"))
     }
 
+    func testCoordinateClicksUpgradeToAccessibilityActionAtPoint() throws {
+        let source = try entrypoint()
+        XCTAssertTrue(source.contains("AXUIElementCopyElementAtPosition"))
+        XCTAssertTrue(source.contains("hitPid == pid"))
+        XCTAssertTrue(source.contains("actionableElement(at: point, pid: snapshot.app.pid, mouseButton: button)"))
+        XCTAssertFalse(source.contains("post(tap: .cghidEventTap)"))
+    }
+
     func testHandshakeUsesCrossHandsVersionDomainsAndNoOrcaContextNames() throws {
         let source = try entrypoint()
         for field in ["providerProtocol", "publicContract", "graphicalSessionId", "generation"] {

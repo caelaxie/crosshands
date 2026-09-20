@@ -414,6 +414,16 @@ export class LocalBroker {
         await this.#publish?.(response)
         return response
       }
+      if ('error' in providerResponse) {
+        // Why: observations have no outcome envelope, so surface the provider's
+        // coded error directly. Validating the absent result instead would mask
+        // app_not_found and friends as an opaque schema failure.
+        throw createComputerError(
+          providerResponse.error.code,
+          providerResponse.error.message,
+          ...(providerResponse.error.details === undefined ? [] : [providerResponse.error.details])
+        )
+      }
       const response = this.#observationResponse(
         requestId,
         request.operation,
