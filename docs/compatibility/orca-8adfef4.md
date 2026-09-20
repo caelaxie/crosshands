@@ -2,7 +2,7 @@
 
 CrossHands uses `stablyai/orca` commit
 `8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c` as its first compatibility
-baseline. Orca remains the source precedent; CrossHands' Product Contract is
+baseline. Orca remains the source precedent; `AGENTS.md` and `README.md` are
 the authority when a behavior is product-specific or intentionally differs.
 
 ## Operation ledger
