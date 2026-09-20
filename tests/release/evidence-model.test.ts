@@ -14,9 +14,8 @@ describe('release evidence model', () => {
   it('rejects package promotion drift, missing provenance, and unsigned ownership', async () => {
     const definition = await loadBenchmarkDefinition()
     const drift = validReleaseEvidence(definition)
-    drift.defaultChannel.packages.find((item) => item.name === 'crosshands')!.sha256 = 'a'.repeat(
-      64
-    )
+    drift.defaultChannel.packages.find((item) => item.name === '@crosshands/cli')!.sha256 =
+      'a'.repeat(64)
     expect(() => validateReleaseEvidence(drift, definition)).toThrow(
       /does not match the frozen value/
     )

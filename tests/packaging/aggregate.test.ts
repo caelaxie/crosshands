@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { validateRunnerManifests } from '../../scripts/package/aggregate.mjs'
 import { packageManagerInvocation } from '../../scripts/package/lib.mjs'
 
-const common = ['@crosshands/contract', '@crosshands/runtime', 'crosshands', '@crosshands/mcp']
+const common = ['@crosshands/contract', '@crosshands/runtime', '@crosshands/cli', '@crosshands/mcp']
 
 function sources() {
   return [

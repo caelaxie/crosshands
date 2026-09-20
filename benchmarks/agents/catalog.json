@@ -20,21 +20,21 @@
       "displayName": "Codex",
       "cellId": "codex-macos-arm64",
       "config": "configs/codex-macos.json",
-      "configSha256": "eaebab79cd759acdd64b99232dd84272cae7faca845ffd8b94fcdeaacfadac82"
+      "configSha256": "7714a4a1a8ce44aa968a036c1b01cfe3ff7710863523cd6bd0ba45f0d3e2b441"
     },
     {
       "id": "opencode",
       "displayName": "OpenCode",
       "cellId": "opencode-windows11-x64",
       "config": "configs/opencode-windows.json",
-      "configSha256": "1b9a0b66152e30d03e9a5d9a0839f3e996edf45abf15cd53d19c467b684752a1"
+      "configSha256": "3c1471284be13011a075c5e753fb46177f784b7e010a58fcbf14466430b3c307"
     },
     {
       "id": "omp",
       "displayName": "Oh My Pi",
       "cellId": "omp-ubuntu-xorg-x64",
       "config": "configs/omp-ubuntu.json",
-      "configSha256": "a484cd8ece5159be4c0850bcbafd04594b45677039893e93ef7cb0c782b56f2d"
+      "configSha256": "7562a1185a6a1803b1065fa3902ed9d23d64840ee5d3c4c4bd1b831e7273bf3c"
     }
   ]
 }

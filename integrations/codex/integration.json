@@ -1,7 +1,7 @@
 {
   "client": "codex",
   "cli": {
-    "package": "crosshands@0.1.2",
+    "package": "@crosshands/cli@0.1.2",
     "command": "crosshands",
     "skill": "../../skills/computer-use/SKILL.md"
   },

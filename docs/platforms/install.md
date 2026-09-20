@@ -31,7 +31,7 @@ compatible, exact-version platform payload through OS/CPU-constrained optional
 dependencies.
 
 ```sh
-npm install --global crosshands@VERSION @crosshands/mcp@VERSION
+npm install --global @crosshands/cli@VERSION @crosshands/mcp@VERSION
 crosshands computer doctor --json
 ```
 
@@ -77,7 +77,7 @@ the two public entry packages at the same exact version so the package manager
 resolves a matching complete bundle:
 
 ```sh
-npm install --global crosshands@NEW_VERSION @crosshands/mcp@NEW_VERSION
+npm install --global @crosshands/cli@NEW_VERSION @crosshands/mcp@NEW_VERSION
 crosshands computer doctor --json
 ```
 
@@ -103,7 +103,7 @@ artifact.
 3. Remove the entry packages with the package manager that installed them:
 
    ```sh
-   npm uninstall --global crosshands @crosshands/mcp
+   npm uninstall --global @crosshands/cli @crosshands/mcp
    ```
 
 4. Remove only CrossHands-owned runtime state after confirming the path is not

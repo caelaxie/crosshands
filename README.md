@@ -30,11 +30,11 @@ packages. It creates a GitHub Release and publishes the package set to the
 public npm registry. Install the CLI and MCP adapter together:
 
 ```sh
-npm install --global crosshands @crosshands/mcp
+npm install --global @crosshands/cli @crosshands/mcp
 crosshands computer doctor --json
 ```
 
-The `crosshands` package selects exactly one version-matched platform payload
+The `@crosshands/cli` package selects exactly one version-matched platform payload
 for the current OS and CPU. Do not install a platform payload directly. Doctor
 must report a compatible payload, a protected local broker endpoint, an active
 unlocked graphical session, native dependencies, integrity, and permissions

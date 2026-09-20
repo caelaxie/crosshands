@@ -289,7 +289,7 @@ describe('CrossHands MCP adapter', () => {
       expect(fixture).toMatchObject({
         client: clientName,
         cli: {
-          package: `crosshands@${CONTRACT_VERSIONS.product}`,
+          package: `@crosshands/cli@${CONTRACT_VERSIONS.product}`,
           command: 'crosshands',
           skill: '../../skills/computer-use/SKILL.md'
         },

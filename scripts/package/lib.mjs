@@ -21,7 +21,7 @@ export const packages = Object.freeze({
     required: ['dist/index.js', 'package.json', 'LICENSE']
   },
   cli: {
-    name: 'crosshands',
+    name: '@crosshands/cli',
     directory: 'packages/cli',
     required: ['dist/bin.js', 'dist/index.js', 'package.json', 'README.md', 'LICENSE'],
     executable: ['dist/bin.js']
@@ -489,7 +489,7 @@ export async function cleanInstallSmoke(packed, parentDirectory = tmpdir()) {
       { cwd: installRoot }
     )
     const smoke = [
-      "import { runCli } from 'crosshands'",
+      "import { runCli } from '@crosshands/cli'",
       'const output = []',
       "const client = { request: async (operation) => operation === 'capabilities' ? ({ operations: { click: true } }) : ({ accessibility: 'granted' }), close: async () => {} }",
       "const code = await runCli(['computer', 'doctor', '--json'], { stdin: async () => '', stdout: (value) => output.push(value), stderr: () => {} }, client)",
@@ -499,7 +499,7 @@ export async function cleanInstallSmoke(packed, parentDirectory = tmpdir()) {
     await run(process.execPath, ['smoke.mjs'], { cwd: installRoot })
     await run(
       process.execPath,
-      ['--check', join(installRoot, 'node_modules/crosshands/dist/bin.js')],
+      ['--check', join(installRoot, 'node_modules/@crosshands/cli/dist/bin.js')],
       {
         cwd: installRoot
       }

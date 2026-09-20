@@ -1,5 +1,5 @@
 {
-  "name": "crosshands",
+  "name": "@crosshands/cli",
   "version": "0.1.2",
   "description": "Agent-agnostic local computer-use CLI",
   "license": "MIT",
