@@ -98,7 +98,7 @@ describe('set product version', () => {
     const pin = JSON.parse(
       await readFile(join(root, 'integrations/codex/integration.json'), 'utf8')
     ) as { cli: { package: string }; mcp: { package: string } }
-    expect(pin.cli.package).toBe('crosshands@0.2.0')
+    expect(pin.cli.package).toBe('@crosshands/cli@0.2.0')
     expect(pin.mcp.package).toBe('@crosshands/mcp@0.2.0')
 
     const configPath = join(root, 'benchmarks/agents/configs/codex-macos.json')
@@ -118,7 +118,7 @@ describe('set product version', () => {
     expect(catalog.releasePolicySha256).toBe(originalCatalog.releasePolicySha256)
     expect(JSON.parse(configBytes.toString('utf8'))).toMatchObject({
       integration: {
-        cliSkill: { package: 'crosshands@0.2.0' },
+        cliSkill: { package: '@crosshands/cli@0.2.0' },
         mcp: { package: '@crosshands/mcp@0.2.0' }
       }
     })

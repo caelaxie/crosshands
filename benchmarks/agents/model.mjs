@@ -23,7 +23,7 @@ export const REQUIRED_RELEASE_PACKAGES = Object.freeze([
   '@crosshands/platform-linux',
   '@crosshands/platform-windows',
   '@crosshands/runtime',
-  'crosshands'
+  '@crosshands/cli'
 ])
 const forbiddenEvidenceKeys = new Set([
   'accessibilityText',
@@ -174,7 +174,9 @@ function validateConfig(config, agent, root) {
   const integration = object(config.integration, `${agent.id}.config.integration`)
   const cli = object(integration.cliSkill, `${agent.id}.config.integration.cliSkill`)
   const mcp = object(integration.mcp, `${agent.id}.config.integration.mcp`)
-  if (!/^crosshands@\d+\.\d+\.\d+$/.test(cli.package)) fail(`${agent.id} CLI package is not pinned`)
+  if (!/^@crosshands\/cli@\d+\.\d+\.\d+$/.test(cli.package)) {
+    fail(`${agent.id} CLI package is not pinned`)
+  }
   exactValue(cli.command, 'crosshands computer', `${agent.id}.config.integration.cliSkill.command`)
   digest(cli.skillSha256, `${agent.id}.config.integration.cliSkill.skillSha256`)
   if (!/^@crosshands\/mcp@\d+\.\d+\.\d+$/.test(mcp.package)) {

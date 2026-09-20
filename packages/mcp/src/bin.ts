@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { createProductionMcpBrokerClient, runMcpStdio, type McpDiagnostic } from './index.js'
 
 function cliEntrypoint(): string {
-  const cliIndex = fileURLToPath(import.meta.resolve('crosshands'))
+  const cliIndex = fileURLToPath(import.meta.resolve('@crosshands/cli'))
   return join(dirname(cliIndex), 'bin.js')
 }
 

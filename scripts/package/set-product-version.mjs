@@ -107,11 +107,14 @@ async function applyNpmPin(absolutePath, version) {
       `@crosshands/mcp@${version}`
     )
     .replace(
-      new RegExp(`(?<![@/])crosshands@${PINNED_VERSION_PATTERN}`, 'g'),
-      `crosshands@${version}`
+      new RegExp(`@crosshands/cli@${PINNED_VERSION_PATTERN}`, 'g'),
+      `@crosshands/cli@${version}`
     )
-  if (!next.includes(`crosshands@${version}`) || !next.includes(`@crosshands/mcp@${version}`)) {
-    throw new Error(`${absolutePath} is missing a crosshands or @crosshands/mcp pin`)
+  if (
+    !next.includes(`@crosshands/cli@${version}`) ||
+    !next.includes(`@crosshands/mcp@${version}`)
+  ) {
+    throw new Error(`${absolutePath} is missing an @crosshands/cli or @crosshands/mcp pin`)
   }
   if (next === original) return false
   await writeFile(absolutePath, next)

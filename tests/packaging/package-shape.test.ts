@@ -50,7 +50,7 @@ afterAll(async () => {
 
 describe('packed package shape', () => {
   it('packs the CLI with an executable entrypoint and complete legal/readme files', () => {
-    const cli = packed.find((item) => item.manifest.name === 'crosshands')
+    const cli = packed.find((item) => item.manifest.name === '@crosshands/cli')
     expect(cli).toBeDefined()
     expect(cli?.entries.find((entry) => entry.path === 'dist/bin.js')?.mode[3]).toBe('x')
     expect(cli?.entries.map((entry) => entry.path)).toEqual(
@@ -105,7 +105,7 @@ describe('packed package shape', () => {
   )
 
   it('rewrites workspace dependencies to exact candidate versions', async () => {
-    const cli = packed.find((item) => item.manifest.name === 'crosshands')
+    const cli = packed.find((item) => item.manifest.name === '@crosshands/cli')
     if (cli === undefined) throw new Error('CLI pack is missing')
     const manifest = await archiveManifest(cli.archive)
     expect(manifest.dependencies['@crosshands/contract']).toBe(manifest.version)
@@ -116,6 +116,6 @@ describe('packed package shape', () => {
     const parent = await mkdtemp(join(tmpdir(), 'CrossHands smoke parent '))
     outputDirectories.push(parent)
     const root = await cleanInstallSmoke(packed, parent)
-    await access(join(root, 'node_modules', 'crosshands', 'dist', 'index.js'))
+    await access(join(root, 'node_modules', '@crosshands', 'cli', 'dist', 'index.js'))
   }, 120_000)
 })

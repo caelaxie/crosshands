@@ -1,6 +1,6 @@
 # CrossHands CLI
 
-The `crosshands` package provides the local JSON CLI and broker entrypoint for
+The `@crosshands/cli` package provides the local JSON CLI and broker entrypoint for
 the CrossHands computer-use runtime.
 
 ```sh

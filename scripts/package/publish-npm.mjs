@@ -5,19 +5,20 @@ import { readdir, readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { archiveManifest, run, workspaceRoot } from './lib.mjs'
+import { archiveManifest, packages, run, workspaceRoot } from './lib.mjs'
 
 export const PUBLIC_NPM_REGISTRY = 'https://registry.npmjs.org'
+const CLI_PACKAGE = packages.cli.name
 
 export function npmDistTag(version) {
   return version.includes('-') ? 'next' : 'latest'
 }
 
 export function publishOrder(archives) {
-  const payloads = archives.filter((item) => item.name !== 'crosshands')
-  const mainPackage = archives.filter((item) => item.name === 'crosshands')
+  const payloads = archives.filter((item) => item.name !== CLI_PACKAGE)
+  const mainPackage = archives.filter((item) => item.name === CLI_PACKAGE)
   if (mainPackage.length !== 1) {
-    throw new Error('npm publish requires exactly one crosshands archive')
+    throw new Error(`npm publish requires exactly one ${CLI_PACKAGE} archive`)
   }
   return [
     ...payloads.toSorted((left, right) => left.name.localeCompare(right.name)),

@@ -38,9 +38,9 @@ describe('release artifact integrity', () => {
     const keys = generateKeyPairSync('ed25519')
     const packed = [
       {
-        archive: '/candidate/crosshands-0.1.0.tgz',
+        archive: '/candidate/crosshands-cli-0.1.0.tgz',
         digest: 'a'.repeat(64),
-        manifest: { name: 'crosshands', version: '0.1.0' }
+        manifest: { name: '@crosshands/cli', version: '0.1.0' }
       }
     ]
     const manifest = createReleaseManifest(packed)
@@ -81,7 +81,7 @@ describe('release artifact integrity', () => {
   it('rejects mixed package versions before producing a candidate', () => {
     expect(() =>
       assertVersionMatch([
-        { name: 'crosshands', version: '0.1.0' },
+        { name: '@crosshands/cli', version: '0.1.0' },
         { name: '@crosshands/platform-darwin', version: '0.1.1' }
       ])
     ).toThrow(/must match exactly/)
@@ -89,16 +89,16 @@ describe('release artifact integrity', () => {
 
   it('detects tampered package archives and payload files', async () => {
     const directory = await temporaryDirectory()
-    const archive = join(directory, 'crosshands-0.1.0.tgz')
+    const archive = join(directory, 'crosshands-cli-0.1.0.tgz')
     await writeFile(archive, 'original package bytes')
     const digest = await sha256(archive)
     const release = {
       version: '0.1.0',
       packages: [
         {
-          name: 'crosshands',
+          name: '@crosshands/cli',
           version: '0.1.0',
-          file: 'crosshands-0.1.0.tgz',
+          file: 'crosshands-cli-0.1.0.tgz',
           sha256: digest
         }
       ]

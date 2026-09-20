@@ -81,15 +81,15 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@crosshands/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@crosshands/contract':
         specifier: workspace:*
         version: link:../contract
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
-      crosshands:
-        specifier: workspace:*
-        version: link:../cli
       zod:
         specifier: 4.4.3
         version: 4.4.3

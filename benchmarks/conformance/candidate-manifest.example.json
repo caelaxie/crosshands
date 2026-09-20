@@ -36,7 +36,7 @@
   "driverSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
   "candidatePackageSetSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
   "packageDigests": {
-    "crosshands": "sha256:REPLACE_WITH_64_HEX_CHARACTERS",
+    "@crosshands/cli": "sha256:REPLACE_WITH_64_HEX_CHARACTERS",
     "crosshands-darwin-arm64": "sha256:REPLACE_WITH_64_HEX_CHARACTERS"
   },
   "signerFingerprints": {

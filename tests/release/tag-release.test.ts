@@ -44,13 +44,13 @@ describe('tag GitHub Release and npm publish', () => {
     expect(npmDistTag('0.1.1-rc.1')).toBe('next')
     expect(
       publishOrder([
-        { name: 'crosshands', version: '0.1.1', archive: 'crosshands.tgz' },
+        { name: '@crosshands/cli', version: '0.1.1', archive: 'cli.tgz' },
         { name: '@crosshands/mcp', version: '0.1.1', archive: 'mcp.tgz' },
         { name: '@crosshands/contract', version: '0.1.1', archive: 'contract.tgz' }
       ]).map((item) => item.name)
-    ).toEqual(['@crosshands/contract', '@crosshands/mcp', 'crosshands'])
+    ).toEqual(['@crosshands/contract', '@crosshands/mcp', '@crosshands/cli'])
     expect(() =>
       publishOrder([{ name: '@crosshands/mcp', version: '0.1.1', archive: 'mcp.tgz' }])
-    ).toThrow(/exactly one crosshands archive/)
+    ).toThrow(/exactly one @crosshands\/cli archive/)
   })
 })
