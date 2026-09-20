@@ -4,7 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { describe, expect, it } from 'vitest'
 
-import { COMPUTER_OPERATIONS } from '../../packages/contract/src/index.js'
+import { COMPUTER_OPERATIONS, CONTRACT_VERSIONS } from '../../packages/contract/src/index.js'
 import {
   MCP_TOOL_CATALOG,
   callMcpTool,
@@ -289,12 +289,12 @@ describe('CrossHands MCP adapter', () => {
       expect(fixture).toMatchObject({
         client: clientName,
         cli: {
-          package: 'crosshands@0.1.0',
+          package: `crosshands@${CONTRACT_VERSIONS.product}`,
           command: 'crosshands',
           skill: '../../skills/computer-use/SKILL.md'
         },
         mcp: {
-          package: '@crosshands/mcp@0.1.0',
+          package: `@crosshands/mcp@${CONTRACT_VERSIONS.product}`,
           transport: 'stdio',
           command: 'crosshands-mcp',
           args: []

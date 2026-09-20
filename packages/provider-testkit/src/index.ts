@@ -74,7 +74,7 @@ export class FakeComputerProvider implements ComputerProvider {
       capabilities: {
         platform: 'linux',
         provider: 'crosshands-fake',
-        providerVersion: '0.1.0',
+        providerVersion: CONTRACT_VERSIONS.product,
         operations: Object.fromEntries(
           Object.keys(COMPUTER_OPERATIONS).map((operation) => [operation, true])
         ),

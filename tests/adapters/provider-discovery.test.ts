@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { loadProviderModule, platformProviderPackage } from '../../packages/cli/src/broker-host.js'
+import { CONTRACT_VERSIONS } from '../../packages/contract/src/index.js'
 
 describe('installed platform provider discovery', () => {
   it.each([
@@ -30,7 +31,7 @@ describe('installed platform provider discovery', () => {
 
   it('loads only the exact version-matched platform package', async () => {
     const module = {
-      packageVersion: '0.1.0',
+      packageVersion: CONTRACT_VERSIONS.product,
       createProvider: vi.fn()
     }
     await expect(loadProviderModule('linux', async () => module)).resolves.toBe(module)
