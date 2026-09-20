@@ -25,8 +25,9 @@ general-purpose desktop UI are intentionally outside the first release.
 
 ## Installation and readiness
 
-Version tags (`vX.Y.Z`) create a GitHub Release and publish the package set to
-the public npm registry. Install the CLI and MCP adapter together:
+A version tag `vX.Y.Z` sets the product version on main and in the packed
+packages. It creates a GitHub Release and publishes the package set to the
+public npm registry. Install the CLI and MCP adapter together:
 
 ```sh
 npm install --global crosshands @crosshands/mcp
@@ -76,8 +77,9 @@ The repository is under active development. See
 [the Orca compatibility ledger](docs/compatibility/orca-9c8f4c3.md) for the
 extraction boundary and intentional deviations.
 
-A version tag opens a GitHub Release immediately, then builds the notarized
-platform payloads and publishes them to npm. The candidate/promote workflow
+A version tag sets the product version on main and in the packed packages.
+It opens a GitHub Release immediately, then builds the notarized platform
+payloads and publishes them to npm. The candidate/promote workflow
 still fail-closes until signing identities, notarization, protected
 environments, and backup release owners are configured; that path builds a
 candidate once and promotes it by digest without rebuilding.

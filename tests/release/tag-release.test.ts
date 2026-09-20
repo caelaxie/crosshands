@@ -17,6 +17,10 @@ describe('tag GitHub Release and npm publish', () => {
     expect(workflow).toContain('registry-url: https://registry.npmjs.org')
     expect(workflow).toContain('node scripts/package/publish-npm.mjs artifacts/packages')
     expect(workflow).toContain('gh release upload')
+    expect(workflow).toContain(
+      'node scripts/package/set-product-version.mjs "${RELEASE_GIT_REF#v}"'
+    )
+    expect(workflow).toContain('git push origin main')
   })
 
   it('marks every released package public for the npm org', async () => {
