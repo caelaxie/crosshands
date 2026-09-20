@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local stdio MCP adapter for the CrossHands computer-use runtime",
   "license": "MIT",
   "bin": {

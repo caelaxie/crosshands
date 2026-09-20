@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "versions": {
-    "product": "0.1.1",
+    "product": "0.1.2",
     "publicContract": "1.1.0",
     "brokerControl": 1,
     "providerProtocol": 1,
@@ -22,7 +22,11 @@
         "properties": {
           "platform": {
             "type": "string",
-            "enum": ["darwin", "win32", "linux"]
+            "enum": [
+              "darwin",
+              "win32",
+              "linux"
+            ]
           },
           "provider": {
             "type": "string",
@@ -49,11 +53,22 @@
             },
             "additionalProperties": {
               "type": "string",
-              "enum": ["granted", "denied", "unknown", "not_required"]
+              "enum": [
+                "granted",
+                "denied",
+                "unknown",
+                "not_required"
+              ]
             }
           }
         },
-        "required": ["platform", "provider", "providerVersion", "operations", "permissions"],
+        "required": [
+          "platform",
+          "provider",
+          "providerVersion",
+          "operations",
+          "permissions"
+        ],
         "additionalProperties": false
       }
     },
@@ -65,7 +80,10 @@
         "properties": {
           "id": {
             "type": "string",
-            "enum": ["accessibility", "screenshots"]
+            "enum": [
+              "accessibility",
+              "screenshots"
+            ]
           }
         },
         "additionalProperties": false
@@ -81,11 +99,18 @@
             },
             "additionalProperties": {
               "type": "string",
-              "enum": ["granted", "denied", "unknown", "not_required"]
+              "enum": [
+                "granted",
+                "denied",
+                "unknown",
+                "not_required"
+              ]
             }
           }
         },
-        "required": ["permissions"],
+        "required": [
+          "permissions"
+        ],
         "additionalProperties": false
       }
     },
@@ -135,12 +160,20 @@
                   "type": "boolean"
                 }
               },
-              "required": ["id", "name", "bundleId", "pid", "isRunning"],
+              "required": [
+                "id",
+                "name",
+                "bundleId",
+                "pid",
+                "isRunning"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["apps"],
+        "required": [
+          "apps"
+        ],
         "additionalProperties": false
       }
     },
@@ -156,7 +189,9 @@
             "maxLength": 512
           }
         },
-        "required": ["app"],
+        "required": [
+          "app"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -204,19 +239,33 @@
                       "exclusiveMinimum": 0
                     }
                   },
-                  "required": ["x", "y", "width", "height"],
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
                   "additionalProperties": false
                 },
                 "minimized": {
                   "type": "boolean"
                 }
               },
-              "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+              "required": [
+                "id",
+                "appId",
+                "title",
+                "index",
+                "bounds",
+                "minimized"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["windows"],
+        "required": [
+          "windows"
+        ],
         "additionalProperties": false
       }
     },
@@ -241,7 +290,9 @@
                     "minLength": 1
                   }
                 },
-                "required": ["id"],
+                "required": [
+                  "id"
+                ],
                 "additionalProperties": false
               },
               {
@@ -253,7 +304,9 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["index"],
+                "required": [
+                  "index"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -265,7 +318,9 @@
             "type": "boolean"
           }
         },
-        "required": ["app"],
+        "required": [
+          "app"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -309,7 +364,11 @@
                     "maxLength": 512
                   }
                 },
-                "required": ["pid", "startedAt", "executableId"],
+                "required": [
+                  "pid",
+                  "startedAt",
+                  "executableId"
+                ],
                 "additionalProperties": false
               },
               "appId": {
@@ -331,7 +390,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["id", "ownerPid"],
+                "required": [
+                  "id",
+                  "ownerPid"
+                ],
                 "additionalProperties": false
               },
               "snapshotId": {
@@ -414,7 +476,13 @@
                     "type": "boolean"
                   }
                 },
-                "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                "required": [
+                  "id",
+                  "name",
+                  "bundleId",
+                  "pid",
+                  "isRunning"
+                ],
                 "additionalProperties": false
               },
               "window": {
@@ -456,14 +524,26 @@
                         "exclusiveMinimum": 0
                       }
                     },
-                    "required": ["x", "y", "width", "height"],
+                    "required": [
+                      "x",
+                      "y",
+                      "width",
+                      "height"
+                    ],
                     "additionalProperties": false
                   },
                   "minimized": {
                     "type": "boolean"
                   }
                 },
-                "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                "required": [
+                  "id",
+                  "appId",
+                  "title",
+                  "index",
+                  "bounds",
+                  "minimized"
+                ],
                 "additionalProperties": false
               },
               "treeText": {
@@ -538,7 +618,12 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                   }
                 },
-                "required": ["format", "width", "height", "scale"],
+                "required": [
+                  "format",
+                  "width",
+                  "height",
+                  "scale"
+                ],
                 "additionalProperties": false
               },
               {
@@ -593,12 +678,22 @@
                 },
                 "details": {}
               },
-              "required": ["code", "message", "retry", "remediation"],
+              "required": [
+                "code",
+                "message",
+                "retry",
+                "remediation"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["context", "snapshot", "screenshot", "issues"],
+        "required": [
+          "context",
+          "snapshot",
+          "screenshot",
+          "issues"
+        ],
         "additionalProperties": false
       }
     },
@@ -663,7 +758,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -685,7 +784,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -705,7 +807,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -734,7 +840,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -750,7 +859,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               },
               {
@@ -797,7 +909,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -819,7 +935,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -839,7 +958,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -874,7 +997,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["kind", "x", "y"],
+                "required": [
+                  "kind",
+                  "x",
+                  "y"
+                ],
                 "additionalProperties": false
               },
               {
@@ -885,7 +1012,9 @@
                     "const": "context-window"
                   }
                 },
-                "required": ["kind"],
+                "required": [
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -897,7 +1026,11 @@
           },
           "button": {
             "type": "string",
-            "enum": ["left", "right", "middle"]
+            "enum": [
+              "left",
+              "right",
+              "middle"
+            ]
           },
           "modifiers": {
             "minItems": 1,
@@ -940,7 +1073,10 @@
             "type": "boolean"
           }
         },
-        "required": ["contextToken", "target"],
+        "required": [
+          "contextToken",
+          "target"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -958,7 +1094,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -972,7 +1110,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1026,11 +1166,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1084,11 +1231,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -1133,7 +1287,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -1155,7 +1313,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -1238,7 +1399,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -1280,14 +1447,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -1362,7 +1541,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -1417,16 +1601,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -1491,7 +1687,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -1513,7 +1713,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -1533,7 +1736,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -1562,7 +1769,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1578,7 +1788,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -1595,7 +1808,11 @@
             "maxLength": 256
           }
         },
-        "required": ["contextToken", "target", "action"],
+        "required": [
+          "contextToken",
+          "target",
+          "action"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -1613,7 +1830,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1627,7 +1846,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1681,11 +1902,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -1739,11 +1967,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -1788,7 +2023,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -1810,7 +2049,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -1893,7 +2135,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -1935,14 +2183,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -2017,7 +2277,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -2072,16 +2337,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -2146,7 +2423,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -2168,7 +2449,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -2188,7 +2472,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -2217,7 +2505,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2233,7 +2524,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2280,7 +2574,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -2302,7 +2600,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -2322,7 +2623,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -2357,7 +2662,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["kind", "x", "y"],
+                "required": [
+                  "kind",
+                  "x",
+                  "y"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2368,14 +2677,21 @@
                     "const": "context-window"
                   }
                 },
-                "required": ["kind"],
+                "required": [
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             ]
           },
           "direction": {
             "type": "string",
-            "enum": ["up", "down", "left", "right"]
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right"
+            ]
           },
           "pages": {
             "type": "integer",
@@ -2389,7 +2705,11 @@
             "type": "boolean"
           }
         },
-        "required": ["contextToken", "target", "direction"],
+        "required": [
+          "contextToken",
+          "target",
+          "direction"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -2407,7 +2727,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2421,7 +2743,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2475,11 +2799,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -2533,11 +2864,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -2582,7 +2920,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -2604,7 +2946,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -2687,7 +3032,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -2729,14 +3080,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -2811,7 +3174,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -2866,16 +3234,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -2940,7 +3320,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -2962,7 +3346,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -2982,7 +3369,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -3011,7 +3402,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3027,7 +3421,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3074,7 +3471,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -3096,7 +3497,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -3116,7 +3520,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -3151,7 +3559,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["kind", "x", "y"],
+                "required": [
+                  "kind",
+                  "x",
+                  "y"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3162,7 +3574,9 @@
                     "const": "context-window"
                   }
                 },
-                "required": ["kind"],
+                "required": [
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -3213,7 +3627,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -3235,7 +3653,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -3255,7 +3676,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -3284,7 +3709,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3300,7 +3728,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3347,7 +3778,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -3369,7 +3804,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -3389,7 +3827,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -3424,7 +3866,11 @@
                     "type": "number"
                   }
                 },
-                "required": ["kind", "x", "y"],
+                "required": [
+                  "kind",
+                  "x",
+                  "y"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3435,7 +3881,9 @@
                     "const": "context-window"
                   }
                 },
-                "required": ["kind"],
+                "required": [
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -3452,7 +3900,11 @@
             "type": "boolean"
           }
         },
-        "required": ["contextToken", "from", "to"],
+        "required": [
+          "contextToken",
+          "from",
+          "to"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3470,7 +3922,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3484,7 +3938,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3538,11 +3994,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -3596,11 +4059,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -3645,7 +4115,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -3667,7 +4141,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -3750,7 +4227,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -3792,14 +4275,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -3874,7 +4369,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -3929,16 +4429,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -3965,7 +4477,9 @@
                 "const": "context-window"
               }
             },
-            "required": ["kind"],
+            "required": [
+              "kind"
+            ],
             "additionalProperties": false
           },
           "captureScreenshot": {
@@ -3979,7 +4493,11 @@
             "maxLength": 1000000
           }
         },
-        "required": ["contextToken", "target", "text"],
+        "required": [
+          "contextToken",
+          "target",
+          "text"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3997,7 +4515,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4011,7 +4531,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4065,11 +4587,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4123,11 +4652,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -4172,7 +4708,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -4194,7 +4734,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -4277,7 +4820,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -4319,14 +4868,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -4401,7 +4962,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -4456,16 +5022,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -4492,7 +5070,9 @@
                 "const": "context-window"
               }
             },
-            "required": ["kind"],
+            "required": [
+              "kind"
+            ],
             "additionalProperties": false
           },
           "captureScreenshot": {
@@ -4507,7 +5087,11 @@
             "maxLength": 128
           }
         },
-        "required": ["contextToken", "target", "key"],
+        "required": [
+          "contextToken",
+          "target",
+          "key"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -4525,7 +5109,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4539,7 +5125,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4593,11 +5181,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -4651,11 +5246,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -4700,7 +5302,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -4722,7 +5328,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -4805,7 +5414,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -4847,14 +5462,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -4929,7 +5556,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -4984,16 +5616,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -5020,7 +5664,9 @@
                 "const": "context-window"
               }
             },
-            "required": ["kind"],
+            "required": [
+              "kind"
+            ],
             "additionalProperties": false
           },
           "captureScreenshot": {
@@ -5040,7 +5686,11 @@
             }
           }
         },
-        "required": ["contextToken", "target", "keys"],
+        "required": [
+          "contextToken",
+          "target",
+          "keys"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -5058,7 +5708,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5072,7 +5724,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5126,11 +5780,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5184,11 +5845,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -5233,7 +5901,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -5255,7 +5927,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -5338,7 +6013,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -5380,14 +6061,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -5462,7 +6155,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -5517,16 +6215,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -5553,7 +6263,9 @@
                 "const": "context-window"
               }
             },
-            "required": ["kind"],
+            "required": [
+              "kind"
+            ],
             "additionalProperties": false
           },
           "captureScreenshot": {
@@ -5567,7 +6279,11 @@
             "maxLength": 1000000
           }
         },
-        "required": ["contextToken", "target", "text"],
+        "required": [
+          "contextToken",
+          "target",
+          "text"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -5585,7 +6301,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5599,7 +6317,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5653,11 +6373,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -5711,11 +6438,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -5760,7 +6494,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -5782,7 +6520,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -5865,7 +6606,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -5907,14 +6654,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -5989,7 +6748,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -6044,16 +6808,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     },
@@ -6118,7 +6894,11 @@
                             "maxLength": 512
                           }
                         },
-                        "required": ["pid", "startedAt", "executableId"],
+                        "required": [
+                          "pid",
+                          "startedAt",
+                          "executableId"
+                        ],
                         "additionalProperties": false
                       },
                       "appId": {
@@ -6140,7 +6920,10 @@
                             "maximum": 9007199254740991
                           }
                         },
-                        "required": ["id", "ownerPid"],
+                        "required": [
+                          "id",
+                          "ownerPid"
+                        ],
                         "additionalProperties": false
                       },
                       "snapshotId": {
@@ -6160,7 +6943,11 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["app", "window", "element"]
+                        "enum": [
+                          "app",
+                          "window",
+                          "element"
+                        ]
                       },
                       "contextToken": {
                         "type": "string",
@@ -6189,7 +6976,10 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "ref"],
+                "required": [
+                  "kind",
+                  "ref"
+                ],
                 "additionalProperties": false
               },
               {
@@ -6205,7 +6995,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["kind", "elementIndex"],
+                "required": [
+                  "kind",
+                  "elementIndex"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -6221,7 +7014,11 @@
             "maxLength": 1000000
           }
         },
-        "required": ["contextToken", "target", "value"],
+        "required": [
+          "contextToken",
+          "target",
+          "value"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -6239,7 +7036,9 @@
                   },
                   "evidence": {}
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -6253,7 +7052,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -6307,11 +7108,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               },
               {
@@ -6365,11 +7173,18 @@
                       },
                       "details": {}
                     },
-                    "required": ["code", "message", "retry", "remediation"],
+                    "required": [
+                      "code",
+                      "message",
+                      "retry",
+                      "remediation"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["state"],
+                "required": [
+                  "state"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -6414,7 +7229,11 @@
                         "maxLength": 512
                       }
                     },
-                    "required": ["pid", "startedAt", "executableId"],
+                    "required": [
+                      "pid",
+                      "startedAt",
+                      "executableId"
+                    ],
                     "additionalProperties": false
                   },
                   "appId": {
@@ -6436,7 +7255,10 @@
                         "maximum": 9007199254740991
                       }
                     },
-                    "required": ["id", "ownerPid"],
+                    "required": [
+                      "id",
+                      "ownerPid"
+                    ],
                     "additionalProperties": false
                   },
                   "snapshotId": {
@@ -6519,7 +7341,13 @@
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "name", "bundleId", "pid", "isRunning"],
+                    "required": [
+                      "id",
+                      "name",
+                      "bundleId",
+                      "pid",
+                      "isRunning"
+                    ],
                     "additionalProperties": false
                   },
                   "window": {
@@ -6561,14 +7389,26 @@
                             "exclusiveMinimum": 0
                           }
                         },
-                        "required": ["x", "y", "width", "height"],
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
                         "additionalProperties": false
                       },
                       "minimized": {
                         "type": "boolean"
                       }
                     },
-                    "required": ["id", "appId", "title", "index", "bounds", "minimized"],
+                    "required": [
+                      "id",
+                      "appId",
+                      "title",
+                      "index",
+                      "bounds",
+                      "minimized"
+                    ],
                     "additionalProperties": false
                   },
                   "treeText": {
@@ -6643,7 +7483,12 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                       }
                     },
-                    "required": ["format", "width", "height", "scale"],
+                    "required": [
+                      "format",
+                      "width",
+                      "height",
+                      "scale"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -6698,16 +7543,28 @@
                     },
                     "details": {}
                   },
-                  "required": ["code", "message", "retry", "remediation"],
+                  "required": [
+                    "code",
+                    "message",
+                    "retry",
+                    "remediation"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["context", "snapshot", "screenshot", "issues"],
+            "required": [
+              "context",
+              "snapshot",
+              "screenshot",
+              "issues"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["outcome"],
+        "required": [
+          "outcome"
+        ],
         "additionalProperties": false
       }
     }
