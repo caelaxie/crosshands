@@ -1,96 +1,49 @@
 # CrossHands
 
-CrossHands is a standalone, agent-agnostic computer-use runtime for coding
-agents. It exposes one versioned operation contract through two local adapters:
+CrossHands is a local computer-use runtime for coding agents. It inspects and
+operates the current user's desktop through a JSON CLI and an MCP server over
+stdio. It only controls that user's active graphical session.
 
-- a JSON CLI with an installable computer-use skill;
-- an MCP server over stdio.
+## Prompt
 
-CrossHands is based on the computer-use subsystem in
-[stablyai/orca](https://github.com/stablyai/orca) and is being separated so
-agents can use the capability without installing the Orca desktop application.
-The compatibility baseline is Orca commit
-`9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4`.
+Paste this into any coding agent:
 
-## First-release scope
-
-- Local computer use on macOS, Windows, and Linux.
-- macOS and Windows are the primary reliability targets.
-- Linux targets Ubuntu 24.04 GNOME on Xorg for full conformance and reports
-  capability gaps honestly on Wayland.
-- Codex, OpenCode, and Oh My Pi are reference clients, not dependencies.
-
-Remote control, hosted services, agent orchestration, OpenTelemetry, and a
-general-purpose desktop UI are intentionally outside the first release.
-
-## Installation and readiness
-
-A version tag `vX.Y.Z` sets the product version on main and in the packed
-packages. It creates a GitHub Release and publishes the package set to the
-public npm registry. Install the CLI and MCP adapter together:
-
-```sh
-npm install --global @crosshands/cli @crosshands/mcp
-crosshands computer doctor --json
 ```
+Install and configure CrossHands for this coding agent.
 
-The `@crosshands/cli` package selects exactly one version-matched platform payload
-for the current OS and CPU. Do not install a platform payload directly. Doctor
-must report a compatible payload, a protected local broker endpoint, an active
-unlocked graphical session, native dependencies, integrity, and permissions
-before an agent is allowed to mutate the desktop. macOS permissions are granted
-manually in System Settings; Windows must run on the local equal-integrity
-desktop; Linux full support requires Ubuntu 24.04 GNOME on Xorg.
+CrossHands drives the current user's local desktop. It does not provide remote
+control.
 
-See the [install, update, and uninstall guide](docs/platforms/install.md) and the
-platform notes for [macOS](docs/platforms/macos.md),
-[Windows](docs/platforms/windows.md), and [Linux](docs/platforms/linux.md).
+1. Confirm Node.js 22 or newer is available.
+2. Install the CLI and MCP adapter together at the same version:
 
-## Updating and uninstalling
+   npm install --global @crosshands/cli @crosshands/mcp
 
-Update the CLI, MCP adapter, and platform payload as one versioned bundle. A
-mixed-version or partially installed bundle fails before desktop dispatch. The
-release process stages and verifies the complete replacement before activation,
-and preserves the previous complete release for the supported rollback path.
+   Do not install a @crosshands/platform-* package directly.
 
-Before uninstalling, close every agent using CrossHands and remove both global
-packages with the same package manager that installed them. CrossHands-owned
-broker IPC, caches, logs, and temporary captures may then be removed; exported
-screenshots and user configuration are preserved. Operating-system permission
-records are never removed automatically. Exact paths and permission-revocation
-steps are in the [lifecycle guide](docs/platforms/install.md#uninstall).
+3. Run this from the same local desktop session:
 
-## Development
+   crosshands computer doctor --json
 
-CrossHands requires Node.js 22 or newer and uses the package manager pinned in
-`package.json`.
+   Continue if readiness is ready or capability_reduced. If it is
+   operator_action_required or unavailable, tell me the exact operator
+   action or error. Never click or accept an OS permission dialog. On
+   macOS, ask me to grant Accessibility and Screen Recording to
+   "CrossHands Computer Use" in System Settings.
 
-```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm lint
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
+4. Register a stdio MCP server in this agent's usual MCP config:
+
+   command: crosshands-mcp
+   args: []
+
+   Do not add a network listener.
+
+5. If this agent uses skills, copy
+   https://raw.githubusercontent.com/caelaxie/crosshands/main/skills/computer-use/SKILL.md
+   into its skills directory.
+
+Confirm doctor readiness and that the MCP server is registered.
 ```
-
-The repository is under active development. See
-[the Orca compatibility ledger](docs/compatibility/orca-9c8f4c3.md) for the
-extraction boundary and intentional deviations.
-
-A version tag sets the product version on main and in the packed packages.
-It opens a GitHub Release immediately, then builds the notarized platform
-payloads and publishes them to npm. The candidate/promote workflow
-still fail-closes until signing identities, notarization, protected
-environments, and backup release owners are configured; that path builds a
-candidate once and promotes it by digest without rebuilding.
-
-The checked-in conformance and release tests validate catalogs, schemas, and
-evidence policy; they are not a claim that live desktops or reference agents
-have passed. A release candidate must still run the final installed artifacts
-on the complete interactive matrix described in the
-[provider conformance guide](docs/platforms/conformance.md), then pass the
-[Codex, OpenCode, and OMP benchmark](docs/platforms/agent-benchmarks.md).
-Promotion requires those exact evidence artifacts.
 
 ## License
 
