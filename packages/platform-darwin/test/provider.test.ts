@@ -10,6 +10,7 @@ import { CONTRACT_VERSIONS } from '@crosshands/contract'
 
 import {
   DarwinComputerProvider,
+  codesignStreamsContain,
   normalizeScreenshotIssues,
   resolveHelperPath,
   verifyDarwinPayload
@@ -120,6 +121,28 @@ describe('@crosshands/platform-darwin', () => {
     await expect(verifyDarwinPayload(helperPath, manifestPath, false)).rejects.toMatchObject({
       code: 'provider_unavailable'
     })
+  })
+
+  it('reads the designated requirement from codesign stdout', () => {
+    expect(
+      codesignStreamsContain(
+        {
+          stdout: 'designated => identifier "ai.crosshands.ComputerUse" and anchor apple generic',
+          stderr:
+            'Executable=/tmp/CrossHands Computer Use.app/Contents/MacOS/crosshands-computer-use-macos'
+        },
+        'identifier "ai.crosshands.ComputerUse"'
+      )
+    ).toBe(true)
+    expect(
+      codesignStreamsContain(
+        {
+          stdout: '',
+          stderr: 'Executable=/tmp/CrossHands Computer Use.app'
+        },
+        'identifier "ai.crosshands.ComputerUse"'
+      )
+    ).toBe(false)
   })
 
   it('resolves the helper from the package asset directory', () => {

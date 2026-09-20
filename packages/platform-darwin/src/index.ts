@@ -72,6 +72,13 @@ const HELPER_PATH = fileURLToPath(
 const MANIFEST_PATH = fileURLToPath(new URL('../assets/payload.json', import.meta.url))
 const execFileAsync = promisify(execFile)
 
+export function codesignStreamsContain(
+  result: { stdout: string; stderr: string },
+  needle: string
+): boolean {
+  return result.stdout.includes(needle) || result.stderr.includes(needle)
+}
+
 export function resolveHelperPath(): string {
   if (!isAbsolute(HELPER_PATH)) throw new Error('CrossHands helper path must be absolute')
   return HELPER_PATH
@@ -131,13 +138,13 @@ export async function verifyDarwinPayload(
   try {
     await execFileAsync('/usr/bin/codesign', ['--verify', '--strict', appPath])
     const requirement = await execFileAsync('/usr/bin/codesign', ['-d', '-r-', appPath])
-    if (!requirement.stderr.includes('identifier "ai.crosshands.ComputerUse"')) {
+    if (!codesignStreamsContain(requirement, 'identifier "ai.crosshands.ComputerUse"')) {
       throw new Error('designated requirement does not bind the stable bundle identifier')
     }
     const details = await execFileAsync('/usr/bin/codesign', ['-d', '--verbose=4', appPath])
     if (
-      !details.stderr.includes(`Authority=${signing.authority}`) ||
-      !details.stderr.includes(`TeamIdentifier=${signing.teamIdentifier}`)
+      !codesignStreamsContain(details, `Authority=${signing.authority}`) ||
+      !codesignStreamsContain(details, `TeamIdentifier=${signing.teamIdentifier}`)
     ) {
       throw new Error('code-signing authority or team identifier does not match the manifest')
     }
