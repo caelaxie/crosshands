@@ -139,13 +139,33 @@ export const MutationResultSchema = z
   })
   .strict()
 
+const BooleanFlagMapSchema = z.record(z.string(), z.boolean())
+
+export const ProviderSupportsSchema = z
+  .object({
+    apps: BooleanFlagMapSchema.optional(),
+    windows: BooleanFlagMapSchema.optional(),
+    surfaces: BooleanFlagMapSchema.optional(),
+    observation: BooleanFlagMapSchema.optional(),
+    actions: BooleanFlagMapSchema.optional()
+  })
+  .strict()
+
+export const ProviderHelperIdentitySchema = z
+  .object({
+    name: z.string().min(1),
+    bundleId: z.string().min(1)
+  })
+  .strict()
+
 export const ProviderCapabilitiesSchema = z
   .object({
     platform: z.enum(['darwin', 'win32', 'linux']),
     provider: IdentifierSchema,
     providerVersion: z.string().min(1),
     operations: z.record(z.string(), z.boolean()),
-    permissions: z.record(z.string(), z.enum(['granted', 'denied', 'unknown', 'not_required']))
+    permissions: z.record(z.string(), z.enum(['granted', 'denied', 'unknown', 'not_required'])),
+    supports: ProviderSupportsSchema.optional()
   })
   .strict()
 
@@ -156,6 +176,7 @@ export const ProviderHandshakeSchema = z
     graphicalSessionId: IdentifierSchema,
     providerProtocol: PositiveIntegerSchema,
     publicContract: z.string().min(1),
-    capabilities: ProviderCapabilitiesSchema
+    capabilities: ProviderCapabilitiesSchema,
+    helper: ProviderHelperIdentitySchema.optional()
   })
   .strict()
