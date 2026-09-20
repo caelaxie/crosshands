@@ -150,10 +150,10 @@ export async function aggregateCandidates({
     inspected.push(await inspectPack(destination, descriptor))
   }
   const base = createReleaseManifest(inspected, {
-    contractVersion: first.manifest.contractVersion,
-    controlProtocol: first.manifest.controlProtocol,
-    providerProtocol: first.manifest.providerProtocol,
-    mcpProtocol: first.manifest.mcpProtocol
+    contractVersion: commonSource.manifest.contractVersion,
+    controlProtocol: commonSource.manifest.controlProtocol,
+    providerProtocol: commonSource.manifest.providerProtocol,
+    mcpProtocol: commonSource.manifest.mcpProtocol
   })
   const evidence = Object.assign({}, ...sources.map((source) => source.manifest.platformEvidence))
   const manifest = await enrichReleaseManifest(
