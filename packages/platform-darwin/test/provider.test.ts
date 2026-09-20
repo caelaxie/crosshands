@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { CONTRACT_VERSIONS } from '@crosshands/contract'
+
 import {
   DarwinComputerProvider,
   normalizeScreenshotIssues,
@@ -106,7 +108,7 @@ describe('@crosshands/platform-darwin', () => {
     await writeFile(
       manifestPath,
       JSON.stringify({
-        productVersion: '0.1.0',
+        productVersion: CONTRACT_VERSIONS.product,
         bundleIdentifier: 'ai.crosshands.ComputerUse',
         files: {
           'crosshands-computer-use-macos': createHash('sha256').update(helper).digest('hex')

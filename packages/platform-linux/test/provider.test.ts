@@ -4,6 +4,8 @@ import { isAbsolute, join } from 'node:path'
 
 import { describe, expect, test } from 'vitest'
 
+import { CONTRACT_VERSIONS } from '@crosshands/contract'
+
 import {
   LinuxComputerProvider,
   linuxProviderEnvironment,
@@ -119,7 +121,7 @@ describe('Linux provider boundary', () => {
     await writeFile(
       manifest,
       JSON.stringify({
-        productVersion: '0.1.0',
+        productVersion: CONTRACT_VERSIONS.product,
         files: { 'runtime.py': '0'.repeat(64) }
       }),
       'utf8'
