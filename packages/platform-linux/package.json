@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/platform-linux",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Linux x64 computer-use provider for CrossHands",
   "license": "MIT",
   "files": [

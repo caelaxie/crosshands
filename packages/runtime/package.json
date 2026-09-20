@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/runtime",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Local broker, policy, provider supervision, and protected IPC for CrossHands",
   "license": "MIT",
   "files": [
