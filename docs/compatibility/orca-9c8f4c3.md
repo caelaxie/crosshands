@@ -4,7 +4,7 @@ CrossHands uses `stablyai/orca` commit
 `9c8f4c398c3f8ba267cca14e0b65c3f6f87f2aa4` as its current computer-use
 compatibility pin. The previous baseline was
 `8adfef4ff80e7817b7c7bcd6b8ddf69289078c3c`. Orca remains the source
-precedent; CrossHands' Product Contract is the authority when a behavior is
+precedent; `AGENTS.md` and `README.md` are the authority when a behavior is
 product-specific or intentionally differs.
 
 ## Operation ledger
