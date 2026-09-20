@@ -9,6 +9,7 @@ import {
 import {
   LocalBroker,
   LocalControlServer,
+  diagnosticsDirectory,
   type BrokerEndpoint,
   type LocalControlIdentity,
   type LocalControlRequest,
@@ -79,6 +80,7 @@ export async function runBrokerHost(): Promise<void> {
   const broker = new LocalBroker({
     identity: peer,
     providerFactory: () => providerModule.createProvider(),
+    diagnosticsDirectory: diagnosticsDirectory(paths.identity.graphicalSessionId),
     ...(providerModule.inspectTarget === undefined
       ? {}
       : {
@@ -88,45 +90,54 @@ export async function runBrokerHost(): Promise<void> {
           ): Promise<TargetInspection | null> => providerModule.inspectTarget!(operation, input)
         })
   })
-  await broker.connect({ peer, versions: CONTRACT_VERSIONS })
-  const handler = async ({ payload, deadlineAt }: LocalControlRequest): Promise<unknown> => {
-    if (payload === null || typeof payload !== 'object') throw new Error('Invalid broker request')
-    const record = payload as Record<string, unknown>
-    if (typeof record.operation !== 'string') throw new Error('Missing operation')
-    const operation = record.operation as ComputerOperationName
-    let input: unknown
-    try {
-      input = parseOperationInput(operation, record.input)
-    } catch (cause) {
-      if (cause instanceof Error && cause.name === 'ZodError') {
-        throw createComputerError('invalid_argument', 'Invalid input for the selected operation')
+  try {
+    await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const handler = async ({ payload, deadlineAt }: LocalControlRequest): Promise<unknown> => {
+      if (payload === null || typeof payload !== 'object') throw new Error('Invalid broker request')
+      const record = payload as Record<string, unknown>
+      if (typeof record.operation !== 'string') throw new Error('Missing operation')
+      const operation = record.operation as ComputerOperationName
+      let input: unknown
+      try {
+        input = parseOperationInput(operation, record.input)
+      } catch (cause) {
+        if (cause instanceof Error && cause.name === 'ZodError') {
+          throw createComputerError('invalid_argument', 'Invalid input for the selected operation')
+        }
+        throw cause
       }
-      throw cause
+      return broker.request({ operation, input, deadlineMs: Math.max(1, deadlineAt - Date.now()) })
     }
-    return broker.request({ operation, input, deadlineMs: Math.max(1, deadlineAt - Date.now()) })
+    const onHandshake = (event: { accepted: boolean; requestId: string; code?: string }): void => {
+      broker.noteHandshake(event)
+    }
+    const server =
+      paths.endpoint.transport === 'named-pipe'
+        ? await (providerModule.createControlServer?.({
+            endpoint: paths.endpoint,
+            identity: paths.identity,
+            handler
+          }) ??
+            Promise.reject(
+              new Error('The Windows payload has no native DACL and peer-token control relay')
+            ))
+        : new LocalControlServer({
+            endpoint: paths.endpoint,
+            runtimeDirectory: paths.runtimeDirectory,
+            tokenFile: paths.tokenFile,
+            identity: paths.identity,
+            handler,
+            onHandshake
+          })
+    await server.start()
+    broker.markListening()
+    await new Promise<void>((resolve) => {
+      const stop = (): void => resolve()
+      process.once('SIGINT', stop)
+      process.once('SIGTERM', stop)
+    })
+    await server.close()
+  } finally {
+    await broker.close()
   }
-  const server =
-    paths.endpoint.transport === 'named-pipe'
-      ? await (providerModule.createControlServer?.({
-          endpoint: paths.endpoint,
-          identity: paths.identity,
-          handler
-        }) ??
-          Promise.reject(
-            new Error('The Windows payload has no native DACL and peer-token control relay')
-          ))
-      : new LocalControlServer({
-          endpoint: paths.endpoint,
-          runtimeDirectory: paths.runtimeDirectory,
-          tokenFile: paths.tokenFile,
-          identity: paths.identity,
-          handler
-        })
-  await server.start()
-  await new Promise<void>((resolve) => {
-    const stop = (): void => resolve()
-    process.once('SIGINT', stop)
-    process.once('SIGTERM', stop)
-  })
-  await server.close()
 }

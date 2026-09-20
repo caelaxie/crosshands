@@ -171,6 +171,7 @@ describe('uninstall ownership boundaries', () => {
     { id: 'broker', kind: 'broker-registration', owner: 'crosshands' },
     { id: 'socket', kind: 'ipc', owner: 'crosshands' },
     { id: 'capture', kind: 'temporary-capture', owner: 'crosshands' },
+    { id: 'diagnostics', kind: 'log', owner: 'crosshands' },
     { id: 'report', kind: 'export', owner: 'user' },
     { id: 'settings', kind: 'configuration', owner: 'user' },
     { id: 'tcc', kind: 'permission', owner: 'os' }
@@ -178,7 +179,7 @@ describe('uninstall ownership boundaries', () => {
 
   it('removes only CrossHands runtime state and reports manual permission cleanup', () => {
     const plan = planUninstall(resources)
-    expect(plan.remove.map(({ id }) => id)).toEqual(['broker', 'socket', 'capture'])
+    expect(plan.remove.map(({ id }) => id)).toEqual(['broker', 'socket', 'capture', 'diagnostics'])
     expect(plan.preserve.map(({ id }) => id)).toEqual(['report', 'settings'])
     expect(plan.manual.map(({ id }) => id)).toEqual(['tcc'])
   })
@@ -192,7 +193,7 @@ describe('uninstall ownership boundaries', () => {
       removed.push(resource.id)
     })
 
-    expect(removed).toEqual(['broker', 'socket', 'capture'])
+    expect(removed).toEqual(['broker', 'socket', 'capture', 'diagnostics'])
     expect(plan.preserve.map(({ id }) => id)).toEqual(['report', 'settings'])
     expect(lifecycle.phase).toBe('uninstalled')
     expect(lifecycle.activeVersion).toBeUndefined()

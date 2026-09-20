@@ -1,11 +1,15 @@
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { chmod, lstat, mkdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
 import { CONTRACT_VERSIONS, createComputerError } from '@crosshands/contract'
-import { LocalControlClient, brokerEndpoint, type LocalControlIdentity } from '@crosshands/runtime'
+import {
+  LocalControlClient,
+  brokerEndpoint,
+  graphicalSessionKey,
+  type LocalControlIdentity
+} from '@crosshands/runtime'
 
 import type { CliBrokerClient } from './index.js'
 
@@ -29,7 +33,7 @@ export function localClientPaths(): LocalClientPaths {
     process.env.SECURITYSESSIONID ??
     process.env.SESSIONNAME ??
     `interactive:${osIdentity}`
-  const sessionKey = createHash('sha256').update(graphicalSessionId).digest('hex').slice(0, 12)
+  const sessionKey = graphicalSessionKey(graphicalSessionId)
   const runtimeDirectory = process.env.CROSSHANDS_RUNTIME_DIR ?? defaultRuntimeDirectory(sessionKey)
   const identity = { osIdentity, graphicalSessionId }
   return {

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 import {
-  COMPUTER_OPERATIONS,
   InteractionContextStore,
   createComputerError,
   negotiateVersionHandshake,
@@ -13,6 +12,18 @@ import {
   type TargetReference
 } from '@crosshands/contract'
 
+import {
+  DIAGNOSTIC_RECORD_VERSION,
+  diagnosticError,
+  diagnosticPlatform,
+  diagnosticRequestResult,
+  diagnosticTarget,
+  isMutationOperation,
+  type DiagnosticRecord,
+  type DiagnosticsSink
+} from '../diagnostics/record.js'
+import { graphicalSessionKey } from '../diagnostics/paths.js'
+import { JsonlDiagnosticsWriter } from '../diagnostics/writer.js'
 import { assertAppAllowed, type StableAppIdentity } from '../policy/policy.js'
 import { ProviderSupervisor } from '../providers/supervisor.js'
 
@@ -51,6 +62,8 @@ export type LocalBrokerOptions = {
     input: unknown
   ) => Promise<TargetInspection | null>
   publish?: (response: BrokerResponse) => Promise<void>
+  diagnostics?: DiagnosticsSink
+  diagnosticsDirectory?: string
   contextTtlMs?: number
   now?: () => number
 }
@@ -74,7 +87,7 @@ class SerialQueue {
 }
 
 function isMutation(operation: ComputerOperationName): boolean {
-  return COMPUTER_OPERATIONS[operation].mutation
+  return isMutationOperation(operation)
 }
 
 function assertedInputApp(input: unknown): void {
@@ -225,21 +238,33 @@ export class BrokerClient {
 export class LocalBroker {
   readonly generation: string
   readonly #identity: BrokerPeer
+  readonly #session: string
   readonly #supervisor: ProviderSupervisor
   readonly #contexts: InteractionContextStore
   readonly #inspectTarget: LocalBrokerOptions['inspectTarget']
   readonly #publish: LocalBrokerOptions['publish']
+  readonly #diagnostics: DiagnosticsSink | undefined
   readonly #now: () => number
   readonly #queue = new SerialQueue()
   #desktopEpoch = 0
   #requestSequence = 0
+  #closed = false
 
   constructor(options: LocalBrokerOptions) {
     this.generation = options.generation ?? `broker-${randomUUID()}`
     this.#identity = options.identity
+    this.#session = graphicalSessionKey(options.identity.graphicalSessionId)
     this.#inspectTarget = options.inspectTarget
     this.#publish = options.publish
     this.#now = options.now ?? Date.now
+    this.#diagnostics =
+      options.diagnostics ??
+      (options.diagnosticsDirectory === undefined
+        ? undefined
+        : new JsonlDiagnosticsWriter({
+            directory: options.diagnosticsDirectory,
+            generation: this.generation
+          }))
     this.#contexts = new InteractionContextStore({
       ...(options.contextTtlMs === undefined ? {} : { ttlMs: options.contextTtlMs }),
       now: this.#now
@@ -274,7 +299,30 @@ export class LocalBroker {
     const versions = negotiateVersionHandshake(handshake.versions)
     if (!versions.ok) throw versions.error
     await this.#supervisor.start()
+    this.#emit({ kind: 'helper.start', ...this.#envelope() })
     return new BrokerClient(this)
+  }
+
+  markListening(): void {
+    this.#emit({ kind: 'broker.start', ...this.#envelope() })
+  }
+
+  noteHandshake(event: { accepted: boolean; requestId: string; code?: string }): void {
+    this.#emit({
+      kind: 'client.handshake',
+      ...this.#envelope(),
+      accepted: event.accepted,
+      requestId: event.requestId,
+      ...(event.code === undefined ? {} : { code: event.code })
+    })
+  }
+
+  async close(): Promise<void> {
+    if (this.#closed) return
+    this.#closed = true
+    await this.#supervisor.close()
+    this.#emit({ kind: 'broker.stop', reason: 'signal', ...this.#envelope() })
+    await this.#diagnostics?.close()
   }
 
   issueContext(bindings: ReferenceBindings): InteractionContext {
@@ -292,57 +340,70 @@ export class LocalBroker {
   }
 
   request(request: BrokerRequest): Promise<BrokerResponse> {
-    return this.#queue.run(() => this.#requestLocked(request))
+    const enqueuedAt = this.#now()
+    return this.#queue.run(() => this.#requestLocked(request, enqueuedAt))
   }
 
-  async #requestLocked(request: BrokerRequest): Promise<BrokerResponse> {
+  async #requestLocked(request: BrokerRequest, enqueuedAt: number): Promise<BrokerResponse> {
+    const startedAt = this.#now()
     const requestId = `broker-${++this.#requestSequence}`
     const deadlineAt = this.#now() + (request.deadlineMs ?? 30_000)
     const mutation = isMutation(request.operation)
+    let inspectMs = 0
+    let dispatchMs = 0
+    let bindings: ReferenceBindings | undefined
+    let dispatched: boolean | undefined
     assertedInputApp(request.input)
     let context: InteractionContext | undefined
     let inspectionInput = request.input
-    if (mutation) {
-      const token = contextToken(request.input)
-      if (token === undefined) {
-        throw createComputerError(
-          'invalid_argument',
-          'Mutation requires a context token and target'
-        )
-      }
-      context = this.#contexts.resolve(token)
-      // Context-window and index shorthand do not carry an identity until the
-      // broker binds them. Inspect the bound form so native providers can
-      // re-resolve the exact process/window before dispatch.
-      inspectionInput = normalizeMutationInput(request.input, context, context)
-    }
-    const inspection = await this.#inspectTarget?.(request.operation, inspectionInput)
-    if (inspection !== undefined && inspection !== null) assertAppAllowed(inspection.appIdentity)
-
-    let providerInput = request.input
-    if (mutation) {
-      if (inspection === undefined || inspection === null) {
-        throw createComputerError('stale_target', 'Target identity could not be re-resolved')
-      }
-      providerInput = normalizeMutationInput(request.input, context!, inspection.bindings)
-      const references = mutationReferences(providerInput)
-      if (references.length === 0) {
-        throw createComputerError('invalid_argument', 'Mutation requires a target selector')
-      }
-      for (const reference of references) {
-        assertFreshReference(reference, context!, inspection.bindings, this.#now())
-      }
-    }
-
     try {
+      if (mutation) {
+        const token = contextToken(request.input)
+        if (token === undefined) {
+          throw createComputerError(
+            'invalid_argument',
+            'Mutation requires a context token and target'
+          )
+        }
+        context = this.#contexts.resolve(token)
+        // Context-window and index shorthand do not carry an identity until the
+        // broker binds them. Inspect the bound form so native providers can
+        // re-resolve the exact process/window before dispatch.
+        inspectionInput = normalizeMutationInput(request.input, context, context)
+      }
+      const inspectStarted = this.#now()
+      const inspection = await this.#inspectTarget?.(request.operation, inspectionInput)
+      inspectMs = this.#now() - inspectStarted
+      if (inspection !== undefined && inspection !== null) {
+        assertAppAllowed(inspection.appIdentity)
+        bindings = inspection.bindings
+      }
+
+      let providerInput = request.input
+      if (mutation) {
+        if (inspection === undefined || inspection === null) {
+          throw createComputerError('stale_target', 'Target identity could not be re-resolved')
+        }
+        providerInput = normalizeMutationInput(request.input, context!, inspection.bindings)
+        const references = mutationReferences(providerInput)
+        if (references.length === 0) {
+          throw createComputerError('invalid_argument', 'Mutation requires a target selector')
+        }
+        for (const reference of references) {
+          assertFreshReference(reference, context!, inspection.bindings, this.#now())
+        }
+      }
+
+      const dispatchStarted = this.#now()
       const providerResponse = await this.#supervisor.dispatch({
         requestId,
         operation: request.operation,
         input: providerInput,
         deadlineAt
       })
+      dispatchMs = this.#now() - dispatchStarted
+      dispatched = providerResponse.dispatched
       if (mutation) {
-        const dispatched = providerResponse.dispatched
         if (dispatched) this.#desktopEpoch += 1
         const result =
           'error' in providerResponse
@@ -358,25 +419,103 @@ export class LocalBroker {
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
+        this.#emitRequest(
+          request,
+          requestId,
+          enqueuedAt,
+          startedAt,
+          inspectMs,
+          dispatchMs,
+          bindings,
+          dispatched,
+          response.result
+        )
         await this.#publish?.(response)
         return response
       }
-      return this.#observationResponse(requestId, request.operation, providerResponse.result)
+      const response = this.#observationResponse(
+        requestId,
+        request.operation,
+        providerResponse.result
+      )
+      this.#emitRequest(
+        request,
+        requestId,
+        enqueuedAt,
+        startedAt,
+        inspectMs,
+        dispatchMs,
+        bindings,
+        dispatched,
+        response.result
+      )
+      return response
     } catch (cause) {
       const error = computerError(cause)
       if (!mutation && error.code === 'provider_crashed') {
+        this.#emit({
+          kind: 'helper.crash',
+          ...this.#envelope(),
+          requestId,
+          operation: request.operation,
+          error: diagnosticError(cause)
+        })
+        const previousGeneration = this.#supervisor.generation
         await this.#supervisor.restart()
         this.#contexts.invalidateAll()
+        this.#emit({
+          kind: 'helper.restart',
+          ...this.#envelope(),
+          ...(previousGeneration === undefined ? {} : { previousGeneration })
+        })
+        const retryStarted = this.#now()
         const retry = await this.#supervisor.dispatch({
           requestId: `${requestId}-retry`,
           operation: request.operation,
           input: request.input,
           deadlineAt
         })
-        if ('error' in retry) throw Object.assign(new Error(retry.error.message), retry.error)
-        return this.#observationResponse(requestId, request.operation, retry.result)
+        dispatchMs += this.#now() - retryStarted
+        if ('error' in retry) {
+          const failure = Object.assign(new Error(retry.error.message), retry.error)
+          this.#emitRequest(
+            request,
+            requestId,
+            enqueuedAt,
+            startedAt,
+            inspectMs,
+            dispatchMs,
+            bindings,
+            retry.dispatched,
+            undefined,
+            failure
+          )
+          throw failure
+        }
+        const response = this.#observationResponse(requestId, request.operation, retry.result)
+        this.#emitRequest(
+          request,
+          requestId,
+          enqueuedAt,
+          startedAt,
+          inspectMs,
+          dispatchMs,
+          bindings,
+          retry.dispatched,
+          response.result
+        )
+        return response
       }
       if (mutation && (error.code === 'provider_crashed' || error.code === 'timeout')) {
+        if (error.code === 'provider_crashed') {
+          this.#emit({
+            kind: 'helper.crash',
+            ...this.#envelope(),
+            requestId,
+            operation: request.operation,
+            error: diagnosticError(cause)
+          })
+        }
         this.#desktopEpoch += 1
         this.#contexts.invalidateAll()
         const response = {
@@ -387,9 +526,32 @@ export class LocalBroker {
           desktopEpoch: this.#desktopEpoch,
           providerGeneration: this.#supervisor.generation ?? 'unknown'
         }
+        this.#emitRequest(
+          request,
+          requestId,
+          enqueuedAt,
+          startedAt,
+          inspectMs,
+          dispatchMs,
+          bindings,
+          true,
+          response.result
+        )
         await this.#publish?.(response)
         return response
       }
+      this.#emitRequest(
+        request,
+        requestId,
+        enqueuedAt,
+        startedAt,
+        inspectMs,
+        dispatchMs,
+        bindings,
+        dispatched,
+        undefined,
+        cause
+      )
       throw cause
     }
   }
@@ -435,5 +597,68 @@ export class LocalBroker {
       }
     }
     return parseOperationOutput(operation, publicResult)
+  }
+
+  #envelope(): {
+    v: typeof DIAGNOSTIC_RECORD_VERSION
+    ts: string
+    session: string
+    brokerGeneration: string
+    providerGeneration?: string
+    desktopEpoch: number
+    platform: ReturnType<typeof diagnosticPlatform>
+  } {
+    return {
+      v: DIAGNOSTIC_RECORD_VERSION,
+      ts: new Date(this.#now()).toISOString(),
+      session: this.#session,
+      brokerGeneration: this.generation,
+      ...(this.#supervisor.generation === undefined
+        ? {}
+        : { providerGeneration: this.#supervisor.generation }),
+      desktopEpoch: this.#desktopEpoch,
+      platform: diagnosticPlatform()
+    }
+  }
+
+  #emit(record: DiagnosticRecord): void {
+    try {
+      this.#diagnostics?.emit(record)
+    } catch {
+      // Diagnostics must not fail computer-use.
+    }
+  }
+
+  #emitRequest(
+    request: BrokerRequest,
+    requestId: string,
+    enqueuedAt: number,
+    startedAt: number,
+    inspectMs: number,
+    dispatchMs: number,
+    bindings: ReferenceBindings | undefined,
+    dispatched: boolean | undefined,
+    result: unknown,
+    cause?: unknown
+  ): void {
+    const target = diagnosticTarget(request.input, bindings)
+    this.#emit({
+      kind: 'request',
+      ...this.#envelope(),
+      requestId,
+      operation: request.operation,
+      mutation: isMutation(request.operation),
+      ms: {
+        queue: Math.max(0, startedAt - enqueuedAt),
+        inspect: inspectMs,
+        dispatch: dispatchMs,
+        total: Math.max(0, this.#now() - enqueuedAt)
+      },
+      ...(target === undefined ? {} : { target }),
+      result:
+        cause !== undefined
+          ? { type: 'error', ...diagnosticError(cause) }
+          : diagnosticRequestResult(request.operation, result, dispatched)
+    })
   }
 }
