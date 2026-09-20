@@ -860,6 +860,16 @@ final class Provider {
             throw ProviderError.coded("element_not_clickable", "element \(record.index) has no clickable frame")
         }
         let point = try coordinatePoint(params: params, xKey: "x", yKey: "y", snapshot: snapshot)
+        // Why: SwiftUI apps silently drop queue-injected mouse events, so a
+        // plain coordinate click first upgrades to the accessibility action of
+        // the element at the point. The HID event tap stays off-limits; the
+        // synthetic fallback remains for points without an actionable element.
+        if modifiers.isEmpty, count <= 1,
+           let (element, action) = actionableElement(at: point, pid: snapshot.app.pid, mouseButton: button),
+           performAction(element, action)
+        {
+            return actionMetadata(path: "accessibility", actionName: action)
+        }
         try Input.click(
             pid: snapshot.app.pid,
             at: point,
@@ -894,6 +904,41 @@ final class Provider {
             if performAction(record.element, action) {
                 return action
             }
+        }
+        return nil
+    }
+
+    private func actionableElement(at point: CGPoint, pid: pid_t, mouseButton: String) -> (AXUIElement, String)? {
+        let wanted: [String]
+        switch mouseButton {
+        case "left": wanted = ["AXPress", "AXConfirm", "AXOpen"]
+        case "right": wanted = ["AXShowMenu"]
+        default: return nil
+        }
+        var hit: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(
+            AXUIElementCreateSystemWide(),
+            Float(point.x),
+            Float(point.y),
+            &hit
+        ) == .success, let element = hit else { return nil }
+        // Why: never act on another app's element, even if it overlaps the point.
+        var hitPid: pid_t = 0
+        guard AXUIElementGetPid(element, &hitPid) == .success, hitPid == pid else { return nil }
+        var current: AXUIElement? = element
+        while let candidate = current {
+            var actionNames: CFArray?
+            if AXUIElementCopyActionNames(candidate, &actionNames) == .success,
+               let names = actionNames as? [String],
+               let action = wanted.first(where: { names.contains($0) })
+            {
+                return (candidate, action)
+            }
+            var parent: AnyObject?
+            guard AXUIElementCopyAttributeValue(candidate, kAXParentAttribute as CFString, &parent) == .success,
+                  let parentElement = parent
+            else { return nil }
+            current = (parentElement as! AXUIElement)
         }
         return nil
     }
