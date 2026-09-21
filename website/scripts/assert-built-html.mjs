@@ -8,8 +8,14 @@ const websiteRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(websiteRoot, '..')
 const html = await readFile(join(websiteRoot, 'dist/index.html'), 'utf8')
 const document = parsePublicReadme(await readFile(join(repoRoot, 'README.md'), 'utf8'))
+const decoded = html
+  .replaceAll('&#39;', "'")
+  .replaceAll('&quot;', '"')
+  .replaceAll('&amp;', '&')
+  .replaceAll('&lt;', '<')
+  .replaceAll('&gt;', '>')
 
-if (!html.includes(document.prompt.body)) {
+if (!decoded.includes(document.prompt.body)) {
   throw new Error('built HTML is missing the Prompt fence text')
 }
 if (/<h2\b[^>]*>\s*license\s*<\/h2>/i.test(html)) {
@@ -26,4 +32,10 @@ if (!/<h2\b[^>]*>\s*Prompt\s*<\/h2>/.test(html)) {
 }
 if (!html.includes('crosshands-mcp')) {
   throw new Error('built HTML is missing crosshands-mcp')
+}
+if (!html.includes('Copy prompt')) {
+  throw new Error('built HTML is missing the Copy prompt control')
+}
+if (!html.includes('crosshands.caelaxie.com')) {
+  throw new Error('built HTML is missing the custom domain')
 }

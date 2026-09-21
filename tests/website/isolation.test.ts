@@ -37,13 +37,19 @@ describe('website isolation', () => {
     expect(Object.values(packages).map((item) => item.name)).not.toContain('crosshands-website')
   })
 
-  it('does not commit wrangler config', () => {
+  it('commits wrangler project shape without account identity', async () => {
     expect(existsSync(new URL('wrangler.toml', root))).toBe(false)
     expect(existsSync(new URL('wrangler.json', root))).toBe(false)
     expect(existsSync(new URL('wrangler.jsonc', root))).toBe(false)
     expect(existsSync(new URL('website/wrangler.toml', root))).toBe(false)
     expect(existsSync(new URL('website/wrangler.json', root))).toBe(false)
-    expect(existsSync(new URL('website/wrangler.jsonc', root))).toBe(false)
+
+    const config = await readText('website/wrangler.jsonc')
+    expect(config).toContain('"name": "crosshands"')
+    expect(config).toContain('"pages_build_output_dir": "./dist"')
+    expect(config).not.toContain('account_id')
+    expect(config).not.toContain('api_token')
+    expect(config).not.toContain('oauth_token')
   })
 
   it('does not commit the Cloudflare account id', () => {

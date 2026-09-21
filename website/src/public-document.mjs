@@ -123,11 +123,11 @@ export async function loadPublicDocument(readmeUrl) {
   return parsePublicReadme(await readFile(readmeUrl, 'utf8'))
 }
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
-function paragraphs(markdown) {
+export function renderParagraphs(markdown) {
   return markdown
     .split(/\n{2,}/)
     .map((block) => block.trim())
@@ -138,14 +138,14 @@ function paragraphs(markdown) {
 
 export function renderPublicDocument(document) {
   const parts = [`<h1>${escapeHtml(document.title)}</h1>`]
-  const leadHtml = paragraphs(document.lead)
+  const leadHtml = renderParagraphs(document.lead)
   if (leadHtml !== '') parts.push(leadHtml)
   parts.push(`<h2>${escapeHtml(document.prompt.heading)}</h2>`)
   if (document.prompt.lead) parts.push(`<p>${escapeHtml(document.prompt.lead)}</p>`)
   parts.push(`<pre><code>${escapeHtml(document.prompt.body)}</code></pre>`)
   for (const section of document.extra) {
     parts.push(`<h2>${escapeHtml(section.heading)}</h2>`)
-    const bodyHtml = paragraphs(section.body)
+    const bodyHtml = renderParagraphs(section.body)
     if (bodyHtml !== '') parts.push(bodyHtml)
   }
   return parts.join('\n')
