@@ -1,0 +1,168 @@
+---
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { loadPublicDocument, renderParagraphs } from '../public-document.mjs'
+
+// Prerender emits this module under dist/.prerender, so import.meta.url cannot reach the repo README.
+const document = await loadPublicDocument(pathToFileURL(resolve(process.cwd(), '../README.md')))
+const leadHtml = renderParagraphs(document.lead)
+const extra = document.extra.map((section) => ({
+  heading: section.heading,
+  bodyHtml: renderParagraphs(section.body)
+}))
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{document.title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500;6..72,650&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --serif: 'Newsreader', 'Iowan Old Style', Palatino, Georgia, serif;
+        --mono: 'IBM Plex Mono', ui-monospace, monospace;
+        --paper: #f6f1e8;
+        --ink: #1c1914;
+        --rule: #c9c0b2;
+        --sheet: #fffdf8;
+        --mute: #5c564c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        font: 1rem/1.5 var(--serif);
+      }
+      .page {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 3rem 1.25rem 5rem;
+      }
+      h1 {
+        font: 650 2.4rem/1.15 var(--serif);
+        letter-spacing: -0.02em;
+        margin: 0 0 1rem;
+      }
+      .lede {
+        font-size: 1.125rem;
+        line-height: 1.55;
+        margin: 0 0 2rem;
+      }
+      .lede p {
+        margin: 0 0 0.8rem;
+      }
+      .lede p:last-child {
+        margin-bottom: 0;
+      }
+      h2 {
+        font: 650 1.35rem/1.2 var(--serif);
+        margin: 0 0 0.6rem;
+      }
+      .prompt-lead {
+        margin: 0 0 0.8rem;
+      }
+      .block {
+        border: 1px solid var(--rule);
+        background: var(--sheet);
+        padding: 1rem 1rem 0.75rem;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.6rem;
+      }
+      button {
+        appearance: none;
+        font: 500 0.85rem/1 var(--mono);
+        color: inherit;
+        background: transparent;
+        border: 1px solid var(--ink);
+        padding: 0.45rem 0.8rem;
+        cursor: pointer;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 3px;
+      }
+      pre {
+        margin: 0;
+        overflow: auto;
+        white-space: pre-wrap;
+        font: 13px/1.45 var(--mono);
+      }
+      .extra {
+        margin-top: 2rem;
+      }
+      footer {
+        margin-top: 2.5rem;
+        font-size: 0.9rem;
+        color: var(--mute);
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <article class="page">
+      <h1>{document.title}</h1>
+      <div class="lede" set:html={leadHtml} />
+      <h2>{document.prompt.heading}</h2>
+      {
+        document.prompt.lead ? (
+          <p class="prompt-lead">{document.prompt.lead}</p>
+        ) : null
+      }
+      <div class="block">
+        <div class="toolbar">
+          <button type="button" data-copy>Copy prompt</button>
+        </div>
+        <pre data-prompt>{document.prompt.body}</pre>
+      </div>
+      {
+        extra.map((section) => (
+          <section class="extra">
+            <h2>{section.heading}</h2>
+            <div set:html={section.bodyHtml} />
+          </section>
+        ))
+      }
+      <footer>
+        <p>
+          License lives on <a href="https://github.com/caelaxie/crosshands">GitHub</a>. Hosted at
+          {' '}
+          <a href="https://crosshands.caelaxie.com">crosshands.caelaxie.com</a>.
+        </p>
+      </footer>
+    </article>
+    <script>
+      const button = document.querySelector('[data-copy]')
+      const source = document.querySelector('[data-prompt]')
+      if (button instanceof HTMLButtonElement && source instanceof HTMLElement) {
+        const label = button.textContent
+        button.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(source.textContent ?? '')
+          button.textContent = 'Copied'
+          window.setTimeout(() => {
+            button.textContent = label
+          }, 1200)
+        })
+      }
+    </script>
+  </body>
+</html>
