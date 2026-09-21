@@ -78,9 +78,6 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
 
-      - name: Enable pinned pnpm
-        run: corepack enable
-
       - name: Verify runner architecture
         shell: bash
         env:
@@ -89,31 +86,31 @@ jobs:
           test "$(node -p 'process.arch')" = "$EXPECTED_ARCH"
 
       - name: Install frozen dependency graph
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: corepack pnpm lint
+        run: pnpm lint
 
       - name: Typecheck
-        run: corepack pnpm typecheck
+        run: pnpm typecheck
 
       - name: Test
-        run: corepack pnpm test
+        run: pnpm test
 
       - name: Build
-        run: corepack pnpm build
+        run: pnpm build
 
       - name: Native provider tests
-        run: corepack pnpm test:native
+        run: pnpm test:native
 
       - name: Pack and clean-install tests
-        run: corepack pnpm test:pack
+        run: pnpm test:pack
 
       - name: Security and tamper tests
-        run: corepack pnpm test:security
+        run: pnpm test:security
 
       - name: Installed lifecycle tests
-        run: corepack pnpm test:lifecycle
+        run: pnpm test:lifecycle
 
       - name: Prepare evidence directory
         shell: bash

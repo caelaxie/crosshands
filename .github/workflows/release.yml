@@ -179,9 +179,6 @@ jobs:
           node-version: '22'
           cache: pnpm
 
-      - name: Enable pinned pnpm
-        run: corepack enable
-
       - name: Verify runner architecture
         shell: bash
         env:
@@ -218,18 +215,18 @@ jobs:
           security find-identity -v -p codesigning "$keychain" | grep -F "$CROSSHANDS_CODESIGN_IDENTITY"
 
       - name: Install frozen dependency graph
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run Node.js 22 release gates
         shell: bash
         run: |
-          corepack pnpm lint
-          corepack pnpm typecheck
-          corepack pnpm test
-          corepack pnpm build
-          corepack pnpm test:native
-          corepack pnpm test:security
-          corepack pnpm test:lifecycle
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+          pnpm test:native
+          pnpm test:security
+          pnpm test:lifecycle
 
       - name: Build the immutable platform candidate once
         run: node scripts/package/candidate.mjs artifacts
@@ -281,7 +278,7 @@ jobs:
           upload-artifact: false
 
       - name: Validate final package evidence
-        run: corepack pnpm release:validate
+        run: pnpm release:validate
 
       - name: Remove imported signing material
         if: always()
@@ -383,14 +380,14 @@ jobs:
           ref: ${{ inputs.git_ref }}
           fetch-depth: 0
 
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           registry-url: ${{ secrets.NPM_REGISTRY_URL }}
-
-      - name: Enable pinned pnpm
-        run: corepack enable
 
       - name: Download all candidate packages and evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -399,7 +396,7 @@ jobs:
           path: candidate-input
 
       - name: Install release validator
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Bind each runner manifest to the configured release key
         shell: bash
@@ -420,7 +417,7 @@ jobs:
             linux=candidate-input/release-build-linux-x64
 
       - name: Validate aggregate signed-manifest input
-        run: corepack pnpm release:validate
+        run: pnpm release:validate
 
       - name: Verify new or byte-identical immutable package versions
         shell: bash

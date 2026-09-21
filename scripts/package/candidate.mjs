@@ -29,7 +29,7 @@ await Promise.all([
 ])
 try {
   await buildAndTestCurrentNative()
-  await runPackageManager('corepack', ['pnpm', '-r', '--if-present', 'build'], {
+  await runPackageManager('pnpm', ['-r', '--if-present', 'build'], {
     cwd: workspaceRoot
   })
   const packed = await packCurrentCandidate(packageDirectory)

@@ -55,8 +55,8 @@ Rollback intentionally does not require currently passing conformance, agent, or
 ## Running the model gates
 
 ```sh
-corepack pnpm benchmark:agents
-corepack pnpm release:validate
+pnpm benchmark:agents
+pnpm release:validate
 ```
 
 These commands validate definitions and evidence models; they do not impersonate a live agent run. Start the `Reference-agent benchmarks` workflow with an immutable release run ID and signed manifest digest to collect live acceptance evidence.

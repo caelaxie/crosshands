@@ -39,8 +39,8 @@ Calculator and are macOS-specific.
 ## Launch
 
 ```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm build
+pnpm install --frozen-lockfile
+pnpm build
 ```
 
 The CLI entrypoint for every command below is the repo build:

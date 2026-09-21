@@ -28,12 +28,12 @@ function sources() {
 
 describe('cross-platform no-rebuild aggregation', () => {
   it('routes Windows package-manager shims through cmd without a shell string', () => {
-    expect(packageManagerInvocation('corepack', ['pnpm', 'build'], 'win32')).toMatchObject({
-      args: ['/d', '/c', 'call', 'corepack.cmd', 'pnpm', 'build']
+    expect(packageManagerInvocation('pnpm', ['build'], 'win32')).toMatchObject({
+      args: ['/d', '/c', 'call', 'pnpm.cmd', 'build']
     })
-    expect(packageManagerInvocation('corepack', ['pnpm', 'build'], 'linux')).toEqual({
-      command: 'corepack',
-      args: ['pnpm', 'build']
+    expect(packageManagerInvocation('pnpm', ['build'], 'linux')).toEqual({
+      command: 'pnpm',
+      args: ['build']
     })
   })
 

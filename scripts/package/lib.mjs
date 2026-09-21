@@ -219,9 +219,8 @@ export async function inspectPack(archive, descriptor) {
 export async function packOne(descriptor, outputDirectory) {
   await mkdir(outputDirectory, { recursive: true })
   const { stdout } = await runPackageManager(
-    'corepack',
+    'pnpm',
     [
-      'pnpm',
       '--dir',
       join(workspaceRoot, descriptor.directory),
       'pack',
