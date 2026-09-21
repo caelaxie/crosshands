@@ -1,13 +1,9 @@
 import type { Suggestion } from '@crosshands/contract'
 
+import { elapsedMs, type JevHttpStats } from './http.js'
 import type { TreeMove } from './tree.js'
 
-export type JevHttpStats = {
-  status: number
-  durationMs: number
-  requestBytes: number
-  responseBytes: number
-}
+export type { JevHttpStats }
 
 export class JevEvaluateError extends Error {
   readonly http: JevHttpStats
@@ -25,6 +21,10 @@ export type JevAnswers = {
   confidence?: number
   goalMet?: number
   blockedReason?: string
+}
+
+export type EvaluateResult = {
+  answers: JevAnswers
   http?: JevHttpStats
 }
 
@@ -34,7 +34,7 @@ export type EvaluateInput = {
   moves: readonly TreeMove[]
 }
 
-export type EvaluateFn = (input: EvaluateInput) => Promise<JevAnswers>
+export type EvaluateFn = (input: EvaluateInput) => Promise<EvaluateResult>
 
 export const GATE_REFUSE_BELOW = 0.35
 
@@ -97,10 +97,6 @@ type SystemOneAnswer = {
 
 const JEV_MODEL = 'jev-latest'
 
-function elapsedMs(started: number): number {
-  return Math.max(0, Date.now() - started)
-}
-
 function httpStats(
   started: number,
   requestBytes: number,
@@ -112,6 +108,30 @@ function httpStats(
     durationMs: elapsedMs(started),
     requestBytes,
     responseBytes
+  }
+}
+
+function answersOf(raw: Record<string, SystemOneAnswer>): JevAnswers {
+  const move = raw.move?.choice
+  if (
+    move !== 'click' &&
+    move !== 'setValue' &&
+    move !== 'wait' &&
+    move !== 'done' &&
+    move !== 'blocked'
+  ) {
+    return { move: 'blocked', blockedReason: 'no_candidate' }
+  }
+  const clickWhich = raw.click_which?.choice
+  const setValueWhich = raw.setvalue_which?.choice
+  const confidence = raw.move?.confidence ?? raw.click_which?.confidence
+  const goalMet = raw.goal_met?.noul
+  return {
+    move,
+    ...(clickWhich === undefined ? {} : { clickWhich }),
+    ...(setValueWhich === undefined ? {} : { setValueWhich }),
+    ...(confidence === undefined ? {} : { confidence }),
+    ...(goalMet === undefined ? {} : { goalMet })
   }
 }
 
@@ -186,28 +206,6 @@ export function liveEvaluator(apiKey: string): EvaluateFn {
     } catch {
       throw new JevEvaluateError('TypeSafe HTTP response was not JSON', http)
     }
-    const answers = parsed.answers ?? {}
-    const move = answers.move?.choice
-    if (
-      move !== 'click' &&
-      move !== 'setValue' &&
-      move !== 'wait' &&
-      move !== 'done' &&
-      move !== 'blocked'
-    ) {
-      return { move: 'blocked', blockedReason: 'no_candidate', http }
-    }
-    const clickWhich = answers.click_which?.choice
-    const setValueWhich = answers.setvalue_which?.choice
-    const confidence = answers.move?.confidence ?? answers.click_which?.confidence
-    const goalMet = answers.goal_met?.noul
-    return {
-      move,
-      ...(clickWhich === undefined ? {} : { clickWhich }),
-      ...(setValueWhich === undefined ? {} : { setValueWhich }),
-      ...(confidence === undefined ? {} : { confidence }),
-      ...(goalMet === undefined ? {} : { goalMet }),
-      http
-    }
+    return { answers: answersOf(parsed.answers ?? {}), http }
   }
 }

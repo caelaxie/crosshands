@@ -26,19 +26,19 @@ describe('liveEvaluator', () => {
         new Response(payload, { status: 200, headers: { 'content-type': 'application/json' } })
     )
     vi.stubGlobal('fetch', fetchMock)
-    const answers = await liveEvaluator('sk-test')({
+    const result = await liveEvaluator('sk-test')({
       goal: 'Make a new note in Notes.',
       app: 'Notes',
       moves
     })
-    expect(answers).toMatchObject({ move: 'click', clickWhich: '68', confidence: 0.9 })
-    expect(answers.http).toMatchObject({
+    expect(result.answers).toMatchObject({ move: 'click', clickWhich: '68', confidence: 0.9 })
+    expect(result.http).toMatchObject({
       status: 200,
       responseBytes: Buffer.byteLength(payload)
     })
-    expect(answers.http?.requestBytes).toBeGreaterThan(0)
-    expect(answers.http?.durationMs).toBeGreaterThanOrEqual(0)
-    expect(JSON.stringify(answers.http)).not.toContain('Make a new note')
+    expect(result.http?.requestBytes).toBeGreaterThan(0)
+    expect(result.http?.durationMs).toBeGreaterThanOrEqual(0)
+    expect(JSON.stringify(result.http)).not.toContain('Make a new note')
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.typesafe.ai/v1/systemone')
   })
 

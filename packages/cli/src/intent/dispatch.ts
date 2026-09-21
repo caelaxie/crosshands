@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import {
   ComputerError,
   createComputerError,
@@ -24,10 +22,18 @@ import {
   liveEvaluator,
   namedTargetAllowed,
   suggestionFromAnswers,
-  type EvaluateFn,
-  type JevHttpStats
+  type EvaluateFn
 } from './evaluate.js'
-import type { JevLogger } from './log.js'
+import { elapsedMs } from './http.js'
+import {
+  createJevCall,
+  emitCall,
+  recordRank,
+  type JevCall,
+  type JevLogger,
+  type JevRankStats,
+  type RankRecorder
+} from './log.js'
 import { clickableMoves, parseTreeMoves } from './tree.js'
 
 export type IntentBroker = {
@@ -42,19 +48,9 @@ export type DispatchOptions = {
 
 const NAMED_GATE = new Set<ComputerOperationName>(['click', 'setValue'])
 
-type JevPhase = 'observe' | 'bind' | 'named'
-
-type JevCallTrace = {
-  callId: string
-  operation: ComputerOperationName
-  goal?: string
-  phase?: JevPhase
-  ranks: number
-  httpMs: number
-  brokerCalls: number
-  bound?: boolean
-  error?: string
-}
+type RankOutcome =
+  | { ok: true; suggestion: Suggestion; stats: JevRankStats }
+  | { ok: false; stats: JevRankStats }
 
 function policyUnavailable() {
   return createComputerError('policy_unavailable', 'Jev could not rank this snapshot').toJSON()
@@ -108,214 +104,80 @@ function boundIndex(operation: ComputerOperationName, suggestion: Suggestion): n
   return undefined
 }
 
-function elapsedMs(started: number): number {
-  return Math.max(0, Date.now() - started)
-}
-
-function httpOf(cause: unknown): JevHttpStats | undefined {
-  return cause instanceof JevEvaluateError ? cause.http : undefined
-}
-
-function emitJev(log: JevLogger | undefined, record: Record<string, unknown>): void {
-  try {
-    log?.emit(record)
-  } catch {
-    // Jev logs must not fail computer-use.
-  }
-}
-
-function errorCodeOf(cause: unknown): string | undefined {
-  if (cause instanceof ComputerError) return cause.code
-  if (
-    cause !== null &&
-    typeof cause === 'object' &&
-    'code' in cause &&
-    typeof cause.code === 'string'
-  ) {
-    return cause.code
-  }
-  return undefined
-}
-
 function errorFromResult(result: unknown): string | undefined {
-  if (result === null || typeof result !== 'object') return undefined
-  const record = result as Record<string, unknown>
-  const outcome = record.outcome
-  if (outcome !== null && typeof outcome === 'object') {
-    const { state, error } = outcome as { state?: string; error?: { code?: string } }
-    if ((state === 'not_attempted' || state === 'failed') && typeof error?.code === 'string') {
-      return error.code
-    }
+  const mutation = PublicMutationResultSchema.safeParse(result)
+  if (mutation.success) {
+    const outcome = mutation.data.outcome
+    if (outcome.state === 'not_attempted' || outcome.state === 'failed') return outcome.error?.code
+    return undefined
   }
-  if (Array.isArray(record.issues)) {
-    for (const issue of record.issues) {
-      if (
-        issue !== null &&
-        typeof issue === 'object' &&
-        'code' in issue &&
-        issue.code === 'policy_unavailable'
-      ) {
-        return 'policy_unavailable'
-      }
-    }
-  }
-  return undefined
+  const snapshot = PublicSnapshotResultSchema.safeParse(result)
+  if (!snapshot.success) return undefined
+  return snapshot.data.issues.find((issue) => issue.code === 'policy_unavailable')?.code
 }
 
-function emitCall(log: JevLogger | undefined, started: number, trace: JevCallTrace): void {
-  emitJev(log, {
-    kind: 'jev.call',
-    callId: trace.callId,
-    operation: trace.operation,
-    durationMs: elapsedMs(started),
-    httpMs: trace.httpMs,
-    brokerCalls: trace.brokerCalls,
-    ranks: trace.ranks,
-    ...(trace.phase === undefined ? {} : { phase: trace.phase }),
-    ...(trace.bound === undefined ? {} : { bound: trace.bound }),
-    ...(trace.error === undefined ? {} : { error: trace.error }),
-    ...(trace.goal === undefined ? {} : { goal: trace.goal })
-  })
-}
-
-function emitRankLogs(
-  log: JevLogger | undefined,
-  trace: JevCallTrace,
-  input: {
-    goal: string
-    phase: JevPhase
-    app?: string
-    snapshotId: string
-    treeChars: number
-    elementCount: number
-    candidateCount: number
-    parseMs: number
-    evaluateMs?: number
-    http?: JevHttpStats
-    suggestion: Suggestion
-  }
-): void {
-  const {
-    goal,
-    phase,
-    app,
-    snapshotId,
-    treeChars,
-    elementCount,
-    candidateCount,
-    parseMs,
-    evaluateMs,
-    http,
-    suggestion
-  } = input
-  trace.phase = phase
-  trace.ranks += 1
-  if (http !== undefined) trace.httpMs += http.durationMs
-  const shared = {
-    callId: trace.callId,
-    operation: trace.operation,
-    snapshotId,
-    phase,
-    goal
-  }
-  if (http !== undefined) {
-    emitJev(log, {
-      kind: 'jev.http',
-      ...shared,
-      status: http.status,
-      durationMs: http.durationMs,
-      requestBytes: http.requestBytes,
-      responseBytes: http.responseBytes,
-      candidateCount
-    })
-  }
-  emitJev(log, {
-    kind: 'jev.decision',
-    ...shared,
-    snapshotId: suggestion.snapshotId,
-    ...(app === undefined ? {} : { app }),
-    move: suggestion.move.kind,
-    ...(suggestion.move.kind === 'click' ||
-    suggestion.move.kind === 'setValue' ||
-    suggestion.move.kind === 'secondary' ||
-    suggestion.move.kind === 'scroll'
-      ? { elementIndex: suggestion.move.elementIndex }
-      : {}),
-    ...(suggestion.move.kind === 'blocked' ? { reason: suggestion.move.reason } : {}),
-    confidence: suggestion.confidence,
-    goalChars: goal.length,
-    treeChars,
-    elementCount,
-    candidateCount,
-    parseMs,
-    ...(evaluateMs === undefined ? {} : { evaluateMs })
-  })
+function boundFromCall(call: JevCall | undefined, result: unknown): boolean | undefined {
+  if (call?.phase !== 'bind') return undefined
+  const mutation = PublicMutationResultSchema.safeParse(result)
+  return mutation.success && mutation.data.resolvedTarget !== undefined
 }
 
 async function rank(
   look: SnapshotResult,
   goal: string,
   evaluate: EvaluateFn,
-  log: JevLogger | undefined,
-  trace: JevCallTrace,
-  phase: JevPhase,
   app?: string
-): Promise<Suggestion> {
+): Promise<RankOutcome> {
   const snapshotId = look.snapshot.id
-  const treeChars = look.snapshot.treeText.length
-  const elementCount = look.snapshot.elementCount
-  const appId = look.snapshot.app.id
   const parseStarted = Date.now()
   const moves = clickableMoves(parseTreeMoves(look.snapshot.treeText))
-  const parseMs = elapsedMs(parseStarted)
-  const candidateCount = moves.length
-  const stats = {
-    goal,
-    phase,
-    app: appId,
+  const stats: JevRankStats = {
     snapshotId,
-    treeChars,
-    elementCount,
-    candidateCount,
-    parseMs
+    treeChars: look.snapshot.treeText.length,
+    elementCount: look.snapshot.elementCount,
+    candidateCount: moves.length,
+    parseMs: elapsedMs(parseStarted),
+    goalChars: goal.length,
+    app: look.snapshot.app.id
   }
   if (moves.length === 0) {
-    const suggestion = {
-      untrusted: true as const,
-      snapshotId,
-      move: { kind: 'blocked' as const, reason: 'no_candidate' }
+    return {
+      ok: true,
+      suggestion: {
+        untrusted: true,
+        snapshotId,
+        move: { kind: 'blocked', reason: 'no_candidate' }
+      },
+      stats
     }
-    emitRankLogs(log, trace, { ...stats, suggestion })
-    return suggestion
   }
   const evalStarted = Date.now()
   try {
-    const answers = await evaluate({
+    const evaluated = await evaluate({
       goal,
       ...(app === undefined ? {} : { app }),
       moves
     })
-    const suggestion = suggestionFromAnswers(snapshotId, moves, answers)
-    emitRankLogs(log, trace, {
-      ...stats,
-      evaluateMs: elapsedMs(evalStarted),
-      ...(answers.http === undefined ? {} : { http: answers.http }),
-      suggestion
-    })
-    return suggestion
-  } catch (cause) {
-    const http = httpOf(cause)
-    emitRankLogs(log, trace, {
-      ...stats,
-      evaluateMs: elapsedMs(evalStarted),
-      ...(http === undefined ? {} : { http }),
-      suggestion: {
-        untrusted: true,
-        snapshotId,
-        move: { kind: 'blocked', reason: 'http_error' }
+    return {
+      ok: true,
+      suggestion: suggestionFromAnswers(snapshotId, moves, evaluated.answers),
+      stats: {
+        ...stats,
+        evaluateMs: elapsedMs(evalStarted),
+        ...(evaluated.http === undefined ? {} : { http: evaluated.http })
       }
-    })
-    throw cause
+    }
+  } catch (cause) {
+    if (cause instanceof ComputerError) throw cause
+    const http = cause instanceof JevEvaluateError ? cause.http : undefined
+    return {
+      ok: false,
+      stats: {
+        ...stats,
+        evaluateMs: elapsedMs(evalStarted),
+        ...(http === undefined ? {} : { http })
+      }
+    }
   }
 }
 
@@ -337,23 +199,24 @@ async function suggestObserve(
   goal: string | undefined,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
-  log: JevLogger | undefined,
-  trace: JevCallTrace
+  record: RankRecorder
 ): Promise<unknown> {
   const result = await request('getAppState', toBrokerInput('getAppState', input))
   if (goal === undefined || env.kind === 'off') return result
   const look = snapshotResultOf(result)
   if (env.kind === 'fail_closed' || evaluate === undefined) {
-    trace.phase = 'observe'
-    trace.error = 'policy_unavailable'
     return withSnapshotIssue(look, policyUnavailable())
   }
+  const app = 'app' in input && typeof input.app === 'string' ? input.app : undefined
   try {
-    const app = 'app' in input && typeof input.app === 'string' ? input.app : undefined
-    const suggestion = await rank(look, goal, evaluate, log, trace, 'observe', app)
-    return parsePublicOutput('getAppState', { ...look, suggestion })
+    const ranked = await rank(look, goal, evaluate, app)
+    if (!ranked.ok) {
+      record('observe', ranked.stats)
+      return withSnapshotIssue(look, policyUnavailable())
+    }
+    record('observe', ranked.stats, ranked.suggestion)
+    return parsePublicOutput('getAppState', { ...look, suggestion: ranked.suggestion })
   } catch {
-    trace.error = 'policy_unavailable'
     return withSnapshotIssue(look, policyUnavailable())
   }
 }
@@ -365,8 +228,7 @@ async function bindIntentTarget(
   goal: string | undefined,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
-  log: JevLogger | undefined,
-  trace: JevCallTrace
+  record: RankRecorder
 ): Promise<unknown> {
   if (env.kind === 'off') {
     throw createComputerError('invalid_argument', 'intent targeting requires CROSSHANDS_JEV=1')
@@ -379,34 +241,31 @@ async function bindIntentTarget(
     throw createComputerError('invalid_argument', 'intent targeting requires a context token')
   }
   let look: SnapshotResult
-  let suggestion: Suggestion
   try {
     look = await lookAgain(request, token)
-    suggestion = await rank(look, goal, evaluate, log, trace, 'bind')
   } catch (cause) {
     if (cause instanceof ComputerError) throw cause
-    trace.bound = false
-    trace.error = 'policy_unavailable'
     return notAttempted(policyUnavailable())
   }
-  const index = boundIndex(operation, suggestion)
-  if (index === undefined) {
-    trace.bound = false
-    trace.error = 'policy_unavailable'
-    return notAttempted(policyUnavailable(), suggestion)
+  const ranked = await rank(look, goal, evaluate)
+  if (!ranked.ok) {
+    record('bind', ranked.stats)
+    return notAttempted(policyUnavailable())
   }
+  record('bind', ranked.stats, ranked.suggestion)
+  const index = boundIndex(operation, ranked.suggestion)
+  if (index === undefined) return notAttempted(policyUnavailable(), ranked.suggestion)
   const bound = {
     ...splitPublicInput(input).rest,
     contextToken: look.context.token,
     target: { kind: 'element' as const, elementIndex: index }
   }
   const result = await request(operation, toBrokerInput(operation, bound))
-  trace.bound = true
   const body = result !== null && typeof result === 'object' ? result : {}
   return parsePublicOutput(operation, {
     ...body,
     resolvedTarget: { kind: 'element', elementIndex: index },
-    suggestion
+    suggestion: ranked.suggestion
   })
 }
 
@@ -415,33 +274,33 @@ async function gateNamedTarget(
   input: object,
   goal: string,
   evaluate: EvaluateFn,
-  log: JevLogger | undefined,
-  trace: JevCallTrace
+  record: RankRecorder
 ): Promise<unknown | undefined> {
   const named = elementIndexOf(input)
   const token = contextTokenOf(input)
   if (token === undefined || named === undefined) return undefined
   try {
     const look = await lookAgain(request, token)
-    const suggestion = await rank(look, goal, evaluate, log, trace, 'named')
+    const ranked = await rank(look, goal, evaluate)
+    if (!ranked.ok) {
+      record('named', ranked.stats)
+      return notAttempted(policyUnavailable())
+    }
+    record('named', ranked.stats, ranked.suggestion)
     const picked =
-      suggestion.move.kind === 'click' || suggestion.move.kind === 'setValue'
-        ? suggestion.move.elementIndex
+      ranked.suggestion.move.kind === 'click' || ranked.suggestion.move.kind === 'setValue'
+        ? ranked.suggestion.move.elementIndex
         : undefined
-    if (picked !== named || !namedTargetAllowed(suggestion.confidence)) {
-      trace.bound = false
-      trace.error = 'goal_mismatch'
+    if (picked !== named || !namedTargetAllowed(ranked.suggestion.confidence)) {
       return notAttempted(
         createComputerError(
           'goal_mismatch',
           'Named target does not match the per-call goal'
         ).toJSON(),
-        suggestion
+        ranked.suggestion
       )
     }
   } catch {
-    trace.bound = false
-    trace.error = 'policy_unavailable'
     return notAttempted(policyUnavailable())
   }
   return undefined
@@ -457,70 +316,58 @@ export async function dispatchPublicOperation(
   const parsed = parsePublicInput(operation, rawInput)
   const { goal } = splitPublicInput(parsed)
   const evaluate = evaluatorFor(envState, options.evaluate)
-  const started = Date.now()
-  const trace: JevCallTrace = {
-    callId: randomUUID(),
-    operation,
-    ...(goal === undefined ? {} : { goal }),
-    ranks: 0,
-    httpMs: 0,
-    brokerCalls: 0
+  const log = options.log
+  const call = log === undefined ? undefined : createJevCall(operation, goal)
+  const record: RankRecorder = (phase, stats, suggestion) => {
+    recordRank(log, call, phase, stats, suggestion)
   }
   const request: IntentBroker['request'] = async (name, input) => {
-    trace.brokerCalls += 1
+    if (call !== undefined) call.brokerCalls += 1
     return unwrapBrokerResult(await broker.request(name, input))
   }
 
-  try {
-    let result: unknown
+  async function dispatch(): Promise<unknown> {
     if (operation === 'getAppState') {
-      result = await suggestObserve(
+      return suggestObserve(
         request,
         parsed as PublicOperationInput<'getAppState'>,
         goal,
         envState,
         evaluate,
-        options.log,
-        trace
+        record
       )
-    } else if (hasIntentTarget(parsed)) {
-      result = await bindIntentTarget(
-        request,
-        operation,
-        parsed,
-        goal,
-        envState,
-        evaluate,
-        options.log,
-        trace
-      )
-    } else if (
+    }
+    if (hasIntentTarget(parsed)) {
+      return bindIntentTarget(request, operation, parsed, goal, envState, evaluate, record)
+    }
+    if (
       goal !== undefined &&
       envState.kind === 'on' &&
       evaluate !== undefined &&
       NAMED_GATE.has(operation)
     ) {
-      const gated = await gateNamedTarget(request, parsed, goal, evaluate, options.log, trace)
-      if (gated !== undefined) result = gated
-      else {
-        if (trace.phase === 'named') trace.bound = true
-        result = await request(operation, toBrokerInput(operation, parsed))
-      }
-    } else {
-      result = await request(operation, toBrokerInput(operation, parsed))
+      const gated = await gateNamedTarget(request, parsed, goal, evaluate, record)
+      if (gated !== undefined) return gated
     }
-    if (trace.error === undefined) {
-      const fromResult = errorFromResult(result)
-      if (fromResult !== undefined) trace.error = fromResult
+    return request(operation, toBrokerInput(operation, parsed))
+  }
+
+  const started = Date.now()
+  try {
+    const result = await dispatch()
+    if (call !== undefined) {
+      const extra: { error?: string; bound?: boolean } = {}
+      const error = errorFromResult(result)
+      const bound = boundFromCall(call, result)
+      if (error !== undefined) extra.error = error
+      if (bound !== undefined) extra.bound = bound
+      emitCall(log, call, started, extra)
     }
-    emitCall(options.log, started, trace)
     return result
   } catch (cause) {
-    if (trace.error === undefined) {
-      const code = errorCodeOf(cause)
-      if (code !== undefined) trace.error = code
+    if (call !== undefined) {
+      emitCall(log, call, started, cause instanceof ComputerError ? { error: cause.code } : {})
     }
-    emitCall(options.log, started, trace)
     throw cause
   }
 }
