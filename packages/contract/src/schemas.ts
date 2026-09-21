@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SerializedComputerErrorSchema } from './errors.js'
+import { PublicSerializedComputerErrorSchema, SerializedComputerErrorSchema } from './errors.js'
 
 const FiniteNumberSchema = z.number().finite()
 const NonNegativeIntegerSchema = z.number().int().nonnegative()
@@ -110,16 +110,19 @@ export const SnapshotSchema = z
   })
   .strict()
 
-export const MutationOutcomeSchema = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('verified'), evidence: z.unknown().optional() }).strict(),
-  z.object({ state: z.literal('indeterminate'), reason: z.string().optional() }).strict(),
-  z
-    .object({ state: z.literal('failed'), error: SerializedComputerErrorSchema.optional() })
-    .strict(),
-  z
-    .object({ state: z.literal('not_attempted'), error: SerializedComputerErrorSchema.optional() })
-    .strict()
-])
+function mutationOutcomeSchema<T extends z.ZodType>(errorSchema: T) {
+  return z.discriminatedUnion('state', [
+    z.object({ state: z.literal('verified'), evidence: z.unknown().optional() }).strict(),
+    z.object({ state: z.literal('indeterminate'), reason: z.string().optional() }).strict(),
+    z.object({ state: z.literal('failed'), error: errorSchema.optional() }).strict(),
+    z.object({ state: z.literal('not_attempted'), error: errorSchema.optional() }).strict()
+  ])
+}
+
+export const MutationOutcomeSchema = mutationOutcomeSchema(SerializedComputerErrorSchema)
+export const PublicMutationOutcomeSchema = mutationOutcomeSchema(
+  PublicSerializedComputerErrorSchema
+)
 
 export type MutationOutcome = z.infer<typeof MutationOutcomeSchema>
 
@@ -179,9 +182,12 @@ export const ResolvedTargetSchema = z
   })
   .strict()
 
-export const PublicSnapshotResultSchema = SnapshotResultSchema.extend({
-  suggestion: SuggestionSchema.optional()
-})
+export const PublicSnapshotResultSchema = SnapshotResultSchema.omit({ issues: true })
+  .extend({
+    issues: z.array(PublicSerializedComputerErrorSchema).default([]),
+    suggestion: SuggestionSchema.optional()
+  })
+  .strict()
 
 export const MutationResultSchema = z
   .object({
@@ -192,10 +198,14 @@ export const MutationResultSchema = z
 
 export type MutationResult = z.infer<typeof MutationResultSchema>
 
-export const PublicMutationResultSchema = MutationResultSchema.extend({
-  resolvedTarget: ResolvedTargetSchema.optional(),
-  suggestion: SuggestionSchema.optional()
-})
+export const PublicMutationResultSchema = z
+  .object({
+    outcome: PublicMutationOutcomeSchema,
+    freshState: SnapshotResultSchema.optional(),
+    resolvedTarget: ResolvedTargetSchema.optional(),
+    suggestion: SuggestionSchema.optional()
+  })
+  .strict()
 
 const BooleanFlagMapSchema = z.record(z.string(), z.boolean())
 

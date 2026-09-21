@@ -313,6 +313,28 @@ describe('CrossHands JSON CLI', () => {
     ])
   })
 
+  it('unwraps a BrokerResponse envelope before printing JSON', async () => {
+    const inner = {
+      context: { token: 'ctx_' + 'a'.repeat(32) },
+      snapshot: { treeText: '0 window', elementCount: 1 },
+      screenshot: null,
+      issues: []
+    }
+    const state = harness({
+      requestId: 'broker-1',
+      result: inner,
+      desktopEpoch: 0,
+      providerGeneration: 'provider-1'
+    })
+    const code = await runCli(
+      ['computer', 'get-app-state', '--app', 'Notes', '--no-screenshot', '--json'],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(0)
+    expect(JSON.parse(state.stdout.join(''))).toEqual(inner)
+  })
+
   it('rejects intent clicks when Jev is off', async () => {
     const state = harness()
     const code = await runCli(
@@ -529,7 +551,7 @@ describe('CrossHands JSON CLI', () => {
         }
       })
       await expect(client.request('capabilities', {})).resolves.toMatchObject({
-        result: { provider: 'crosshands-fake' }
+        provider: 'crosshands-fake'
       })
       expect(starts).toBe(1)
       expect(provider.calls).toHaveLength(1)

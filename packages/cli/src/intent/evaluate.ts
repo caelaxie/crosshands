@@ -1,5 +1,15 @@
+import type { Suggestion } from '@crosshands/contract'
+
 import type { TreeMove } from './tree.js'
-import type { JevAnswers } from './decide.js'
+
+export type JevAnswers = {
+  move: 'click' | 'setValue' | 'wait' | 'done' | 'blocked'
+  clickWhich?: string
+  setValueWhich?: string
+  confidence?: number
+  goalMet?: number
+  blockedReason?: string
+}
 
 export type EvaluateInput = {
   goal: string
@@ -9,8 +19,50 @@ export type EvaluateInput = {
 
 export type EvaluateFn = (input: EvaluateInput) => Promise<JevAnswers>
 
-export function recordedEvaluator(answers: JevAnswers): EvaluateFn {
-  return async () => answers
+export const GATE_REFUSE_BELOW = 0.35
+
+export function namedTargetAllowed(confidence: number | undefined): boolean {
+  if (confidence === undefined) return true
+  return confidence >= GATE_REFUSE_BELOW
+}
+
+export function suggestionFromAnswers(
+  snapshotId: string,
+  moves: readonly TreeMove[],
+  answers: JevAnswers
+): Suggestion {
+  const byIndex = new Map(moves.map((move) => [String(move.elementIndex), move]))
+  if (answers.move === 'wait') {
+    return { untrusted: true, snapshotId, move: { kind: 'wait' }, confidence: answers.confidence }
+  }
+  if (answers.move === 'done') {
+    return { untrusted: true, snapshotId, move: { kind: 'done' }, confidence: answers.confidence }
+  }
+  if (answers.move === 'blocked') {
+    return {
+      untrusted: true,
+      snapshotId,
+      move: { kind: 'blocked', reason: answers.blockedReason ?? 'blocked' },
+      confidence: answers.confidence
+    }
+  }
+  const raw = answers.move === 'setValue' ? answers.setValueWhich : answers.clickWhich
+  const selected = raw === undefined ? undefined : byIndex.get(raw)
+  if (selected === undefined) {
+    return {
+      untrusted: true,
+      snapshotId,
+      move: { kind: 'blocked', reason: 'no_candidate' },
+      confidence: answers.confidence
+    }
+  }
+  return {
+    untrusted: true,
+    snapshotId,
+    move: { kind: answers.move, elementIndex: selected.elementIndex },
+    confidence: answers.confidence,
+    label: `${selected.role} ${selected.label}`.trim()
+  }
 }
 
 function criteria(moves: readonly TreeMove[]): Record<string, string> {

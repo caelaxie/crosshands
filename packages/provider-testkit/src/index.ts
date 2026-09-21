@@ -103,13 +103,13 @@ export class FakeComputerProvider implements ComputerProvider {
           return {
             requestId: request.requestId,
             dispatched: step.dispatched ?? false,
-            error: createComputerError(step.code, step.message).toJSON()
+            error: createComputerError(step.code, step.message).toBrokerJSON()
           }
         case 'timeout':
           return {
             requestId: request.requestId,
             dispatched: step.dispatched ?? true,
-            error: createComputerError('timeout', 'Fake provider request timed out').toJSON()
+            error: createComputerError('timeout', 'Fake provider request timed out').toBrokerJSON()
           }
         case 'crash':
           this.#closed = true

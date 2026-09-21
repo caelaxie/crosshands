@@ -398,7 +398,7 @@ export class WindowsComputerProvider implements ComputerProvider {
       return {
         requestId: request.requestId,
         dispatched,
-        error: createComputerError(errorCode(message), message).toJSON()
+        error: createComputerError(errorCode(message), message).toBrokerJSON()
       }
     }
     return {

@@ -2,17 +2,17 @@ import { closeSync, fstatSync, fsyncSync, openSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { ensurePrivateDirectory } from '../private-directory.js'
-import type { DiagnosticsSink } from './record.js'
+import type { DiagnosticRecord, DiagnosticsSink } from './record.js'
 
 export const DEFAULT_DIAGNOSTICS_ROTATE_BYTES = 5 * 1024 * 1024
 
-export type JsonlDiagnosticsWriterOptions = {
+export type JsonlFileWriterOptions = {
   directory: string
   generation: string
   maxBytes?: number
 }
 
-export class JsonlDiagnosticsWriter implements DiagnosticsSink {
+export class JsonlFileWriter {
   readonly directory: string
   readonly generation: string
   readonly #maxBytes: number
@@ -22,7 +22,7 @@ export class JsonlDiagnosticsWriter implements DiagnosticsSink {
   #fd: number | undefined
   #bytes = 0
 
-  constructor(options: JsonlDiagnosticsWriterOptions) {
+  constructor(options: JsonlFileWriterOptions) {
     this.directory = options.directory
     this.generation = options.generation
     this.#maxBytes = options.maxBytes ?? DEFAULT_DIAGNOSTICS_ROTATE_BYTES
@@ -34,7 +34,7 @@ export class JsonlDiagnosticsWriter implements DiagnosticsSink {
     this.#started = true
   }
 
-  emit(record: Record<string, unknown> & { kind: string }): void {
+  emit(record: Record<string, unknown>): void {
     if (this.#closed) return
     if (!this.#started) this.start()
     const line = `${JSON.stringify(record)}\n`
@@ -78,5 +78,35 @@ export class JsonlDiagnosticsWriter implements DiagnosticsSink {
   #rotate(): void {
     this.#closeFile()
     this.#part += 1
+  }
+}
+
+export type JsonlDiagnosticsWriterOptions = JsonlFileWriterOptions
+
+export class JsonlDiagnosticsWriter implements DiagnosticsSink {
+  readonly #file: JsonlFileWriter
+
+  constructor(options: JsonlDiagnosticsWriterOptions) {
+    this.#file = new JsonlFileWriter(options)
+  }
+
+  get directory(): string {
+    return this.#file.directory
+  }
+
+  get generation(): string {
+    return this.#file.generation
+  }
+
+  start(): void {
+    this.#file.start()
+  }
+
+  emit(record: DiagnosticRecord): void {
+    this.#file.emit(record)
+  }
+
+  close(): Promise<void> {
+    return this.#file.close()
   }
 }

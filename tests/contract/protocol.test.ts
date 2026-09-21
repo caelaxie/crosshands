@@ -4,6 +4,7 @@ import {
   CONTRACT_VERSIONS,
   ERROR_CATALOG,
   MutationOutcomeSchema,
+  PUBLIC_ERROR_CATALOG,
   ProviderHandshakeSchema,
   createComputerError,
   negotiateVersionHandshake
@@ -27,6 +28,17 @@ describe('outcomes, errors, and protocol negotiation', () => {
         remediation: expect.any(String)
       })
     }
+  })
+
+  it('keeps Jev-only codes on the public catalog', () => {
+    expect(Object.keys(PUBLIC_ERROR_CATALOG).toSorted()).toEqual([
+      'goal_mismatch',
+      'intent_unavailable',
+      'policy_unavailable'
+    ])
+    expect(ERROR_CATALOG).not.toHaveProperty('goal_mismatch')
+    const error = createComputerError('goal_mismatch', 'Named target does not match')
+    expect(error.toJSON()).toMatchObject({ code: 'goal_mismatch', retry: true })
   })
 
   it('accepts the native macOS helper handshake including helper and supports', () => {

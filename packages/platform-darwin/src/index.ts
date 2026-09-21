@@ -418,7 +418,7 @@ export function normalizeScreenshotIssues(value: unknown): JsonObject[] {
     createComputerError(code, message, {
       component: 'screenshots',
       ...(status.metadata === undefined ? {} : { native: status.metadata })
-    }).toJSON()
+    }).toBrokerJSON()
   ]
 }
 
@@ -669,7 +669,7 @@ export class DarwinComputerProvider implements ComputerProvider {
       return {
         requestId: request.requestId,
         dispatched: !notDispatched.has(native.code),
-        error: error.toJSON()
+        error: error.toBrokerJSON()
       }
     }
   }

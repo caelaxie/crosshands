@@ -497,7 +497,7 @@ export class LinuxComputerProvider implements ComputerProvider {
               : 'provider_unavailable',
             handshake.capabilities.readiness.issues.map((issue) => issue.message).join('; ') ||
               `${request.operation} is unavailable in this session`
-          ).toJSON()
+          ).toBrokerJSON()
         }
       }
       const input = record(request.input)
@@ -514,7 +514,7 @@ export class LinuxComputerProvider implements ComputerProvider {
           error: createComputerError(
             'unsupported_capability',
             `Window screenshots are unavailable in ${handshake.capabilities.readiness.sessionType} sessions; retry with captureScreenshot=false`
-          ).toJSON()
+          ).toBrokerJSON()
         }
       }
       if (
@@ -528,7 +528,7 @@ export class LinuxComputerProvider implements ComputerProvider {
           error: createComputerError(
             'unsupported_capability',
             `Coordinate clicking is unavailable in ${handshake.capabilities.readiness.sessionType} sessions`
-          ).toJSON()
+          ).toBrokerJSON()
         }
       }
     }
@@ -552,7 +552,7 @@ export class LinuxComputerProvider implements ComputerProvider {
       return {
         requestId: request.requestId,
         dispatched: frame.dispatched === true,
-        error: normalizeNativeError(frame.error).toJSON()
+        error: normalizeNativeError(frame.error).toBrokerJSON()
       }
     }
     return {

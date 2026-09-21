@@ -736,10 +736,7 @@
                     "interaction_context_expired",
                     "session_unavailable",
                     "screenshot_failed",
-                    "accessibility_error",
-                    "goal_mismatch",
-                    "policy_unavailable",
-                    "intent_unavailable"
+                    "accessibility_error"
                   ]
                 },
                 "message": {
@@ -1227,10 +1224,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -1295,10 +1289,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -1668,10 +1659,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -1972,10 +1960,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -2040,10 +2025,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -2413,10 +2395,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -2878,10 +2857,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -2946,10 +2922,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -3319,10 +3292,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -4082,10 +4052,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -4150,10 +4117,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -4523,10 +4487,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -4684,10 +4645,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -4752,10 +4710,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -5125,10 +5080,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -5287,10 +5239,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -5355,10 +5304,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -5728,10 +5674,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -5895,10 +5838,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -5963,10 +5903,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -6336,10 +6273,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -6497,10 +6431,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -6565,10 +6496,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -6938,10 +6866,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -7241,10 +7166,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -7309,10 +7231,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -7682,10 +7601,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -8084,16 +8000,16 @@
                   }
                 ]
               },
-              "goal": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 512
-              },
               "captureScreenshot": {
                 "type": "boolean"
               },
               "restoreWindow": {
                 "type": "boolean"
+              },
+              "goal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
               }
             },
             "required": [
@@ -8108,16 +8024,16 @@
                 "type": "string",
                 "pattern": "^ctx_[A-Za-z0-9_-]{32,}$"
               },
-              "goal": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 512
-              },
               "captureScreenshot": {
                 "type": "boolean"
               },
               "restoreWindow": {
                 "type": "boolean"
+              },
+              "goal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
               }
             },
             "required": [
@@ -8688,6 +8604,59 @@
             "minLength": 1,
             "maxLength": 512
           },
+          "clickCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "button": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "middle"
+            ]
+          },
+          "modifiers": {
+            "minItems": 1,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Shift",
+                "Ctrl",
+                "Control",
+                "Alt",
+                "Option",
+                "Meta",
+                "Cmd",
+                "Command",
+                "Super",
+                "Win",
+                "CmdOrCtrl",
+                "CommandOrControl",
+                "shift",
+                "ctrl",
+                "control",
+                "alt",
+                "option",
+                "meta",
+                "cmd",
+                "command",
+                "super",
+                "win",
+                "cmdorctrl",
+                "commandorcontrol"
+              ]
+            }
+          },
+          "captureScreenshot": {
+            "type": "boolean"
+          },
+          "restoreWindow": {
+            "type": "boolean"
+          },
           "target": {
             "anyOf": [
               {
@@ -9011,59 +8980,6 @@
                 "additionalProperties": false
               }
             ]
-          },
-          "clickCount": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3
-          },
-          "button": {
-            "type": "string",
-            "enum": [
-              "left",
-              "right",
-              "middle"
-            ]
-          },
-          "modifiers": {
-            "minItems": 1,
-            "maxItems": 4,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "Shift",
-                "Ctrl",
-                "Control",
-                "Alt",
-                "Option",
-                "Meta",
-                "Cmd",
-                "Command",
-                "Super",
-                "Win",
-                "CmdOrCtrl",
-                "CommandOrControl",
-                "shift",
-                "ctrl",
-                "control",
-                "alt",
-                "option",
-                "meta",
-                "cmd",
-                "command",
-                "super",
-                "win",
-                "cmdorctrl",
-                "commandorcontrol"
-              ]
-            }
-          },
-          "captureScreenshot": {
-            "type": "boolean"
-          },
-          "restoreWindow": {
-            "type": "boolean"
           },
           "goal": {
             "type": "string",
@@ -9589,10 +9505,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -9836,6 +9749,17 @@
             "minLength": 1,
             "maxLength": 512
           },
+          "captureScreenshot": {
+            "type": "boolean"
+          },
+          "restoreWindow": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
           "target": {
             "anyOf": [
               {
@@ -10008,17 +9932,6 @@
               }
             ]
           },
-          "captureScreenshot": {
-            "type": "boolean"
-          },
-          "restoreWindow": {
-            "type": "boolean"
-          },
-          "action": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
-          },
           "goal": {
             "type": "string",
             "minLength": 1,
@@ -10027,8 +9940,8 @@
         },
         "required": [
           "contextToken",
-          "target",
-          "action"
+          "action",
+          "target"
         ],
         "additionalProperties": false
       },
@@ -10544,10 +10457,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -10790,6 +10700,26 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right"
+            ]
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "captureScreenshot": {
+            "type": "boolean"
+          },
+          "restoreWindow": {
+            "type": "boolean"
           },
           "target": {
             "anyOf": [
@@ -11115,26 +11045,6 @@
               }
             ]
           },
-          "direction": {
-            "type": "string",
-            "enum": [
-              "up",
-              "down",
-              "left",
-              "right"
-            ]
-          },
-          "pages": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100
-          },
-          "captureScreenshot": {
-            "type": "boolean"
-          },
-          "restoreWindow": {
-            "type": "boolean"
-          },
           "goal": {
             "type": "string",
             "minLength": 1,
@@ -11143,8 +11053,8 @@
         },
         "required": [
           "contextToken",
-          "target",
-          "direction"
+          "direction",
+          "target"
         ],
         "additionalProperties": false
       },
@@ -11660,10 +11570,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -12611,10 +12518,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -12679,10 +12583,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -13052,10 +12953,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -13213,10 +13111,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -13281,10 +13176,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -13654,10 +13546,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -13816,10 +13705,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -13884,10 +13770,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -14257,10 +14140,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -14424,10 +14304,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -14492,10 +14369,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -14865,10 +14739,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -15026,10 +14897,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -15094,10 +14962,7 @@
                           "interaction_context_expired",
                           "session_unavailable",
                           "screenshot_failed",
-                          "accessibility_error",
-                          "goal_mismatch",
-                          "policy_unavailable",
-                          "intent_unavailable"
+                          "accessibility_error"
                         ]
                       },
                       "message": {
@@ -15467,10 +15332,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {
@@ -15525,6 +15387,16 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512
+          },
+          "captureScreenshot": {
+            "type": "boolean"
+          },
+          "restoreWindow": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 1000000
           },
           "target": {
             "anyOf": [
@@ -15698,16 +15570,6 @@
               }
             ]
           },
-          "captureScreenshot": {
-            "type": "boolean"
-          },
-          "restoreWindow": {
-            "type": "boolean"
-          },
-          "value": {
-            "type": "string",
-            "maxLength": 1000000
-          },
           "goal": {
             "type": "string",
             "minLength": 1,
@@ -15716,8 +15578,8 @@
         },
         "required": [
           "contextToken",
-          "target",
-          "value"
+          "value",
+          "target"
         ],
         "additionalProperties": false
       },
@@ -16233,10 +16095,7 @@
                         "interaction_context_expired",
                         "session_unavailable",
                         "screenshot_failed",
-                        "accessibility_error",
-                        "goal_mismatch",
-                        "policy_unavailable",
-                        "intent_unavailable"
+                        "accessibility_error"
                       ]
                     },
                     "message": {

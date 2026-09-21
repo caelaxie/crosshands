@@ -1,15 +1,32 @@
+import { mkdtemp, readdir, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { dispatchPublicOperation } from '../../packages/cli/src/intent/dispatch.js'
-import { recordedEvaluator } from '../../packages/cli/src/intent/evaluate.js'
-import { parseJevEnv, brokerSpawnEnv, hashGoal } from '../../packages/cli/src/intent/env.js'
-import { parseOperationInput, parsePublicInput } from '../../packages/contract/src/index.js'
+import type { EvaluateFn, JevAnswers } from '../../packages/cli/src/intent/evaluate.js'
+import { parseJevEnv } from '../../packages/cli/src/intent/env.js'
+import { createJevLogger, hashGoal } from '../../packages/cli/src/intent/log.js'
+import { brokerSpawnEnv } from '../../packages/cli/src/local-client.js'
+import {
+  ERROR_CATALOG,
+  PUBLIC_ERROR_CATALOG,
+  parseOperationInput,
+  parsePublicInput,
+  toBrokerInput
+} from '../../packages/contract/src/index.js'
 
 const token = `ctx_${'a'.repeat(32)}`
 const treeText = `0 standard window Notes
 	65 button Add Folder
 	68 button New Note
+	77 search text field Title
 `
+
+function recordedEvaluator(answers: JevAnswers): EvaluateFn {
+  return async () => answers
+}
 
 function snapshotResult(text = treeText) {
   return {
@@ -44,12 +61,21 @@ function snapshotResult(text = treeText) {
         minimized: false
       },
       treeText: text,
-      elementCount: 3,
+      elementCount: 4,
       focusedElementRef: null,
       desktopEpoch: 0
     },
     screenshot: null,
     issues: []
+  }
+}
+
+function envelope(result: unknown) {
+  return {
+    requestId: 'broker-1',
+    result,
+    desktopEpoch: 0,
+    providerGeneration: 'provider-1'
   }
 }
 
@@ -96,6 +122,27 @@ describe('public vs broker input', () => {
     expect(() =>
       parsePublicInput('click', { contextToken: token, target: { kind: 'intent' } })
     ).toThrow()
+  })
+
+  it('rejects unbound intent before broker parse', () => {
+    expect(() =>
+      toBrokerInput('click', {
+        contextToken: token,
+        target: { kind: 'intent' },
+        goal: 'Make a new note in Notes.'
+      })
+    ).toThrow(/bound before broker parse/)
+  })
+
+  it('keeps Jev codes off the broker error catalog', () => {
+    expect(ERROR_CATALOG).not.toHaveProperty('goal_mismatch')
+    expect(ERROR_CATALOG).not.toHaveProperty('policy_unavailable')
+    expect(ERROR_CATALOG).not.toHaveProperty('intent_unavailable')
+    expect(PUBLIC_ERROR_CATALOG).toMatchObject({
+      goal_mismatch: { retry: true },
+      policy_unavailable: { retry: true },
+      intent_unavailable: { retry: false }
+    })
   })
 })
 
@@ -162,6 +209,28 @@ describe('dispatchPublicOperation', () => {
     })
   })
 
+  it('unwraps a BrokerResponse envelope before ranking', async () => {
+    const result = await dispatchPublicOperation(
+      {
+        request: async () => envelope(snapshotResult())
+      },
+      'getAppState',
+      { app: 'Notes', goal: 'Make a new note in Notes.', captureScreenshot: false },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({
+          move: 'click',
+          clickWhich: '68',
+          confidence: 0.88
+        })
+      }
+    )
+    expect(result).toMatchObject({
+      suggestion: { move: { kind: 'click', elementIndex: 68 } }
+    })
+    expect(result).not.toHaveProperty('requestId')
+  })
+
   it('fills an intent click from a fresh look', async () => {
     const calls: Array<{ operation: string; input: unknown }> = []
     const result = await dispatchPublicOperation(
@@ -198,6 +267,126 @@ describe('dispatchPublicOperation', () => {
       outcome: { state: 'indeterminate' },
       resolvedTarget: { kind: 'element', elementIndex: 68 }
     })
+  })
+
+  it('fills intent setValue from a setValue suggestion', async () => {
+    const calls: Array<{ operation: string; input: unknown }> = []
+    const result = await dispatchPublicOperation(
+      {
+        request: async (operation, input) => {
+          calls.push({ operation, input })
+          if (operation === 'getAppState') return snapshotResult()
+          return { outcome: { state: 'indeterminate', reason: 'synthetic_input' } }
+        }
+      },
+      'setValue',
+      {
+        contextToken: token,
+        target: { kind: 'intent' },
+        value: 'New note',
+        goal: 'Name the note',
+        captureScreenshot: false
+      },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({
+          move: 'setValue',
+          setValueWhich: '77',
+          confidence: 0.9
+        })
+      }
+    )
+    expect(calls[1]?.input).toMatchObject({
+      target: { kind: 'element', elementIndex: 77 },
+      value: 'New note'
+    })
+    expect(result).toMatchObject({
+      resolvedTarget: { kind: 'element', elementIndex: 77 }
+    })
+  })
+
+  it('does not bind a click suggestion onto setValue intent', async () => {
+    const result = await dispatchPublicOperation(
+      {
+        request: async (operation) => {
+          if (operation === 'getAppState') return snapshotResult()
+          return { outcome: { state: 'verified' } }
+        }
+      },
+      'setValue',
+      {
+        contextToken: token,
+        target: { kind: 'intent' },
+        value: 'New note',
+        goal: 'Name the note'
+      },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({ move: 'click', clickWhich: '68', confidence: 0.9 })
+      }
+    )
+    expect(result).toMatchObject({
+      outcome: { state: 'not_attempted', error: { code: 'policy_unavailable' } }
+    })
+  })
+
+  it('refuses a named click that does not match the ranked target', async () => {
+    const result = await dispatchPublicOperation(
+      {
+        request: async (operation) => {
+          if (operation === 'getAppState') return snapshotResult()
+          return { outcome: { state: 'verified' } }
+        }
+      },
+      'click',
+      {
+        contextToken: token,
+        target: { kind: 'element', elementIndex: 65 },
+        goal: 'Make a new note in Notes.'
+      },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({ move: 'click', clickWhich: '68', confidence: 0.9 })
+      }
+    )
+    expect(result).toMatchObject({
+      outcome: { state: 'not_attempted', error: { code: 'goal_mismatch' } }
+    })
+  })
+
+  it('hashes the goal in the Jev log and omits secrets', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const goal = 'Make a new note in Notes.'
+    await dispatchPublicOperation(
+      { request: async () => snapshotResult() },
+      'getAppState',
+      { app: 'Notes', goal, captureScreenshot: false },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({ move: 'click', clickWhich: '68', confidence: 0.88 }),
+        log
+      }
+    )
+    log.emit({
+      kind: 'jev.http',
+      goal,
+      apiKey: 'sk-test',
+      treeText,
+      text: 'secret-text',
+      value: 'secret-value'
+    })
+    await log.close()
+    const files = await readdir(directory)
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatch(/^jev-[0-9a-f-]+\.jsonl$/)
+    const body = await readFile(join(directory, files[0]!), 'utf8')
+    expect(body).toContain(hashGoal(goal))
+    expect(body).not.toContain(goal)
+    expect(body).not.toContain('sk-test')
+    expect(body).not.toContain('secret-text')
+    expect(body).not.toContain('secret-value')
+    expect(body).not.toContain('button New Note')
   })
 
   it('hashes the goal in the Jev log', () => {

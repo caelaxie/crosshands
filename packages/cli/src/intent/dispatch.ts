@@ -1,22 +1,34 @@
 import {
+  ComputerError,
   createComputerError,
+  hasIntentTarget,
   parsePublicInput,
   parsePublicOutput,
+  PublicMutationResultSchema,
+  PublicSnapshotResultSchema,
+  SnapshotResultSchema,
   splitPublicInput,
   toBrokerInput,
   type ComputerOperationName,
+  type PublicOperationInput,
+  type SnapshotResult,
   type Suggestion
 } from '@crosshands/contract'
 
-import { namedClickAllowed, suggestionFromAnswers, type JevAnswers } from './decide.js'
+import { unwrapBrokerResult } from '../broker-result.js'
+import { parseJevEnv, type JevEnv } from './env.js'
+import {
+  liveEvaluator,
+  namedTargetAllowed,
+  suggestionFromAnswers,
+  type EvaluateFn
+} from './evaluate.js'
+import type { JevLogger } from './log.js'
+import { clickableMoves, parseTreeMoves } from './tree.js'
 
 export type IntentBroker = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
 }
-import { liveEvaluator, type EvaluateFn } from './evaluate.js'
-import { parseJevEnv, type JevEnv } from './env.js'
-import type { JevLogger } from './log.js'
-import { clickableMoves, parseTreeMoves } from './tree.js'
 
 export type DispatchOptions = {
   env?: NodeJS.ProcessEnv
@@ -24,73 +36,80 @@ export type DispatchOptions = {
   log?: JevLogger
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
-  return value as Record<string, unknown>
-}
-
-function snapshotOf(result: unknown): Record<string, unknown> | undefined {
-  return asRecord(asRecord(result)?.snapshot)
-}
-
-function treeTextOf(result: unknown): string {
-  const treeText = snapshotOf(result)?.treeText
-  return typeof treeText === 'string' ? treeText : ''
-}
-
-function snapshotIdOf(result: unknown): string {
-  const id = snapshotOf(result)?.id
-  return typeof id === 'string' ? id : 'unknown'
-}
-
-function contextTokenOf(result: unknown): string | undefined {
-  const token = asRecord(asRecord(result)?.context)?.token
-  return typeof token === 'string' ? token : undefined
-}
+const NAMED_GATE = new Set<ComputerOperationName>(['click', 'setValue'])
 
 function policyUnavailable() {
   return createComputerError('policy_unavailable', 'Jev could not rank this snapshot').toJSON()
 }
 
-function withIssue(result: unknown, issue: ReturnType<typeof policyUnavailable>): unknown {
-  const record = asRecord(result)
-  if (record === undefined) return result
-  const issues = Array.isArray(record.issues) ? [...record.issues, issue] : [issue]
-  return { ...record, issues }
+function snapshotResultOf(value: unknown): SnapshotResult {
+  return SnapshotResultSchema.parse(value)
 }
 
-function withSuggestion(result: unknown, suggestion: Suggestion): unknown {
-  const record = asRecord(result)
-  if (record === undefined) return result
-  return { ...record, suggestion }
+function notAttempted(
+  error: ReturnType<typeof policyUnavailable>,
+  suggestion?: Suggestion
+): unknown {
+  return PublicMutationResultSchema.parse({
+    outcome: { state: 'not_attempted', error },
+    ...(suggestion === undefined ? {} : { suggestion })
+  })
 }
 
-function targetKind(input: unknown): string | undefined {
-  return asRecord(asRecord(input)?.target)?.kind as string | undefined
+function withSnapshotIssue(
+  look: SnapshotResult,
+  issue: ReturnType<typeof policyUnavailable>
+): unknown {
+  return PublicSnapshotResultSchema.parse({
+    ...look,
+    issues: [...look.issues, issue]
+  })
 }
 
-function elementIndexOf(input: unknown): number | undefined {
-  const index = asRecord(asRecord(input)?.target)?.elementIndex
-  return typeof index === 'number' ? index : undefined
+function contextTokenOf(input: object): string | undefined {
+  if (!('contextToken' in input) || typeof input.contextToken !== 'string') return undefined
+  return input.contextToken
+}
+
+function elementIndexOf(input: object): number | undefined {
+  if (!('target' in input)) return undefined
+  const target = input.target
+  if (target === null || typeof target !== 'object' || !('elementIndex' in target)) return undefined
+  return typeof target.elementIndex === 'number' ? target.elementIndex : undefined
+}
+
+function boundIndex(operation: ComputerOperationName, suggestion: Suggestion): number | undefined {
+  const move = suggestion.move
+  if (operation === 'setValue' && move.kind === 'setValue') return move.elementIndex
+  if (
+    (operation === 'click' || operation === 'scroll' || operation === 'performSecondaryAction') &&
+    move.kind === 'click'
+  ) {
+    return move.elementIndex
+  }
+  return undefined
 }
 
 async function rank(
-  result: unknown,
+  look: SnapshotResult,
   goal: string,
   evaluate: EvaluateFn,
   log: JevLogger | undefined,
   app?: string
-): Promise<Suggestion | undefined> {
-  const moves = clickableMoves(parseTreeMoves(treeTextOf(result)))
+): Promise<Suggestion> {
+  const moves = clickableMoves(parseTreeMoves(look.snapshot.treeText))
   if (moves.length === 0) {
     return {
       untrusted: true,
-      snapshotId: snapshotIdOf(result),
+      snapshotId: look.snapshot.id,
       move: { kind: 'blocked', reason: 'no_candidate' }
     }
   }
-  const answers: JevAnswers = await evaluate({ goal, ...(app === undefined ? {} : { app }), moves })
-  const suggestion = suggestionFromAnswers(snapshotIdOf(result), moves, answers)
+  const suggestion = suggestionFromAnswers(
+    look.snapshot.id,
+    moves,
+    await evaluate({ goal, ...(app === undefined ? {} : { app }), moves })
+  )
   log?.emit({
     kind: 'jev.decision',
     snapshotId: suggestion.snapshotId,
@@ -113,6 +132,111 @@ function evaluatorFor(env: JevEnv, override: EvaluateFn | undefined): EvaluateFn
   return liveEvaluator(env.apiKey)
 }
 
+async function lookAgain(request: IntentBroker['request'], token: string): Promise<SnapshotResult> {
+  return snapshotResultOf(
+    await request('getAppState', { contextToken: token, captureScreenshot: false })
+  )
+}
+
+async function suggestObserve(
+  request: IntentBroker['request'],
+  input: PublicOperationInput<'getAppState'>,
+  goal: string | undefined,
+  env: JevEnv,
+  evaluate: EvaluateFn | undefined,
+  log: JevLogger | undefined
+): Promise<unknown> {
+  const result = await request('getAppState', toBrokerInput('getAppState', input))
+  if (goal === undefined || env.kind === 'off') return result
+  const look = snapshotResultOf(result)
+  if (env.kind === 'fail_closed' || evaluate === undefined) {
+    return withSnapshotIssue(look, policyUnavailable())
+  }
+  try {
+    const app = 'app' in input && typeof input.app === 'string' ? input.app : undefined
+    const suggestion = await rank(look, goal, evaluate, log, app)
+    return parsePublicOutput('getAppState', { ...look, suggestion })
+  } catch {
+    return withSnapshotIssue(look, policyUnavailable())
+  }
+}
+
+async function bindIntentTarget(
+  request: IntentBroker['request'],
+  operation: ComputerOperationName,
+  input: object,
+  goal: string | undefined,
+  env: JevEnv,
+  evaluate: EvaluateFn | undefined,
+  log: JevLogger | undefined
+): Promise<unknown> {
+  if (env.kind === 'off') {
+    throw createComputerError('invalid_argument', 'intent targeting requires CROSSHANDS_JEV=1')
+  }
+  if (env.kind === 'fail_closed' || evaluate === undefined || goal === undefined) {
+    throw createComputerError('intent_unavailable', 'Jev is enabled but no TypeSafe key is set')
+  }
+  const token = contextTokenOf(input)
+  if (token === undefined) {
+    throw createComputerError('invalid_argument', 'intent targeting requires a context token')
+  }
+  let look: SnapshotResult
+  let suggestion: Suggestion
+  try {
+    look = await lookAgain(request, token)
+    suggestion = await rank(look, goal, evaluate, log)
+  } catch (cause) {
+    if (cause instanceof ComputerError) throw cause
+    return notAttempted(policyUnavailable())
+  }
+  const index = boundIndex(operation, suggestion)
+  if (index === undefined) return notAttempted(policyUnavailable(), suggestion)
+  const bound = {
+    ...splitPublicInput(input).rest,
+    contextToken: look.context.token,
+    target: { kind: 'element' as const, elementIndex: index }
+  }
+  const result = await request(operation, toBrokerInput(operation, bound))
+  const body = result !== null && typeof result === 'object' ? result : {}
+  return parsePublicOutput(operation, {
+    ...body,
+    resolvedTarget: { kind: 'element', elementIndex: index },
+    suggestion
+  })
+}
+
+async function gateNamedTarget(
+  request: IntentBroker['request'],
+  input: object,
+  goal: string,
+  evaluate: EvaluateFn,
+  log: JevLogger | undefined
+): Promise<unknown | undefined> {
+  const named = elementIndexOf(input)
+  const token = contextTokenOf(input)
+  if (token === undefined || named === undefined) return undefined
+  try {
+    const look = await lookAgain(request, token)
+    const suggestion = await rank(look, goal, evaluate, log)
+    const picked =
+      suggestion.move.kind === 'click' || suggestion.move.kind === 'setValue'
+        ? suggestion.move.elementIndex
+        : undefined
+    if (picked !== named || !namedTargetAllowed(suggestion.confidence)) {
+      return notAttempted(
+        createComputerError(
+          'goal_mismatch',
+          'Named target does not match the per-call goal'
+        ).toJSON(),
+        suggestion
+      )
+    }
+  } catch {
+    return notAttempted(policyUnavailable())
+  }
+  return undefined
+}
+
 export async function dispatchPublicOperation(
   broker: IntentBroker,
   operation: ComputerOperationName,
@@ -121,112 +245,32 @@ export async function dispatchPublicOperation(
 ): Promise<unknown> {
   const envState = parseJevEnv(options.env)
   const parsed = parsePublicInput(operation, rawInput)
-  const { goal, brokerInput } = splitPublicInput(parsed)
+  const { goal } = splitPublicInput(parsed)
   const evaluate = evaluatorFor(envState, options.evaluate)
+  const request: IntentBroker['request'] = async (name, input) =>
+    unwrapBrokerResult(await broker.request(name, input))
 
   if (operation === 'getAppState') {
-    const result = await broker.request(operation, toBrokerInput(operation, parsed))
-    if (goal === undefined || envState.kind === 'off') return result
-    if (envState.kind === 'fail_closed' || evaluate === undefined) {
-      return withIssue(result, policyUnavailable())
-    }
-    try {
-      const suggestion = await rank(
-        result,
-        goal,
-        evaluate,
-        options.log,
-        typeof asRecord(parsed)?.app === 'string' ? (asRecord(parsed)?.app as string) : undefined
-      )
-      if (suggestion === undefined) return result
-      return parsePublicOutput(operation, withSuggestion(result, suggestion))
-    } catch {
-      return withIssue(result, policyUnavailable())
-    }
+    return suggestObserve(
+      request,
+      parsed as PublicOperationInput<'getAppState'>,
+      goal,
+      envState,
+      evaluate,
+      options.log
+    )
   }
-
-  const intent = targetKind(parsed) === 'intent'
-  if (intent) {
-    if (envState.kind === 'off') {
-      throw createComputerError('invalid_argument', 'intent targeting requires CROSSHANDS_JEV=1')
-    }
-    if (envState.kind === 'fail_closed' || evaluate === undefined || goal === undefined) {
-      throw createComputerError('intent_unavailable', 'Jev is enabled but no TypeSafe key is set')
-    }
-    const token = asRecord(parsed)?.contextToken
-    if (typeof token !== 'string') {
-      throw createComputerError('invalid_argument', 'intent targeting requires a context token')
-    }
-    const look = await broker.request('getAppState', {
-      contextToken: token,
-      captureScreenshot: false
-    })
-    const suggestion = await rank(look, goal, evaluate, options.log)
-    if (suggestion === undefined || suggestion.move.kind !== 'click') {
-      return parsePublicOutput(operation, {
-        outcome: { state: 'not_attempted', error: policyUnavailable() },
-        suggestion
-      })
-    }
-    const freshToken = contextTokenOf(look)
-    if (freshToken === undefined) {
-      throw createComputerError('interaction_context_invalid', 'Refreshed snapshot had no token')
-    }
-    const rest = asRecord(brokerInput) ?? {}
-    const { goal: _ignored, ...withoutGoal } = rest
-    const bound = {
-      ...withoutGoal,
-      contextToken: freshToken,
-      target: { kind: 'element', elementIndex: suggestion.move.elementIndex }
-    }
-    const result = await broker.request(operation, toBrokerInput(operation, bound))
-    return parsePublicOutput(operation, {
-      ...asRecord(result),
-      resolvedTarget: { kind: 'element', elementIndex: suggestion.move.elementIndex },
-      suggestion
-    })
+  if (hasIntentTarget(parsed)) {
+    return bindIntentTarget(request, operation, parsed, goal, envState, evaluate, options.log)
   }
-
   if (
     goal !== undefined &&
     envState.kind === 'on' &&
     evaluate !== undefined &&
-    (operation === 'click' || operation === 'setValue')
+    NAMED_GATE.has(operation)
   ) {
-    const named = elementIndexOf(parsed)
-    const token = asRecord(parsed)?.contextToken
-    if (typeof token === 'string' && named !== undefined) {
-      const look = await broker.request('getAppState', {
-        contextToken: token,
-        captureScreenshot: false
-      })
-      try {
-        const suggestion = await rank(look, goal, evaluate, options.log)
-        const picked =
-          suggestion?.move.kind === 'click' || suggestion?.move.kind === 'setValue'
-            ? suggestion.move.elementIndex
-            : undefined
-        if (picked !== named || !namedClickAllowed(suggestion?.confidence)) {
-          return parsePublicOutput(operation, {
-            outcome: {
-              state: 'not_attempted',
-              error: createComputerError(
-                'goal_mismatch',
-                'Named target does not match the per-call goal'
-              ).toJSON()
-            },
-            suggestion
-          })
-        }
-      } catch {
-        return withIssue(
-          { outcome: { state: 'not_attempted', error: policyUnavailable() } },
-          policyUnavailable()
-        )
-      }
-    }
+    const gated = await gateNamedTarget(request, parsed, goal, evaluate, options.log)
+    if (gated !== undefined) return gated
   }
-
-  const result = await broker.request(operation, toBrokerInput(operation, parsed))
-  return result
+  return request(operation, toBrokerInput(operation, parsed))
 }

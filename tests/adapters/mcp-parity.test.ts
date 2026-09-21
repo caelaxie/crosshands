@@ -121,6 +121,17 @@ describe('CrossHands MCP adapter', () => {
     }
   })
 
+  it('unwraps a BrokerResponse envelope before returning structured content', async () => {
+    const inner = { apps: [{ id: 'fixture', name: 'Fixture' }] }
+    const state = broker({
+      requestId: 'broker-1',
+      result: inner,
+      desktopEpoch: 0,
+      providerGeneration: 'provider-1'
+    })
+    await expect(callMcpTool(state.client, 'listApps', {})).resolves.toEqual(inner)
+  })
+
   it('returns structured content plus text JSON fallback through the server', async () => {
     const result = { apps: [{ id: 'fixture', name: 'Fixture' }] }
     const state = broker(result)

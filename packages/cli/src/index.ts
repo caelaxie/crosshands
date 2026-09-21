@@ -5,7 +5,9 @@ import { dirname, resolve } from 'node:path'
 
 import type { ComputerOperationName } from '@crosshands/contract'
 
+import { unwrapBrokerResult } from './broker-result.js'
 import { dispatchPublicOperation } from './intent/dispatch.js'
+import { createCliJevLogger } from './intent/log.js'
 
 export type CliBrokerClient = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
@@ -263,12 +265,6 @@ function contextToken(flags: Flags): string {
   return stringFlag(flags, 'context', true)!
 }
 
-function elementTarget(flags: Flags, name = 'element-index'): unknown {
-  const index = numberFlag(flags, name, { integer: true, min: 0 })
-  if (index === undefined) throw new CliError('invalid_argument', `Missing required --${name}`)
-  return { kind: 'element', elementIndex: index }
-}
-
 function chordTokens(raw: string): string[] {
   return raw.split('+')
 }
@@ -287,10 +283,11 @@ function optionalGoal(flags: Flags): { goal?: string } {
   return goal === undefined ? {} : { goal }
 }
 
-function pointOrElement(flags: Flags): unknown {
+function actionTarget(flags: Flags, options: { coordinates?: boolean } = {}): unknown {
   const element = numberFlag(flags, 'element-index', { integer: true, min: 0 })
-  const x = numberFlag(flags, 'x')
-  const y = numberFlag(flags, 'y')
+  const allowCoordinates = options.coordinates === true
+  const x = allowCoordinates ? numberFlag(flags, 'x') : undefined
+  const y = allowCoordinates ? numberFlag(flags, 'y') : undefined
   const hasCoordinates = x !== undefined || y !== undefined
   if (element !== undefined && hasCoordinates)
     throw new CliError('invalid_argument', 'Choose an element index or coordinates, not both')
@@ -301,7 +298,12 @@ function pointOrElement(flags: Flags): unknown {
     return { kind: 'coordinate', x, y }
   }
   if (stringFlag(flags, 'goal') !== undefined) return { kind: 'intent' }
-  throw new CliError('invalid_argument', 'Choose an element index, coordinates, or --goal')
+  throw new CliError(
+    'invalid_argument',
+    allowCoordinates
+      ? 'Choose an element index, coordinates, or --goal'
+      : 'Missing required --element-index'
+  )
 }
 
 async function protectedText(flags: Flags, name: 'text' | 'value', io: CliIo): Promise<string> {
@@ -358,7 +360,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const modifiers = parseClickModifiers(flags)
       return {
         ...common(),
-        target: pointOrElement(flags),
+        target: actionTarget(flags, { coordinates: true }),
         ...optionalGoal(flags),
         ...(clickCount === undefined ? {} : { clickCount }),
         ...(button === undefined ? {} : { button }),
@@ -368,11 +370,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'perform-secondary-action':
       return {
         ...common(),
-        target:
-          numberFlag(flags, 'element-index', { integer: true, min: 0 }) !== undefined ||
-          stringFlag(flags, 'goal') === undefined
-            ? elementTarget(flags)
-            : { kind: 'intent' },
+        target: actionTarget(flags),
         action: stringFlag(flags, 'action', true),
         ...optionalGoal(flags)
       }
@@ -383,7 +381,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const pages = numberFlag(flags, 'pages', { integer: true, min: 1 })
       return {
         ...common(),
-        target: pointOrElement(flags),
+        target: actionTarget(flags, { coordinates: true }),
         direction,
         ...optionalGoal(flags),
         ...(pages === undefined ? {} : { pages })
@@ -439,11 +437,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'set-value':
       return {
         ...common(),
-        target:
-          numberFlag(flags, 'element-index', { integer: true, min: 0 }) !== undefined ||
-          stringFlag(flags, 'goal') === undefined
-            ? elementTarget(flags)
-            : { kind: 'intent' },
+        target: actionTarget(flags),
         value: await protectedText(flags, 'value', io),
         ...optionalGoal(flags)
       }
@@ -469,19 +463,9 @@ function readiness(capabilities: unknown): string {
 }
 
 async function runDoctor(client: CliBrokerClient): Promise<unknown> {
-  const capabilities = await client.request('capabilities', {})
+  const capabilities = unwrapBrokerResult(await client.request('capabilities', {}))
   const permissions = await client.request('permissions', {})
-  const capabilityResult =
-    capabilities !== null && typeof capabilities === 'object' && 'result' in capabilities
-      ? (capabilities as Record<string, unknown>).result
-      : capabilities
-  return { readiness: readiness(capabilityResult), checks: { capabilities, permissions } }
-}
-
-function publicBrokerResult(value: unknown): unknown {
-  if (value !== null && typeof value === 'object' && 'requestId' in value && 'result' in value)
-    return (value as Record<string, unknown>).result
-  return value
+  return { readiness: readiness(capabilities), checks: { capabilities, permissions } }
 }
 
 function serializedError(cause: unknown): Record<string, unknown> {
@@ -565,6 +549,7 @@ async function exportScreenshot(value: unknown, destination: string): Promise<vo
 
 export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient): Promise<number> {
   let json = false
+  const log = createCliJevLogger()
   try {
     if (argv[0] !== 'computer')
       throw new CliError('invalid_argument', 'Usage: crosshands computer <command> --json')
@@ -577,11 +562,12 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     const brokerResult =
       operation === 'doctor'
         ? await runDoctor(client)
-        : publicBrokerResult(
+        : unwrapBrokerResult(
             await dispatchPublicOperation(
               client,
               operation,
-              await operationInput(command, flags, io)
+              await operationInput(command, flags, io),
+              { env: process.env, ...(log === undefined ? {} : { log }) }
             )
           )
     const result = structuredClone(brokerResult)
@@ -595,11 +581,14 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     if (!json) io.stderr(`${String(error.message)}\n`)
     return EXIT_CODES[String(error.code)] ?? 1
   } finally {
-    await client.close().catch(() => undefined)
+    await Promise.all([client.close().catch(() => undefined), log?.close().catch(() => undefined)])
   }
 }
 
-export { createProductionBrokerClient, localClientPaths } from './local-client.js'
+export { unwrapBrokerResult } from './broker-result.js'
+export { createProductionBrokerClient, localClientPaths, brokerSpawnEnv } from './local-client.js'
 export type { LocalClientPaths, ProductionClientOptions } from './local-client.js'
 export { dispatchPublicOperation } from './intent/dispatch.js'
-export { parseJevEnv, brokerSpawnEnv } from './intent/env.js'
+export { parseJevEnv } from './intent/env.js'
+export { createCliJevLogger, createJevLogger, hashGoal } from './intent/log.js'
+export type { JevLogger } from './intent/log.js'
