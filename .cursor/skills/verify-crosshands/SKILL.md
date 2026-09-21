@@ -87,6 +87,7 @@ unavailable: run only the fail-closed proof (below) and say so in the report.
 ```sh
 RUN_ID=$(date +%Y%m%d-%H%M%S)
 SCRATCH=$(mktemp -d /tmp/crosshands-verify-XXXXXX)
+unset CROSSHANDS_JEV TYPESAFE_API_KEY
 export CROSSHANDS_RUNTIME_DIR="$SCRATCH/runtime"
 export CROSSHANDS_DIAGNOSTICS_DIR="$SCRATCH/diagnostics"
 EVIDENCE=".crosshands/verify/$RUN_ID"   # gitignored; survives cleanup
@@ -96,6 +97,8 @@ mkdir -p "$EVIDENCE"
 Do **not** override `CROSSHANDS_GRAPHICAL_SESSION_ID` or
 `CROSSHANDS_OS_IDENTITY` for the live tier — the broker and helper must run in
 the operator's real session; the runtime dir alone isolates your broker.
+Keep `CROSSHANDS_JEV` and `TYPESAFE_API_KEY` unset except in
+`features/intent-targeting.md`.
 
 The first CLI command auto-spawns the broker (detached `node
 packages/cli/dist/bin.js broker`); it persists until you kill it. Readiness =
@@ -112,7 +115,7 @@ node packages/cli/dist/bin.js computer doctor --json
 
 - Exit 0, `readiness: "ready"` → drive the live tier.
 - `readiness: "capability_reduced"` → drive only operations advertised `true`
-  in `checks.capabilities.result.operations`.
+  in `checks.capabilities.operations`.
 - `readiness: "operator_action_required"` → an OS permission is missing.
   **Stop.** Only the operator grants Accessibility / Screen Recording in
   System Settings. Never click a TCC dialog.
@@ -170,7 +173,8 @@ Everything lands in `$EVIDENCE` (`.crosshands/verify/<run-id>/`, gitignored):
   result JSON;
 - broker diagnostics: `$CROSSHANDS_DIAGNOSTICS_DIR/broker-*.jsonl` records
   every request with operation, timing, target, and outcome — copy the file
-  into `$EVIDENCE` before cleanup;
+  into `$EVIDENCE` before cleanup. With Jev off there is no `jev-*.jsonl`.
+  Copy `jev-*.jsonl` only after `features/intent-targeting.md` turned Jev on;
 - MCP transcript summary from the helper (`mcp-smoke.json`).
 
 Proof standards: exercise the real user path (the CLI/MCP are the product's
@@ -205,7 +209,7 @@ pgrep -fl "packages/platform-darwin/assets/CrossHands Computer Use.app" \
 
 # 4. Scratch state. Never the evidence.
 rm -rf "$SCRATCH"
-unset CROSSHANDS_RUNTIME_DIR CROSSHANDS_DIAGNOSTICS_DIR
+unset CROSSHANDS_RUNTIME_DIR CROSSHANDS_DIAGNOSTICS_DIR CROSSHANDS_JEV TYPESAFE_API_KEY
 ls "$EVIDENCE"   # must still exist
 ```
 
@@ -232,5 +236,6 @@ ls "$EVIDENCE"   # must still exist
 - `keyboard-input.md` — type-text, press-key, hotkey, paste-text, set-value (canonical Calculator proof)
 - `pointer-actions.md` — click, perform-secondary-action, scroll, drag
 - `mcp-adapter.md` — stdio server, catalog parity, protected-input rejection
+- `intent-targeting.md` — `--goal` / intent targets; env-gated, off unless `CROSSHANDS_JEV=1`
 
 Keep the map honest as the app changes; see `/maintain-verification-skill`.

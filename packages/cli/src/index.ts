@@ -5,6 +5,10 @@ import { dirname, resolve } from 'node:path'
 
 import type { ComputerOperationName } from '@crosshands/contract'
 
+import { unwrapBrokerResult } from './broker-result.js'
+import { dispatchPublicOperation } from './intent/dispatch.js'
+import { createCliJevLogger } from './intent/log.js'
+
 export type CliBrokerClient = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
   close(): Promise<void>
@@ -52,8 +56,10 @@ const ALLOWED: Record<string, readonly string[]> = {
   'get-app-state': [
     'json',
     'app',
+    'context',
     'window-id',
     'window-index',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -68,6 +74,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'click-count',
     'mouse-button',
     'modifiers',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -78,6 +85,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'context',
     'element-index',
     'action',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -91,6 +99,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'y',
     'direction',
     'pages',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -146,6 +155,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'element-index',
     'value',
     'value-stdin',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -165,7 +175,10 @@ const EXIT_CODES: Record<string, number> = {
   action_not_supported: 7,
   timeout: 8,
   version_incompatible: 9,
-  session_unavailable: 10
+  session_unavailable: 10,
+  goal_mismatch: 5,
+  policy_unavailable: 5,
+  intent_unavailable: 2
 }
 
 class CliError extends Error {
@@ -252,12 +265,6 @@ function contextToken(flags: Flags): string {
   return stringFlag(flags, 'context', true)!
 }
 
-function elementTarget(flags: Flags, name = 'element-index'): unknown {
-  const index = numberFlag(flags, name, { integer: true, min: 0 })
-  if (index === undefined) throw new CliError('invalid_argument', `Missing required --${name}`)
-  return { kind: 'element', elementIndex: index }
-}
-
 function chordTokens(raw: string): string[] {
   return raw.split('+')
 }
@@ -271,17 +278,32 @@ function parseClickModifiers(flags: Flags): string[] | undefined {
   return modifiers
 }
 
-function pointOrElement(flags: Flags): unknown {
+function optionalGoal(flags: Flags): { goal?: string } {
+  const goal = stringFlag(flags, 'goal')
+  return goal === undefined ? {} : { goal }
+}
+
+function actionTarget(flags: Flags, options: { coordinates?: boolean } = {}): unknown {
   const element = numberFlag(flags, 'element-index', { integer: true, min: 0 })
-  const x = numberFlag(flags, 'x')
-  const y = numberFlag(flags, 'y')
+  const allowCoordinates = options.coordinates === true
+  const x = allowCoordinates ? numberFlag(flags, 'x') : undefined
+  const y = allowCoordinates ? numberFlag(flags, 'y') : undefined
   const hasCoordinates = x !== undefined || y !== undefined
   if (element !== undefined && hasCoordinates)
     throw new CliError('invalid_argument', 'Choose an element index or coordinates, not both')
   if (element !== undefined) return { kind: 'element', elementIndex: element }
-  if (x === undefined || y === undefined)
-    throw new CliError('invalid_argument', 'Coordinates require both --x and --y')
-  return { kind: 'coordinate', x, y }
+  if (hasCoordinates) {
+    if (x === undefined || y === undefined)
+      throw new CliError('invalid_argument', 'Coordinates require both --x and --y')
+    return { kind: 'coordinate', x, y }
+  }
+  if (stringFlag(flags, 'goal') !== undefined) return { kind: 'intent' }
+  throw new CliError(
+    'invalid_argument',
+    allowCoordinates
+      ? 'Choose an element index, coordinates, or --goal'
+      : 'Missing required --element-index'
+  )
 }
 
 async function protectedText(flags: Flags, name: 'text' | 'value', io: CliIo): Promise<string> {
@@ -314,10 +336,19 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'list-windows':
       return { app: stringFlag(flags, 'app', true) }
     case 'get-app-state': {
+      const context = stringFlag(flags, 'context')
       const window = windowSelector(flags)
+      if (context !== undefined) {
+        return {
+          contextToken: context,
+          ...optionalGoal(flags),
+          ...observationFlags(flags)
+        }
+      }
       return {
         app: stringFlag(flags, 'app', true),
         ...(window === undefined ? {} : { window }),
+        ...optionalGoal(flags),
         ...observationFlags(flags)
       }
     }
@@ -329,7 +360,8 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const modifiers = parseClickModifiers(flags)
       return {
         ...common(),
-        target: pointOrElement(flags),
+        target: actionTarget(flags, { coordinates: true }),
+        ...optionalGoal(flags),
         ...(clickCount === undefined ? {} : { clickCount }),
         ...(button === undefined ? {} : { button }),
         ...(modifiers === undefined ? {} : { modifiers })
@@ -338,8 +370,9 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'perform-secondary-action':
       return {
         ...common(),
-        target: elementTarget(flags),
-        action: stringFlag(flags, 'action', true)
+        target: actionTarget(flags),
+        action: stringFlag(flags, 'action', true),
+        ...optionalGoal(flags)
       }
     case 'scroll': {
       const direction = stringFlag(flags, 'direction', true)!
@@ -348,8 +381,9 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       const pages = numberFlag(flags, 'pages', { integer: true, min: 1 })
       return {
         ...common(),
-        target: pointOrElement(flags),
+        target: actionTarget(flags, { coordinates: true }),
         direction,
+        ...optionalGoal(flags),
         ...(pages === undefined ? {} : { pages })
       }
     }
@@ -403,8 +437,9 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'set-value':
       return {
         ...common(),
-        target: elementTarget(flags),
-        value: await protectedText(flags, 'value', io)
+        target: actionTarget(flags),
+        value: await protectedText(flags, 'value', io),
+        ...optionalGoal(flags)
       }
     default:
       throw new CliError('invalid_argument', `Unknown computer command: ${command}`)
@@ -428,19 +463,9 @@ function readiness(capabilities: unknown): string {
 }
 
 async function runDoctor(client: CliBrokerClient): Promise<unknown> {
-  const capabilities = await client.request('capabilities', {})
+  const capabilities = unwrapBrokerResult(await client.request('capabilities', {}))
   const permissions = await client.request('permissions', {})
-  const capabilityResult =
-    capabilities !== null && typeof capabilities === 'object' && 'result' in capabilities
-      ? (capabilities as Record<string, unknown>).result
-      : capabilities
-  return { readiness: readiness(capabilityResult), checks: { capabilities, permissions } }
-}
-
-function publicBrokerResult(value: unknown): unknown {
-  if (value !== null && typeof value === 'object' && 'requestId' in value && 'result' in value)
-    return (value as Record<string, unknown>).result
-  return value
+  return { readiness: readiness(capabilities), checks: { capabilities, permissions } }
 }
 
 function serializedError(cause: unknown): Record<string, unknown> {
@@ -524,6 +549,7 @@ async function exportScreenshot(value: unknown, destination: string): Promise<vo
 
 export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient): Promise<number> {
   let json = false
+  const log = createCliJevLogger()
   try {
     if (argv[0] !== 'computer')
       throw new CliError('invalid_argument', 'Usage: crosshands computer <command> --json')
@@ -536,8 +562,13 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     const brokerResult =
       operation === 'doctor'
         ? await runDoctor(client)
-        : publicBrokerResult(
-            await client.request(operation, await operationInput(command, flags, io))
+        : unwrapBrokerResult(
+            await dispatchPublicOperation(
+              client,
+              operation,
+              await operationInput(command, flags, io),
+              { env: process.env, ...(log === undefined ? {} : { log }) }
+            )
           )
     const result = structuredClone(brokerResult)
     const screenshotOutput = stringFlag(flags, 'screenshot-output')
@@ -550,9 +581,14 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     if (!json) io.stderr(`${String(error.message)}\n`)
     return EXIT_CODES[String(error.code)] ?? 1
   } finally {
-    await client.close().catch(() => undefined)
+    await Promise.all([client.close().catch(() => undefined), log?.close().catch(() => undefined)])
   }
 }
 
-export { createProductionBrokerClient, localClientPaths } from './local-client.js'
+export { unwrapBrokerResult } from './broker-result.js'
+export { createProductionBrokerClient, localClientPaths, brokerSpawnEnv } from './local-client.js'
 export type { LocalClientPaths, ProductionClientOptions } from './local-client.js'
+export { dispatchPublicOperation } from './intent/dispatch.js'
+export { parseJevEnv } from './intent/env.js'
+export { createCliJevLogger, createJevLogger, hashGoal } from './intent/log.js'
+export type { JevLogger } from './intent/log.js'

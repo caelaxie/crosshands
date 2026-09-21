@@ -94,7 +94,7 @@ describe('CrossHands MCP adapter', () => {
       properties?: Record<string, unknown>
     }
     expect(schema.properties).toHaveProperty('modifiers')
-    expect(MCP_TOOL_CATALOG.click.metadata['crosshands.publicContractVersion']).toBe('1.1.0')
+    expect(MCP_TOOL_CATALOG.click.metadata['crosshands.publicContractVersion']).toBe('1.2.0')
     expect(MCP_TOOL_CATALOG).not.toHaveProperty('doctor')
   })
 
@@ -119,6 +119,17 @@ describe('CrossHands MCP adapter', () => {
     } finally {
       await mcp.close()
     }
+  })
+
+  it('unwraps a BrokerResponse envelope before returning structured content', async () => {
+    const inner = { apps: [{ id: 'fixture', name: 'Fixture' }] }
+    const state = broker({
+      requestId: 'broker-1',
+      result: inner,
+      desktopEpoch: 0,
+      providerGeneration: 'provider-1'
+    })
+    await expect(callMcpTool(state.client, 'listApps', {})).resolves.toEqual(inner)
   })
 
   it('returns structured content plus text JSON fallback through the server', async () => {

@@ -1,11 +1,9 @@
-import { COMPUTER_OPERATIONS } from './operations.js'
+import { COMPUTER_OPERATIONS, PUBLIC_OPERATIONS } from './operations.js'
 import { CONTRACT_VERSIONS } from './versions.js'
 
-export const contractJsonSchemas = {
-  $schema: 'https://json-schema.org/draft/2020-12/schema',
-  versions: CONTRACT_VERSIONS,
-  operations: Object.fromEntries(
-    Object.entries(COMPUTER_OPERATIONS).map(([name, operation]) => [
+function schemaCatalog(operations: typeof COMPUTER_OPERATIONS | typeof PUBLIC_OPERATIONS) {
+  return Object.fromEntries(
+    Object.entries(operations).map(([name, operation]) => [
       name,
       {
         mutation: operation.mutation,
@@ -14,4 +12,11 @@ export const contractJsonSchemas = {
       }
     ])
   )
+}
+
+export const contractJsonSchemas = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  versions: CONTRACT_VERSIONS,
+  operations: schemaCatalog(COMPUTER_OPERATIONS),
+  publicOperations: schemaCatalog(PUBLIC_OPERATIONS)
 } as const

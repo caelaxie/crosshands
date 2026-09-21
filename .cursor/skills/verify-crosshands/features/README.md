@@ -13,7 +13,8 @@ feature file as the recipe.
   `CONTRACT_VERSIONS.product`), or the run explicitly targets the fail-closed tier.
 - `CROSSHANDS_RUNTIME_DIR` and `CROSSHANDS_DIAGNOSTICS_DIR` point at a fresh
   scratch dir owned by this run; `EVIDENCE` points at a fresh
-  `.crosshands/verify/<run-id>/`.
+  `.crosshands/verify/<run-id>/`. `CROSSHANDS_JEV` and `TYPESAFE_API_KEY` are
+  unset (SKILL isolation) except while driving `intent-targeting.md`.
 - `node packages/cli/dist/bin.js computer doctor --json` exits 0 and reports
   `readiness: "ready"` (or the run documents the reduced/fail-closed tier).
 - `lsof -U | grep -F "$CROSSHANDS_RUNTIME_DIR"` shows exactly one broker, from
@@ -74,3 +75,6 @@ handles, required state, commands, and observable proof.
   clicks, secondary actions, scroll, and drag.
 - [MCP adapter](./mcp-adapter.md) covers the stdio server, tool catalog
   parity, and protected-input rejection.
+- [Intent targeting](./intent-targeting.md) covers per-call `--goal` / `goal`
+  and `{ kind: "intent" }` targets. Off unless `CROSSHANDS_JEV=1`; skip live
+  ranking when `TYPESAFE_API_KEY` is absent.

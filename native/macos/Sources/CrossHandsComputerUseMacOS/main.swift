@@ -12,7 +12,7 @@ private let helperBundleId = "ai.crosshands.ComputerUse"
 private let providerName = "crosshands-darwin"
 private let providerVersion = "1.0.0"
 private let providerProtocolVersion = 1
-private let publicContractVersion = "1.1.0"
+private let publicContractVersion = "1.2.0"
 private let providerGeneration = "darwin-\(UUID().uuidString.lowercased())"
 private let graphicalSessionId = ProcessInfo.processInfo.environment["CROSSHANDS_GRAPHICAL_SESSION_ID"]
     ?? "aqua-\(getuid())"
