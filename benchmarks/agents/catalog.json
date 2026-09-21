@@ -10,28 +10,31 @@
   "releasePolicySha256": "9a76642ecdc39fdd42713d17fdeb21ff3a68a066e402cfc772ae8031e37a123c",
   "requiredRunsPerAdapter": 5,
   "minimumPassesPerAdapter": 4,
-  "adapters": ["cli-skill", "mcp"],
+  "adapters": [
+    "cli-skill",
+    "mcp"
+  ],
   "agents": [
     {
       "id": "codex",
       "displayName": "Codex",
       "cellId": "codex-macos-arm64",
       "config": "configs/codex-macos.json",
-      "configSha256": "532e7502f56471bddff3fea13e81ac0c4049da53ee6debe054d98e309e5cab74"
+      "configSha256": "5e182575b65cc44bd27a18cd6eeca09eded9efea0acc5b1971803d57b1c5dbbf"
     },
     {
       "id": "opencode",
       "displayName": "OpenCode",
       "cellId": "opencode-windows11-x64",
       "config": "configs/opencode-windows.json",
-      "configSha256": "c3d2a710025f7f27584ba7bcb973b147feab37c6827885a6d82e33439bba98ce"
+      "configSha256": "ac94548710c69a80bd6db4e766c41661d53ebf485b1b256e616edcc0e56a2b9a"
     },
     {
       "id": "omp",
       "displayName": "Oh My Pi",
       "cellId": "omp-ubuntu-xorg-x64",
       "config": "configs/omp-ubuntu.json",
-      "configSha256": "f36a698a6a3f8523862bda61a8968523eff1d4aa16551805e2d091ce8fdbc724"
+      "configSha256": "12cb55305d7f1e2428d833ba3852fcf420c4fe9e5f76b9b7bba4469987d6b270"
     }
   ]
 }
