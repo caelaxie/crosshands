@@ -2,7 +2,7 @@
 
 This repo is CrossHands, a local computer-use runtime for coding agents. Read
 `README.md` for product scope. Drive the desktop with
-`skills/computer-use/SKILL.md`. Compatibility ledgers live in
+`skills/crosshands-computer-use/SKILL.md`. Compatibility ledgers live in
 `docs/compatibility/`. Platform install and permissions live in
 `docs/platforms/`.
 
@@ -21,7 +21,7 @@ This repo is CrossHands, a local computer-use runtime for coding agents. Read
 - One versioned operation contract. CLI and MCP must stay equivalent for the
   same operation, capabilities, errors, and verification meanings.
 - Do not load the computer-use skill from an Orca executable. The shipped
-  skill is `skills/computer-use/SKILL.md`.
+  skill is `skills/crosshands-computer-use/SKILL.md`.
 - Keep `doctor` and secret-safe stdin even when Orca has no equivalent.
 
 ## Safety

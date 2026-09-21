@@ -62,7 +62,7 @@ computer-use primitive.
 | Agent session ownership                        | excluded | Broker-issued interaction context replaces Orca sessions                            |
 | Authenticated session hangup monitor           | excluded | Session-owned helper reaping is Orca product                                        |
 | `computer.permissionsStatus`                   | excluded | App-only Orca path; agents use `permissions` and `doctor`                           |
-| Skill loaded from the Orca executable          | excluded | CrossHands ships `skills/computer-use/SKILL.md`                                     |
+| Skill loaded from the Orca executable          | excluded | CrossHands ships `skills/crosshands-computer-use/SKILL.md`                          |
 
 ## Result and error meanings
 

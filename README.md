@@ -39,7 +39,7 @@ control.
    Do not add a network listener.
 
 5. If this agent uses skills, copy
-   https://raw.githubusercontent.com/caelaxie/crosshands/main/skills/computer-use/SKILL.md
+   https://raw.githubusercontent.com/caelaxie/crosshands/main/skills/crosshands-computer-use/SKILL.md
    into its skills directory.
 
 Confirm doctor readiness and that the MCP server is registered.
