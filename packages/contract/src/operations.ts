@@ -1,10 +1,15 @@
 import { z } from 'zod'
 
+import { createComputerError } from './errors.js'
 import {
   AppInfoSchema,
+  GoalSchema,
+  IntentTargetSchema,
   InteractionContextTokenSchema,
   MutationResultSchema,
   ProviderCapabilitiesSchema,
+  PublicMutationResultSchema,
+  PublicSnapshotResultSchema,
   ScreenshotSchema,
   SnapshotResultSchema,
   TargetReferenceSchema,
@@ -116,13 +121,21 @@ export const COMPUTER_OPERATIONS = {
   },
   getAppState: {
     mutation: false,
-    input: z
-      .object({
-        app: AppQuerySchema,
-        window: WindowSelectorSchema.optional(),
-        ...CaptureOptionsShape
-      })
-      .strict(),
+    input: z.union([
+      z
+        .object({
+          app: AppQuerySchema,
+          window: WindowSelectorSchema.optional(),
+          ...CaptureOptionsShape
+        })
+        .strict(),
+      z
+        .object({
+          contextToken: InteractionContextTokenSchema,
+          ...CaptureOptionsShape
+        })
+        .strict()
+    ]),
     output: SnapshotResultSchema
   },
   click: {
@@ -213,12 +226,137 @@ export const COMPUTER_OPERATIONS = {
 
 export type ComputerOperationName = keyof typeof COMPUTER_OPERATIONS
 
+const PublicGetAppStateInputSchema = z.union([
+  z
+    .object({
+      app: AppQuerySchema,
+      window: WindowSelectorSchema.optional(),
+      goal: GoalSchema.optional(),
+      ...CaptureOptionsShape
+    })
+    .strict(),
+  z
+    .object({
+      contextToken: InteractionContextTokenSchema,
+      goal: GoalSchema.optional(),
+      ...CaptureOptionsShape
+    })
+    .strict()
+])
+
+const PublicActionTargetSchema = z.union([ActionTargetSchema, IntentTargetSchema])
+
+function withOptionalGoal<T extends z.ZodRawShape>(shape: T) {
+  return z.object({ ...shape, goal: GoalSchema.optional() }).strict()
+}
+
+export const PUBLIC_OPERATIONS = {
+  ...COMPUTER_OPERATIONS,
+  getAppState: {
+    mutation: false,
+    input: PublicGetAppStateInputSchema,
+    output: PublicSnapshotResultSchema
+  },
+  click: {
+    mutation: true,
+    input: withOptionalGoal({
+      contextToken: InteractionContextTokenSchema,
+      app: AppQuerySchema.optional(),
+      target: PublicActionTargetSchema,
+      clickCount: z.number().int().min(1).max(3).optional(),
+      button: z.enum(['left', 'right', 'middle']).optional(),
+      modifiers: z.array(ClickModifierTokenSchema).min(1).max(4).optional(),
+      ...CaptureOptionsShape
+    }).superRefine((value, ctx) => {
+      if (value.target.kind === 'intent' && value.goal === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'intent targeting requires goal', path: ['goal'] })
+      }
+    }),
+    output: PublicMutationResultSchema
+  },
+  performSecondaryAction: {
+    mutation: true,
+    input: withOptionalGoal({
+      ...ElementMutationBaseShape,
+      target: z.union([ElementActionTargetSchema, IntentTargetSchema]),
+      action: z.string().min(1).max(256)
+    }).superRefine((value, ctx) => {
+      if (value.target.kind === 'intent' && value.goal === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'intent targeting requires goal', path: ['goal'] })
+      }
+    }),
+    output: PublicMutationResultSchema
+  },
+  scroll: {
+    mutation: true,
+    input: withOptionalGoal({
+      contextToken: InteractionContextTokenSchema,
+      app: AppQuerySchema.optional(),
+      target: PublicActionTargetSchema,
+      direction: z.enum(['up', 'down', 'left', 'right']),
+      pages: z.number().int().min(1).max(100).optional(),
+      ...CaptureOptionsShape
+    }).superRefine((value, ctx) => {
+      if (value.target.kind === 'intent' && value.goal === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'intent targeting requires goal', path: ['goal'] })
+      }
+    }),
+    output: PublicMutationResultSchema
+  },
+  setValue: {
+    mutation: true,
+    input: withOptionalGoal({
+      ...ElementMutationBaseShape,
+      target: z.union([ElementActionTargetSchema, IntentTargetSchema]),
+      value: z.string().max(1_000_000)
+    }).superRefine((value, ctx) => {
+      if (value.target.kind === 'intent' && value.goal === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'intent targeting requires goal', path: ['goal'] })
+      }
+    }),
+    output: PublicMutationResultSchema
+  }
+} as const
+
 export function parseOperationInput(operation: ComputerOperationName, input: unknown): unknown {
   return COMPUTER_OPERATIONS[operation].input.parse(input)
 }
 
 export function parseOperationOutput(operation: ComputerOperationName, output: unknown): unknown {
   return COMPUTER_OPERATIONS[operation].output.parse(output)
+}
+
+export function parsePublicInput(operation: ComputerOperationName, input: unknown): unknown {
+  return PUBLIC_OPERATIONS[operation].input.parse(input)
+}
+
+export function parsePublicOutput(operation: ComputerOperationName, output: unknown): unknown {
+  return PUBLIC_OPERATIONS[operation].output.parse(output)
+}
+
+export function splitPublicInput(input: unknown): { goal?: string; brokerInput: unknown } {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return { brokerInput: input }
+  }
+  const { goal, ...brokerInput } = input as Record<string, unknown>
+  if (typeof goal === 'string' && goal.length > 0) return { goal, brokerInput }
+  return { brokerInput }
+}
+
+export function toBrokerInput(operation: ComputerOperationName, publicInput: unknown): unknown {
+  const { brokerInput } = splitPublicInput(publicInput)
+  if (
+    brokerInput !== null &&
+    typeof brokerInput === 'object' &&
+    'target' in brokerInput &&
+    (brokerInput as { target?: { kind?: string } }).target?.kind === 'intent'
+  ) {
+    throw createComputerError(
+      'invalid_argument',
+      'intent targeting must be bound before broker parse'
+    )
+  }
+  return parseOperationInput(operation, brokerInput)
 }
 
 export const ScreenshotOutputSchema = ScreenshotSchema

@@ -178,6 +178,31 @@ function contextToken(input: unknown): string | undefined {
   return typeof token === 'string' ? token : undefined
 }
 
+function observationApp(input: unknown): string | undefined {
+  if (input === null || typeof input !== 'object') return undefined
+  const app = (input as Record<string, unknown>).app
+  return typeof app === 'string' && app.length > 0 ? app : undefined
+}
+
+function bindGetAppStateInput(
+  input: unknown,
+  resolve: (token: string) => InteractionContext
+): unknown {
+  if (input === null || typeof input !== 'object') return input
+  const record = input as Record<string, unknown>
+  const token = contextToken(record)
+  if (token === undefined || observationApp(record) !== undefined) return input
+  const context = resolve(token)
+  return {
+    app: context.appId,
+    window: { id: context.window.id },
+    ...(typeof record.captureScreenshot === 'boolean'
+      ? { captureScreenshot: record.captureScreenshot }
+      : {}),
+    ...(typeof record.restoreWindow === 'boolean' ? { restoreWindow: record.restoreWindow } : {})
+  }
+}
+
 function computerError(cause: unknown): { code?: string; message: string; toJSON?: () => unknown } {
   if (cause instanceof Error) return cause
   return { message: 'Unknown provider failure' }
@@ -344,9 +369,13 @@ export class LocalBroker {
     let dispatched: boolean | undefined
     let result: unknown
     let cause: unknown
-    assertedInputApp(request.input)
+    let input = request.input
+    if (request.operation === 'getAppState') {
+      input = bindGetAppStateInput(input, (token) => this.#contexts.resolve(token))
+    }
+    assertedInputApp(input)
     let context: InteractionContext | undefined
-    let inspectionInput = request.input
+    let inspectionInput = input
     try {
       if (mutation) {
         const token = contextToken(request.input)
@@ -370,7 +399,7 @@ export class LocalBroker {
         bindings = inspection.bindings
       }
 
-      let providerInput = request.input
+      let providerInput = input
       if (mutation) {
         if (inspection === undefined || inspection === null) {
           throw createComputerError('stale_target', 'Target identity could not be re-resolved')

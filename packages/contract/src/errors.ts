@@ -23,7 +23,10 @@ export const ERROR_CATALOG = {
   interaction_context_expired: { retry: true, remediation: 'refresh_state' },
   session_unavailable: { retry: true, remediation: 'unlock_graphical_session' },
   screenshot_failed: { retry: true, remediation: 'check_screenshot_permission' },
-  accessibility_error: { retry: true, remediation: 'check_accessibility_permission' }
+  accessibility_error: { retry: true, remediation: 'check_accessibility_permission' },
+  goal_mismatch: { retry: true, remediation: 'refresh_state' },
+  policy_unavailable: { retry: true, remediation: 'refresh_state' },
+  intent_unavailable: { retry: false, remediation: 'correct_request' }
 } as const
 
 export type ComputerErrorCode = keyof typeof ERROR_CATALOG

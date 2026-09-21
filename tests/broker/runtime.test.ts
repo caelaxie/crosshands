@@ -170,6 +170,35 @@ describe('local broker', () => {
     expect(provider.calls).toHaveLength(3)
   })
 
+  it('rewrites getAppState context tokens to the bound app and window', async () => {
+    const current = bindings()
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'result',
+      result: observedState(current, 'refreshed'),
+      dispatched: false
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-1',
+      providerFactory: () => provider
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const context = broker.issueContext(current)
+    const refreshed = await client.request({
+      operation: 'getAppState',
+      input: { contextToken: context.token, captureScreenshot: false }
+    })
+    expect(provider.calls[0]?.input).toEqual({
+      app: 'fixture.app',
+      window: { id: 'window-1' },
+      captureScreenshot: false
+    })
+    expect(refreshed.result).toMatchObject({ snapshot: { treeText: 'refreshed' } })
+  })
+
   it('binds context-window shorthand before provider identity inspection', async () => {
     const current = bindings()
     const provider = new FakeComputerProvider({

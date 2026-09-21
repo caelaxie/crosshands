@@ -5,6 +5,8 @@ import { dirname, resolve } from 'node:path'
 
 import type { ComputerOperationName } from '@crosshands/contract'
 
+import { dispatchPublicOperation } from './intent/dispatch.js'
+
 export type CliBrokerClient = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
   close(): Promise<void>
@@ -52,8 +54,10 @@ const ALLOWED: Record<string, readonly string[]> = {
   'get-app-state': [
     'json',
     'app',
+    'context',
     'window-id',
     'window-index',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -68,6 +72,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'click-count',
     'mouse-button',
     'modifiers',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -78,6 +83,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'context',
     'element-index',
     'action',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -91,6 +97,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'y',
     'direction',
     'pages',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -146,6 +153,7 @@ const ALLOWED: Record<string, readonly string[]> = {
     'element-index',
     'value',
     'value-stdin',
+    'goal',
     'no-screenshot',
     'restore-window',
     'screenshot-output'
@@ -165,7 +173,10 @@ const EXIT_CODES: Record<string, number> = {
   action_not_supported: 7,
   timeout: 8,
   version_incompatible: 9,
-  session_unavailable: 10
+  session_unavailable: 10,
+  goal_mismatch: 5,
+  policy_unavailable: 5,
+  intent_unavailable: 2
 }
 
 class CliError extends Error {
@@ -271,6 +282,11 @@ function parseClickModifiers(flags: Flags): string[] | undefined {
   return modifiers
 }
 
+function optionalGoal(flags: Flags): { goal?: string } {
+  const goal = stringFlag(flags, 'goal')
+  return goal === undefined ? {} : { goal }
+}
+
 function pointOrElement(flags: Flags): unknown {
   const element = numberFlag(flags, 'element-index', { integer: true, min: 0 })
   const x = numberFlag(flags, 'x')
@@ -279,9 +295,13 @@ function pointOrElement(flags: Flags): unknown {
   if (element !== undefined && hasCoordinates)
     throw new CliError('invalid_argument', 'Choose an element index or coordinates, not both')
   if (element !== undefined) return { kind: 'element', elementIndex: element }
-  if (x === undefined || y === undefined)
-    throw new CliError('invalid_argument', 'Coordinates require both --x and --y')
-  return { kind: 'coordinate', x, y }
+  if (hasCoordinates) {
+    if (x === undefined || y === undefined)
+      throw new CliError('invalid_argument', 'Coordinates require both --x and --y')
+    return { kind: 'coordinate', x, y }
+  }
+  if (stringFlag(flags, 'goal') !== undefined) return { kind: 'intent' }
+  throw new CliError('invalid_argument', 'Choose an element index, coordinates, or --goal')
 }
 
 async function protectedText(flags: Flags, name: 'text' | 'value', io: CliIo): Promise<string> {
@@ -314,10 +334,19 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'list-windows':
       return { app: stringFlag(flags, 'app', true) }
     case 'get-app-state': {
+      const context = stringFlag(flags, 'context')
       const window = windowSelector(flags)
+      if (context !== undefined) {
+        return {
+          contextToken: context,
+          ...optionalGoal(flags),
+          ...observationFlags(flags)
+        }
+      }
       return {
         app: stringFlag(flags, 'app', true),
         ...(window === undefined ? {} : { window }),
+        ...optionalGoal(flags),
         ...observationFlags(flags)
       }
     }
@@ -330,6 +359,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       return {
         ...common(),
         target: pointOrElement(flags),
+        ...optionalGoal(flags),
         ...(clickCount === undefined ? {} : { clickCount }),
         ...(button === undefined ? {} : { button }),
         ...(modifiers === undefined ? {} : { modifiers })
@@ -338,8 +368,13 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'perform-secondary-action':
       return {
         ...common(),
-        target: elementTarget(flags),
-        action: stringFlag(flags, 'action', true)
+        target:
+          numberFlag(flags, 'element-index', { integer: true, min: 0 }) !== undefined ||
+          stringFlag(flags, 'goal') === undefined
+            ? elementTarget(flags)
+            : { kind: 'intent' },
+        action: stringFlag(flags, 'action', true),
+        ...optionalGoal(flags)
       }
     case 'scroll': {
       const direction = stringFlag(flags, 'direction', true)!
@@ -350,6 +385,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
         ...common(),
         target: pointOrElement(flags),
         direction,
+        ...optionalGoal(flags),
         ...(pages === undefined ? {} : { pages })
       }
     }
@@ -403,8 +439,13 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
     case 'set-value':
       return {
         ...common(),
-        target: elementTarget(flags),
-        value: await protectedText(flags, 'value', io)
+        target:
+          numberFlag(flags, 'element-index', { integer: true, min: 0 }) !== undefined ||
+          stringFlag(flags, 'goal') === undefined
+            ? elementTarget(flags)
+            : { kind: 'intent' },
+        value: await protectedText(flags, 'value', io),
+        ...optionalGoal(flags)
       }
     default:
       throw new CliError('invalid_argument', `Unknown computer command: ${command}`)
@@ -537,7 +578,11 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
       operation === 'doctor'
         ? await runDoctor(client)
         : publicBrokerResult(
-            await client.request(operation, await operationInput(command, flags, io))
+            await dispatchPublicOperation(
+              client,
+              operation,
+              await operationInput(command, flags, io)
+            )
           )
     const result = structuredClone(brokerResult)
     const screenshotOutput = stringFlag(flags, 'screenshot-output')
@@ -556,3 +601,5 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
 
 export { createProductionBrokerClient, localClientPaths } from './local-client.js'
 export type { LocalClientPaths, ProductionClientOptions } from './local-client.js'
+export { dispatchPublicOperation } from './intent/dispatch.js'
+export { parseJevEnv, brokerSpawnEnv } from './intent/env.js'

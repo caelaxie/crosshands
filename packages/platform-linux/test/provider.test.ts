@@ -143,7 +143,7 @@ describe('Linux provider boundary', () => {
       try {
         const handshake = await provider.start()
         expect(handshake.provider).toBe('crosshands-computer-use-linux')
-        expect(handshake.publicContract).toBe('1.1.0')
+        expect(handshake.publicContract).toBe('1.2.0')
         expect(handshake.capabilities.operations.capabilities).toBe(true)
         expect(handshake.capabilities.operations.getAppState).toBe(false)
         const response = await provider.dispatch({

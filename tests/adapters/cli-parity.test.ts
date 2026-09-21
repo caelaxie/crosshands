@@ -255,6 +255,83 @@ describe('CrossHands JSON CLI', () => {
     expect(state.calls).toEqual([])
   })
 
+  it('strips per-call goal before the broker when Jev is off', async () => {
+    const state = harness({
+      context: { token: 'ctx_' + 'a'.repeat(32) },
+      snapshot: { treeText: '0 window', elementCount: 1 },
+      screenshot: null,
+      issues: []
+    })
+    const code = await runCli(
+      [
+        'computer',
+        'get-app-state',
+        '--app',
+        'Notes',
+        '--no-screenshot',
+        '--goal',
+        'Make a new note in Notes.',
+        '--json'
+      ],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(0)
+    expect(state.calls).toEqual([
+      {
+        operation: 'getAppState',
+        input: { app: 'Notes', captureScreenshot: false }
+      }
+    ])
+  })
+
+  it('sends get-app-state context tokens without an app name', async () => {
+    const state = harness({
+      context: { token: 'ctx_' + 'b'.repeat(32) },
+      snapshot: { treeText: '0 window', elementCount: 1 },
+      screenshot: null,
+      issues: []
+    })
+    const code = await runCli(
+      [
+        'computer',
+        'get-app-state',
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--no-screenshot',
+        '--json'
+      ],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(0)
+    expect(state.calls).toEqual([
+      {
+        operation: 'getAppState',
+        input: { contextToken: 'ctx_' + 'a'.repeat(32), captureScreenshot: false }
+      }
+    ])
+  })
+
+  it('rejects intent clicks when Jev is off', async () => {
+    const state = harness()
+    const code = await runCli(
+      [
+        'computer',
+        'click',
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--goal',
+        'Make a new note in Notes.',
+        '--json'
+      ],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(2)
+    expect(state.calls).toEqual([])
+  })
+
   it('reads protected text only from stdin and never renders the canary', async () => {
     const canary = 'crosshands-secret-canary'
     const state = harness({ outcome: { state: 'verified' } })

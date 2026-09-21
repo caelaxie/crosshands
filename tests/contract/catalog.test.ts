@@ -50,6 +50,10 @@ describe('computer operation catalog', () => {
     expect(() => parseOperationInput(operation as ComputerOperationName, input)).not.toThrow()
   })
 
+  it('accepts getAppState bound to a context token', () => {
+    expect(() => parseOperationInput('getAppState', { contextToken })).not.toThrow()
+  })
+
   it('rejects unknown, contradictory, and out-of-range fields', () => {
     expect(() => parseOperationInput('capabilities', { surprise: true })).toThrow()
     expect(() =>

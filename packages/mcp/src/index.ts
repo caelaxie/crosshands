@@ -6,12 +6,13 @@ import { z } from 'zod'
 import {
   COMPUTER_OPERATIONS,
   CONTRACT_VERSIONS,
+  PUBLIC_OPERATIONS,
   contractJsonSchemas,
-  parseOperationInput,
   type ComputerOperationName
 } from '@crosshands/contract'
 import {
   createProductionBrokerClient,
+  dispatchPublicOperation,
   type CliBrokerClient,
   type ProductionClientOptions
 } from '@crosshands/cli'
@@ -23,13 +24,6 @@ const PROTECTED_INPUT_OPERATIONS = new Set<ComputerOperationName>([
   'pasteText',
   'setValue'
 ])
-const ProtectedInputSchema = z
-  .boolean()
-  .optional()
-  .describe(
-    'MCP literal text and value arguments are not secret-safe. Set true only to receive a rejection with CLI stdin remediation; protected input is never dispatched through MCP.'
-  )
-
 export type { CliBrokerClient }
 
 export type McpToolDefinition = {
@@ -89,7 +83,7 @@ function description(name: ComputerOperationName, mutation: boolean): string {
 }
 
 function inputJsonSchema(name: ComputerOperationName): Record<string, unknown> {
-  const schema = structuredClone(contractJsonSchemas.operations[name]!.input) as Record<
+  const schema = structuredClone(contractJsonSchemas.publicOperations[name]!.input) as Record<
     string,
     unknown
   >
@@ -144,11 +138,11 @@ export const MCP_TOOL_CATALOG = Object.fromEntries(
 ) as Record<ComputerOperationName, McpToolDefinition>
 
 function runtimeInputSchema(name: ComputerOperationName): z.ZodType<Record<string, unknown>> {
-  const schema = COMPUTER_OPERATIONS[name].input
+  const schema = PUBLIC_OPERATIONS[name].input
   if (!PROTECTED_INPUT_OPERATIONS.has(name)) {
     return schema as z.ZodType<Record<string, unknown>>
   }
-  return schema.safeExtend({ protectedInput: ProtectedInputSchema }).strict() as z.ZodType<
+  return z.object({ protectedInput: z.boolean().optional() }).passthrough() as z.ZodType<
     Record<string, unknown>
   >
 }
@@ -190,8 +184,7 @@ export async function callMcpTool(
     }
   }
   try {
-    const parsed = parseOperationInput(operation, input)
-    return publicBrokerResult(await client.request(operation, parsed))
+    return publicBrokerResult(await dispatchPublicOperation(client, operation, input))
   } catch (cause) {
     if (cause instanceof z.ZodError) throw invalidInputError()
     throw cause

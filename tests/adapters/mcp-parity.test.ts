@@ -94,7 +94,7 @@ describe('CrossHands MCP adapter', () => {
       properties?: Record<string, unknown>
     }
     expect(schema.properties).toHaveProperty('modifiers')
-    expect(MCP_TOOL_CATALOG.click.metadata['crosshands.publicContractVersion']).toBe('1.1.0')
+    expect(MCP_TOOL_CATALOG.click.metadata['crosshands.publicContractVersion']).toBe('1.2.0')
     expect(MCP_TOOL_CATALOG).not.toHaveProperty('doctor')
   })
 

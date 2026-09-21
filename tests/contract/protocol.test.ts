@@ -73,7 +73,7 @@ describe('outcomes, errors, and protocol negotiation', () => {
   })
 
   it('rejects a previous public contract after the modifiers schema bump', () => {
-    expect(CONTRACT_VERSIONS.publicContract).toBe('1.1.0')
+    expect(CONTRACT_VERSIONS.publicContract).toBe('1.2.0')
     expect(
       negotiateVersionHandshake({
         ...CONTRACT_VERSIONS,

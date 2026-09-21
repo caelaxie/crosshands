@@ -12,6 +12,7 @@ import {
   type LocalControlIdentity
 } from '@crosshands/runtime'
 
+import { brokerSpawnEnv } from './intent/env.js'
 import type { CliBrokerClient } from './index.js'
 
 export type LocalClientPaths = {
@@ -116,7 +117,7 @@ function defaultSpawnBroker(entrypoint: string): void {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
-    env: process.env
+    env: brokerSpawnEnv(process.env)
   })
   child.unref()
 }

@@ -2,7 +2,7 @@ import { closeSync, fstatSync, fsyncSync, openSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { ensurePrivateDirectory } from '../private-directory.js'
-import type { DiagnosticRecord, DiagnosticsSink } from './record.js'
+import type { DiagnosticsSink } from './record.js'
 
 export const DEFAULT_DIAGNOSTICS_ROTATE_BYTES = 5 * 1024 * 1024
 
@@ -34,7 +34,7 @@ export class JsonlDiagnosticsWriter implements DiagnosticsSink {
     this.#started = true
   }
 
-  emit(record: DiagnosticRecord): void {
+  emit(record: Record<string, unknown> & { kind: string }): void {
     if (this.#closed) return
     if (!this.#started) this.start()
     const line = `${JSON.stringify(record)}\n`

@@ -104,7 +104,7 @@ export type DiagnosticRecord =
     })
 
 export type DiagnosticsSink = {
-  emit(record: DiagnosticRecord): void
+  emit(record: Record<string, unknown> & { kind: string }): void
   close(): Promise<void>
 }
 
