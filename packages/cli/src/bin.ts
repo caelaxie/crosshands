@@ -3,9 +3,7 @@
 import { stdin, stderr, stdout } from 'node:process'
 import { StringDecoder } from 'node:string_decoder'
 
-import { runBrokerHost } from './broker-host.js'
-import { runCli, type CliIo } from './index.js'
-import { createProductionBrokerClient } from './local-client.js'
+import type { CliIo } from './index.js'
 
 async function readStdin(): Promise<string> {
   const decoder = new StringDecoder('utf8')
@@ -25,9 +23,12 @@ async function readStdin(): Promise<string> {
 async function main(): Promise<number> {
   const argv = process.argv.slice(2)
   if (argv[0] === 'broker') {
+    const { runBrokerHost } = await import('./broker-host.js')
     await runBrokerHost()
     return 0
   }
+  const { runCli } = await import('./index.js')
+  const { createProductionBrokerClient } = await import('./local-client.js')
   const io: CliIo = {
     stdin: readStdin,
     stdout: (value) => stdout.write(value),

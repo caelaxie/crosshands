@@ -27,10 +27,10 @@ Preconditions:
   run on a version with no published payload).
 
 - **Doctor ready.** Run `$CH doctor --json`. Exit code `0`; stdout has
-  `readiness: "ready"`; `checks.capabilities.result.platform` is `"darwin"`;
-  `checks.capabilities.result.operations` lists all 14 operations `true`;
-  `checks.permissions.result.permissions` shows `accessibility` and
-  `screenshots` as `granted` or `not_required`.
+  `readiness: "ready"`; `checks.capabilities.platform` is `"darwin"`;
+  `checks.capabilities.operations` lists all 14 operations `true`;
+  `checks.permissions.permissions` shows `accessibility` and `screenshots`
+  as `granted` or `not_required`. Doctor has no Jev section.
 - **Capabilities.** Run `$CH capabilities --json`. Exit code `0`; the result
   names the provider (`crosshands-darwin`), its version, and the `supports`
   matrix (apps, windows, surfaces, observation, actions).

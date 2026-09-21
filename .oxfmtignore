@@ -6,3 +6,4 @@ website/.astro/
 pnpm-lock.yaml
 packages/contract/schemas/contract.json
 benchmarks/agents/catalog.json
+jev-crosshands-*.html

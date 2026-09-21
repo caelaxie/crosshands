@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { SerializedComputerErrorSchema } from './errors.js'
+import { PublicSerializedComputerErrorSchema, SerializedComputerErrorSchema } from './errors.js'
 
 const FiniteNumberSchema = z.number().finite()
 const NonNegativeIntegerSchema = z.number().int().nonnegative()
@@ -110,16 +110,19 @@ export const SnapshotSchema = z
   })
   .strict()
 
-export const MutationOutcomeSchema = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('verified'), evidence: z.unknown().optional() }).strict(),
-  z.object({ state: z.literal('indeterminate'), reason: z.string().optional() }).strict(),
-  z
-    .object({ state: z.literal('failed'), error: SerializedComputerErrorSchema.optional() })
-    .strict(),
-  z
-    .object({ state: z.literal('not_attempted'), error: SerializedComputerErrorSchema.optional() })
-    .strict()
-])
+function mutationOutcomeSchema<T extends z.ZodType>(errorSchema: T) {
+  return z.discriminatedUnion('state', [
+    z.object({ state: z.literal('verified'), evidence: z.unknown().optional() }).strict(),
+    z.object({ state: z.literal('indeterminate'), reason: z.string().optional() }).strict(),
+    z.object({ state: z.literal('failed'), error: errorSchema.optional() }).strict(),
+    z.object({ state: z.literal('not_attempted'), error: errorSchema.optional() }).strict()
+  ])
+}
+
+export const MutationOutcomeSchema = mutationOutcomeSchema(SerializedComputerErrorSchema)
+export const PublicMutationOutcomeSchema = mutationOutcomeSchema(
+  PublicSerializedComputerErrorSchema
+)
 
 export type MutationOutcome = z.infer<typeof MutationOutcomeSchema>
 
@@ -134,6 +137,58 @@ export const SnapshotResultSchema = z
 
 export type SnapshotResult = z.infer<typeof SnapshotResultSchema>
 
+export const GoalSchema = z.string().trim().min(1).max(512)
+
+export const IntentTargetSchema = z.object({ kind: z.literal('intent') }).strict()
+
+export const SuggestionMoveSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('click'), elementIndex: NonNegativeIntegerSchema }).strict(),
+  z.object({ kind: z.literal('setValue'), elementIndex: NonNegativeIntegerSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('secondary'),
+      elementIndex: NonNegativeIntegerSchema,
+      action: z.string().min(1).max(256)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('scroll'),
+      elementIndex: NonNegativeIntegerSchema,
+      direction: z.enum(['up', 'down', 'left', 'right'])
+    })
+    .strict(),
+  z.object({ kind: z.literal('wait') }).strict(),
+  z.object({ kind: z.literal('done') }).strict(),
+  z.object({ kind: z.literal('blocked'), reason: z.string().min(1).max(256) }).strict()
+])
+
+export const SuggestionSchema = z
+  .object({
+    untrusted: z.literal(true),
+    snapshotId: IdentifierSchema,
+    move: SuggestionMoveSchema,
+    confidence: z.number().min(0).max(1).optional(),
+    label: z.string().optional()
+  })
+  .strict()
+
+export type Suggestion = z.infer<typeof SuggestionSchema>
+
+export const ResolvedTargetSchema = z
+  .object({
+    kind: z.literal('element'),
+    elementIndex: NonNegativeIntegerSchema
+  })
+  .strict()
+
+export const PublicSnapshotResultSchema = SnapshotResultSchema.omit({ issues: true })
+  .extend({
+    issues: z.array(PublicSerializedComputerErrorSchema).default([]),
+    suggestion: SuggestionSchema.optional()
+  })
+  .strict()
+
 export const MutationResultSchema = z
   .object({
     outcome: MutationOutcomeSchema,
@@ -142,6 +197,15 @@ export const MutationResultSchema = z
   .strict()
 
 export type MutationResult = z.infer<typeof MutationResultSchema>
+
+export const PublicMutationResultSchema = z
+  .object({
+    outcome: PublicMutationOutcomeSchema,
+    freshState: SnapshotResultSchema.optional(),
+    resolvedTarget: ResolvedTargetSchema.optional(),
+    suggestion: SuggestionSchema.optional()
+  })
+  .strict()
 
 const BooleanFlagMapSchema = z.record(z.string(), z.boolean())
 

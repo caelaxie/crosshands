@@ -12,6 +12,7 @@ import {
   type LocalControlIdentity
 } from '@crosshands/runtime'
 
+import { unwrapBrokerResult } from './broker-result.js'
 import type { CliBrokerClient } from './index.js'
 
 export type LocalClientPaths = {
@@ -111,12 +112,21 @@ export type ProductionClientOptions = {
   paths?: LocalClientPaths
 }
 
+export function brokerSpawnEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = { ...env }
+  delete next.CROSSHANDS_JEV
+  for (const key of Object.keys(next)) {
+    if (key === 'TYPESAFE_API_KEY' || key.startsWith('TYPESAFE_')) delete next[key]
+  }
+  return next
+}
+
 function defaultSpawnBroker(entrypoint: string): void {
   const child = spawn(process.execPath, [entrypoint, 'broker'], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
-    env: process.env
+    env: brokerSpawnEnv(process.env)
   })
   child.unref()
 }
@@ -171,7 +181,7 @@ export async function createProductionBrokerClient(
 function controlAdapter(control: LocalControlClient): CliBrokerClient {
   return {
     request: async (operation, input) =>
-      control.request({ operation, input }, { deadlineMs: 30_000 }),
+      unwrapBrokerResult(await control.request({ operation, input }, { deadlineMs: 30_000 })),
     close: () => control.close()
   }
 }

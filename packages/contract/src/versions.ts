@@ -1,8 +1,8 @@
 import { createComputerError } from './errors.js'
 
 export const CONTRACT_VERSIONS = {
-  product: '0.1.6',
-  publicContract: '1.1.0',
+  product: '0.2.0',
+  publicContract: '1.2.0',
   brokerControl: 1,
   providerProtocol: 1,
   mcpProtocol: '2025-11-25'

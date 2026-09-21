@@ -1,5 +1,5 @@
 ---
-name: computer-use
+name: crosshands-computer-use
 description: >-
   Inspect and operate local desktop applications with the agent-agnostic
   CrossHands JSON CLI. Use for listing apps/windows, reading accessibility

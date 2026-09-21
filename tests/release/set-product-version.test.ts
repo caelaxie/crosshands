@@ -93,7 +93,7 @@ describe('set product version', () => {
 
     const versions = await readFile(join(root, 'packages/contract/src/versions.ts'), 'utf8')
     expect(versions).toContain("product: '0.2.0'")
-    expect(versions).toContain("publicContract: '1.1.0'")
+    expect(versions).toContain("publicContract: '1.2.0'")
 
     const pin = JSON.parse(
       await readFile(join(root, 'integrations/codex/integration.json'), 'utf8')
