@@ -25,14 +25,11 @@ jobs:
           node-version: '22'
           cache: pnpm
 
-      - name: Enable pinned pnpm
-        run: corepack enable
-
       - name: Install frozen dependency graph
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build website
-        run: corepack pnpm --filter crosshands-website astro:build
+        run: pnpm --filter crosshands-website astro:build
 
       - name: Assert built HTML
         run: node website/scripts/assert-built-html.mjs

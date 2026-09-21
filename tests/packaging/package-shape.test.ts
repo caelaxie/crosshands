@@ -31,7 +31,7 @@ beforeAll(async () => {
   const output = await mkdtemp(join(tmpdir(), 'CrossHands pack output '))
   outputDirectories.push(output)
   await buildAndTestCurrentNative()
-  await runPackageManager('corepack', ['pnpm', '-r', '--if-present', 'build'], {
+  await runPackageManager('pnpm', ['-r', '--if-present', 'build'], {
     cwd: workspaceRoot
   })
   const descriptors = [packages.contract, packages.runtime, packages.cli, currentPlatformPackage]

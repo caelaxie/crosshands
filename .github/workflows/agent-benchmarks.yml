@@ -69,7 +69,7 @@ jobs:
           cache: pnpm
 
       - name: Install frozen workspace dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Verify the frozen catalog before touching the desktop
         shell: bash
@@ -147,7 +147,7 @@ jobs:
           cache: pnpm
 
       - name: Install frozen workspace dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Download all three agent fragments
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4

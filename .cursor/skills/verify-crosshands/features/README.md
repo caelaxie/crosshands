@@ -7,7 +7,7 @@ feature file as the recipe.
 
 ## Baseline preconditions
 
-- The repo is built: `corepack pnpm install --frozen-lockfile && corepack pnpm build`.
+- The repo is built: `pnpm install --frozen-lockfile && pnpm build`.
 - The macOS payload gate is satisfied (signed payload in
   `packages/platform-darwin/assets/` whose `productVersion` equals
   `CONTRACT_VERSIONS.product`), or the run explicitly targets the fail-closed tier.
