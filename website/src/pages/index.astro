@@ -1,0 +1,49 @@
+---
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { loadPublicDocument, renderPublicDocument } from '../public-document.mjs'
+
+// Prerender emits this module under dist/.prerender, so import.meta.url cannot reach the repo README.
+const document = await loadPublicDocument(pathToFileURL(resolve(process.cwd(), '../README.md')))
+const page = renderPublicDocument(document)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{document.title}</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 40rem;
+        padding: 2rem 1.25rem 4rem;
+        font: 1rem/1.5 ui-sans-serif, system-ui, sans-serif;
+        color: CanvasText;
+        background: Canvas;
+      }
+      pre {
+        overflow: auto;
+        padding: 1rem;
+        border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas);
+        background: color-mix(in srgb, CanvasText 6%, Canvas);
+        white-space: pre-wrap;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main set:html={page} />
+    <footer>
+      <p>
+        License lives on <a href="https://github.com/caelaxie/crosshands">GitHub</a>.
+      </p>
+    </footer>
+  </body>
+</html>

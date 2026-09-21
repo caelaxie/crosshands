@@ -1,4 +1,6 @@
 packages:
   - packages/*
+  - website
 
-onlyBuiltDependencies: []
+onlyBuiltDependencies:
+  - esbuild
