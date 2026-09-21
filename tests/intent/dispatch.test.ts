@@ -5,9 +5,14 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { dispatchPublicOperation } from '../../packages/cli/src/intent/dispatch.js'
-import type { EvaluateFn, JevAnswers } from '../../packages/cli/src/intent/evaluate.js'
+import {
+  JevEvaluateError,
+  type EvaluateFn,
+  type JevAnswers,
+  type JevHttpStats
+} from '../../packages/cli/src/intent/evaluate.js'
 import { parseJevEnv } from '../../packages/cli/src/intent/env.js'
-import { createJevLogger, hashGoal } from '../../packages/cli/src/intent/log.js'
+import { createJevLogger, hashGoal, type JevRecord } from '../../packages/cli/src/intent/log.js'
 import { brokerSpawnEnv } from '../../packages/cli/src/local-client.js'
 import {
   ERROR_CATALOG,
@@ -24,8 +29,12 @@ const treeText = `0 standard window Notes
 	77 search text field Title
 `
 
-function recordedEvaluator(answers: JevAnswers): EvaluateFn {
-  return async () => answers
+function recordedEvaluator(answers: JevAnswers & { http?: JevHttpStats }): EvaluateFn {
+  const { http, ...rest } = answers
+  return async () => ({
+    answers: rest,
+    ...(http === undefined ? {} : { http })
+  })
 }
 
 function snapshotResult(text = treeText) {
@@ -77,6 +86,22 @@ function envelope(result: unknown) {
     desktopEpoch: 0,
     providerGeneration: 'provider-1'
   }
+}
+
+async function readJevRecords(directory: string) {
+  const files = await readdir(directory)
+  expect(files).toHaveLength(1)
+  return (await readFile(join(directory, files[0]!), 'utf8'))
+    .trim()
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+}
+
+function recordOf(records: Record<string, unknown>[], kind: string) {
+  const match = records.find((record) => record.kind === kind)
+  expect(match, `missing ${kind}`).toBeDefined()
+  return match!
 }
 
 describe('Jev env', () => {
@@ -368,14 +393,24 @@ describe('dispatchPublicOperation', () => {
         log
       }
     )
-    log.emit({
+    const omitRecord: JevRecord & Record<string, unknown> = {
       kind: 'jev.http',
+      callId: 'omit-test',
+      operation: 'getAppState',
+      snapshotId: 'snap-1',
+      phase: 'observe',
       goal,
-      apiKey: 'sk-test',
-      treeText,
-      text: 'secret-text',
-      value: 'secret-value'
-    })
+      status: 200,
+      durationMs: 1,
+      requestBytes: 1,
+      responseBytes: 1,
+      candidateCount: 1
+    }
+    omitRecord.apiKey = 'sk-test'
+    omitRecord.treeText = treeText
+    omitRecord.text = 'secret-text'
+    omitRecord.value = 'secret-value'
+    log.emit(omitRecord)
     await log.close()
     const files = await readdir(directory)
     expect(files).toHaveLength(1)
@@ -387,6 +422,275 @@ describe('dispatchPublicOperation', () => {
     expect(body).not.toContain('secret-text')
     expect(body).not.toContain('secret-value')
     expect(body).not.toContain('button New Note')
+  })
+
+  it('records rank sizes and TypeSafe timings without the goal or tree', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const goal = 'Make a new note in Notes.'
+    await dispatchPublicOperation(
+      { request: async () => snapshotResult() },
+      'getAppState',
+      { app: 'Notes', goal, captureScreenshot: false },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({
+          move: 'click',
+          clickWhich: '68',
+          confidence: 0.88,
+          http: { status: 200, durationMs: 42, requestBytes: 1200, responseBytes: 80 }
+        }),
+        log
+      }
+    )
+    await log.close()
+    const records = await readJevRecords(directory)
+    const http = recordOf(records, 'jev.http')
+    const decision = recordOf(records, 'jev.decision')
+    const call = recordOf(records, 'jev.call')
+    expect(http).toMatchObject({
+      snapshotId: 'snap-1',
+      operation: 'getAppState',
+      phase: 'observe',
+      status: 200,
+      durationMs: 42,
+      requestBytes: 1200,
+      responseBytes: 80,
+      candidateCount: 3,
+      goalSha256: hashGoal(goal)
+    })
+    expect(decision).toMatchObject({
+      snapshotId: 'snap-1',
+      operation: 'getAppState',
+      phase: 'observe',
+      app: 'com.apple.Notes',
+      move: 'click',
+      elementIndex: 68,
+      confidence: 0.88,
+      goalChars: goal.length,
+      treeChars: treeText.length,
+      elementCount: 4,
+      candidateCount: 3,
+      goalSha256: hashGoal(goal)
+    })
+    expect(call).toMatchObject({
+      operation: 'getAppState',
+      phase: 'observe',
+      httpMs: 42,
+      brokerCalls: 1,
+      ranks: 1,
+      goalSha256: hashGoal(goal)
+    })
+    expect(call).not.toHaveProperty('bound')
+    expect(call).not.toHaveProperty('error')
+    expect(call.durationMs).toBeGreaterThanOrEqual(0)
+    expect(call.callId).toEqual(http.callId)
+    expect(call.callId).toEqual(decision.callId)
+    expect(decision.parseMs).toBeGreaterThanOrEqual(0)
+    expect(decision.evaluateMs).toBeGreaterThanOrEqual(0)
+    expect(decision).not.toHaveProperty('goal')
+    expect(decision).not.toHaveProperty('label')
+    expect(decision).not.toHaveProperty('treeText')
+    const body = JSON.stringify(records)
+    expect(body).not.toContain(goal)
+    expect(body).not.toContain('button New Note')
+  })
+
+  it('logs TypeSafe failures and fail-closes the look', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const goal = 'Make a new note in Notes.'
+    const result = await dispatchPublicOperation(
+      { request: async () => snapshotResult() },
+      'getAppState',
+      { app: 'Notes', goal, captureScreenshot: false },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: async () => {
+          throw new JevEvaluateError('TypeSafe HTTP 503', {
+            status: 503,
+            durationMs: 15,
+            requestBytes: 900,
+            responseBytes: 4
+          })
+        },
+        log
+      }
+    )
+    await log.close()
+    expect(result).toMatchObject({
+      issues: [expect.objectContaining({ code: 'policy_unavailable' })]
+    })
+    expect(result).not.toHaveProperty('suggestion')
+    const records = await readJevRecords(directory)
+    expect(recordOf(records, 'jev.http')).toMatchObject({
+      status: 503,
+      durationMs: 15,
+      requestBytes: 900,
+      responseBytes: 4,
+      phase: 'observe',
+      operation: 'getAppState'
+    })
+    expect(recordOf(records, 'jev.call')).toMatchObject({
+      operation: 'getAppState',
+      phase: 'observe',
+      httpMs: 15,
+      brokerCalls: 1,
+      ranks: 1,
+      error: 'policy_unavailable'
+    })
+    expect(recordOf(records, 'jev.call')).not.toHaveProperty('bound')
+    expect(records.find((record) => record.kind === 'jev.decision')).toBeUndefined()
+    expect(JSON.stringify(records)).not.toContain(goal)
+  })
+
+  it('records a bound intent click as one public call with a hidden look', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const goal = 'Make a new note in Notes.'
+    const result = await dispatchPublicOperation(
+      {
+        request: async (operation) => {
+          if (operation === 'getAppState') return snapshotResult()
+          return { outcome: { state: 'indeterminate', reason: 'synthetic_input' } }
+        }
+      },
+      'click',
+      {
+        contextToken: token,
+        target: { kind: 'intent' },
+        goal,
+        captureScreenshot: false
+      },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({
+          move: 'click',
+          clickWhich: '68',
+          confidence: 0.9,
+          http: { status: 200, durationMs: 30, requestBytes: 800, responseBytes: 40 }
+        }),
+        log
+      }
+    )
+    await log.close()
+    expect(result).toMatchObject({
+      outcome: { state: 'indeterminate' },
+      resolvedTarget: { kind: 'element', elementIndex: 68 }
+    })
+    const records = await readJevRecords(directory)
+    expect(recordOf(records, 'jev.decision')).toMatchObject({
+      operation: 'click',
+      phase: 'bind',
+      elementIndex: 68
+    })
+    expect(recordOf(records, 'jev.call')).toMatchObject({
+      operation: 'click',
+      phase: 'bind',
+      bound: true,
+      brokerCalls: 2,
+      ranks: 1,
+      httpMs: 30
+    })
+    expect(recordOf(records, 'jev.call')).not.toHaveProperty('error')
+    expect(JSON.stringify(records)).not.toContain(goal)
+  })
+
+  it('records an unbound named click as bound false', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const goal = 'Make a new note in Notes.'
+    const result = await dispatchPublicOperation(
+      {
+        request: async (operation) => {
+          if (operation === 'getAppState') return snapshotResult()
+          return { outcome: { state: 'verified' } }
+        }
+      },
+      'click',
+      {
+        contextToken: token,
+        target: { kind: 'element', elementIndex: 65 },
+        goal
+      },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({ move: 'click', clickWhich: '68', confidence: 0.9 }),
+        log
+      }
+    )
+    await log.close()
+    expect(result).toMatchObject({
+      outcome: { state: 'not_attempted', error: { code: 'goal_mismatch' } }
+    })
+    const records = await readJevRecords(directory)
+    expect(recordOf(records, 'jev.decision')).toMatchObject({
+      operation: 'click',
+      phase: 'named',
+      elementIndex: 68
+    })
+    expect(recordOf(records, 'jev.call')).toMatchObject({
+      operation: 'click',
+      phase: 'named',
+      brokerCalls: 1,
+      ranks: 1,
+      error: 'goal_mismatch',
+      httpMs: 0
+    })
+    expect(recordOf(records, 'jev.call')).not.toHaveProperty('bound')
+  })
+
+  it('records fail-closed observe without a rank phase', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    const result = await dispatchPublicOperation(
+      { request: async () => snapshotResult() },
+      'getAppState',
+      { app: 'Notes', goal: 'Make a new note in Notes.', captureScreenshot: false },
+      { env: { CROSSHANDS_JEV: '1' }, log }
+    )
+    await log.close()
+    expect(result).toMatchObject({
+      issues: [expect.objectContaining({ code: 'policy_unavailable' })]
+    })
+    const call = recordOf(await readJevRecords(directory), 'jev.call')
+    expect(call).toMatchObject({
+      operation: 'getAppState',
+      error: 'policy_unavailable',
+      brokerCalls: 1,
+      ranks: 0,
+      httpMs: 0
+    })
+    expect(call).not.toHaveProperty('phase')
+    expect(call).not.toHaveProperty('bound')
+  })
+
+  it('records fail-closed intent fill on jev.call', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    await expect(
+      dispatchPublicOperation(
+        { request: async () => snapshotResult() },
+        'click',
+        {
+          contextToken: token,
+          target: { kind: 'intent' },
+          goal: 'Make a new note in Notes.'
+        },
+        { env: { CROSSHANDS_JEV: '1' }, log }
+      )
+    ).rejects.toMatchObject({ code: 'intent_unavailable' })
+    await log.close()
+    const call = recordOf(await readJevRecords(directory), 'jev.call')
+    expect(call).toMatchObject({
+      operation: 'click',
+      error: 'intent_unavailable',
+      brokerCalls: 0,
+      ranks: 0,
+      httpMs: 0
+    })
+    expect(call).not.toHaveProperty('bound')
+    expect(call).not.toHaveProperty('phase')
   })
 
   it('hashes the goal in the Jev log', () => {
