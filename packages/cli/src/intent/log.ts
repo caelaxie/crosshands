@@ -27,15 +27,24 @@ export function createJevLogger(
   writer.start()
   return {
     emit(record) {
-      const kind = record.kind
-      if (typeof kind !== 'string') return
-      const goal = record.goal
-      const rest: Record<string, unknown> = { ...record, kind, v: 1, ts: new Date().toISOString() }
-      for (const key of OMIT) delete rest[key]
-      writer.emit({
-        ...rest,
-        ...(typeof goal === 'string' ? { goalSha256: hashGoal(goal) } : {})
-      })
+      try {
+        const kind = record.kind
+        if (typeof kind !== 'string') return
+        const goal = record.goal
+        const rest: Record<string, unknown> = {
+          ...record,
+          kind,
+          v: 1,
+          ts: new Date().toISOString()
+        }
+        for (const key of OMIT) delete rest[key]
+        writer.emit({
+          ...rest,
+          ...(typeof goal === 'string' ? { goalSha256: hashGoal(goal) } : {})
+        })
+      } catch {
+        // Jev logs must not fail computer-use.
+      }
     },
     close: () => writer.close()
   }
