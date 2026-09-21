@@ -3,7 +3,7 @@
   "cli": {
     "package": "@crosshands/cli@0.1.6",
     "command": "crosshands",
-    "skill": "../../skills/computer-use/SKILL.md"
+    "skill": "../../skills/crosshands-computer-use/SKILL.md"
   },
   "mcp": {
     "package": "@crosshands/mcp@0.1.6",

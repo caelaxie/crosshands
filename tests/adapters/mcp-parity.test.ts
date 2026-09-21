@@ -291,7 +291,7 @@ describe('CrossHands MCP adapter', () => {
         cli: {
           package: `@crosshands/cli@${CONTRACT_VERSIONS.product}`,
           command: 'crosshands',
-          skill: '../../skills/computer-use/SKILL.md'
+          skill: '../../skills/crosshands-computer-use/SKILL.md'
         },
         mcp: {
           package: `@crosshands/mcp@${CONTRACT_VERSIONS.product}`,
