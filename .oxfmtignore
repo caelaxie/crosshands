@@ -5,3 +5,4 @@ native/macos/.build/
 website/.astro/
 pnpm-lock.yaml
 packages/contract/schemas/contract.json
+benchmarks/agents/catalog.json
