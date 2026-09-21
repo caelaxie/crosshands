@@ -22,7 +22,7 @@ describe('installed platform provider discovery', () => {
     const createProvider = vi.fn()
     await expect(
       loadProviderModule('darwin', async () => ({
-        packageVersion: '0.2.0',
+        packageVersion: '0.0.0',
         createProvider
       }))
     ).rejects.toThrow(/payload version mismatch/)
