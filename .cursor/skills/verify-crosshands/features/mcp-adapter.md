@@ -30,7 +30,8 @@ Preconditions:
   Exit code `0`; stdout ends with `{"ok":true,"checks":4,"toolCount":14}`;
   `$EVIDENCE/mcp-smoke.json` records each check.
 - **Handshake.** The transcript's initialize response has
-  `serverInfo.name: "CrossHands"` and the product version.
+  `serverInfo.name: "CrossHands"` and `serverInfo.version` equal to
+  `CONTRACT_VERSIONS.product`. `mcp-smoke.json` records that `serverInfo`.
 - **Catalog.** `tools/list` returns exactly the 14 contract operation names
   (`capabilities`, `permissions`, `listApps`, `listWindows`, `getAppState`,
   `click`, `performSecondaryAction`, `scroll`, `drag`, `typeText`,

@@ -10,8 +10,9 @@
 // Writes <evidence-dir>/mcp-smoke.json with the full transcript summary.
 
 import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const evidenceDir = process.argv[2]
 if (evidenceDir === undefined) {
@@ -19,6 +20,13 @@ if (evidenceDir === undefined) {
   process.exit(1)
 }
 mkdirSync(evidenceDir, { recursive: true })
+
+const productVersion = JSON.parse(
+  readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../../../../packages/contract/package.json'),
+    'utf8'
+  )
+).version
 
 const EXPECTED_TOOLS = [
   'capabilities',
@@ -89,8 +97,9 @@ try {
   })
   checks.push(
     check(
-      initialized.result?.serverInfo?.name === 'CrossHands',
-      'initialize returns serverInfo.name CrossHands',
+      initialized.result?.serverInfo?.name === 'CrossHands' &&
+        initialized.result?.serverInfo?.version === productVersion,
+      'initialize returns serverInfo.name CrossHands and the product version',
       initialized.result?.serverInfo
     )
   )
@@ -141,6 +150,7 @@ try {
     ok: true,
     checks,
     toolCount: names.length,
+    serverInfo: initialized.result?.serverInfo ?? null,
     capabilities: capabilities.result?.structuredContent ?? null,
     protectedInputRejection: protectedError ?? null,
     serverStderr: stderr.trim()

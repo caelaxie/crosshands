@@ -17,7 +17,7 @@ and a signed native helper. The primary surface is the CLI; the MCP adapter
 must stay equivalent. This skill drives the **repo build** end to end against
 the **real desktop of the machine you run on**.
 
-Verified on macOS (darwin, Apple silicon) with product version 0.1.6. The
+Verified on macOS (darwin, Apple silicon) with product version 0.2.1. The
 CLI/broker/contract tiers are platform-agnostic; the live desktop recipes use
 Calculator and are macOS-specific.
 
@@ -153,11 +153,10 @@ Conventions, all grounded in the repo contract:
   exit 0 with `outcome.state: "not_attempted"`. Broker-side rejections
   (`invalid_argument`, `app_blocked`, `interaction_context_invalid`, ...)
   surface as `{"error": {...}}` with a stable nonzero exit code.
-- Prefer element targets over coordinates. On macOS, synthetic coordinate
-  clicks are posted to the target pid and SwiftUI apps (e.g. Calculator)
-  silently drop them; in source, coordinate clicks now upgrade to the AX
-  action of the element at the point, but staged payloads ≤ 0.1.6 still drop
-  them. Always verify a coordinate click by re-observing state; see
+- Prefer element targets over coordinates. A plain coordinate click upgrades
+  to the accessibility action of the element at that point when one exists.
+  Re-observe to prove the click. A coordinate click that changes nothing is
+  the synthetic fallback, not the normal Calculator digit path. See
   `features/pointer-actions.md`.
 - The canonical live proof is the Calculator recipe in
   `features/keyboard-input.md`. Read `features/README.md` first, then drive
@@ -216,7 +215,7 @@ ls "$EVIDENCE"   # must still exist
 ## Helpers
 
 - `helpers/mcp-smoke.mjs` — spawns the repo-built MCP server over stdio and
-  proves: handshake (`serverInfo.name: "CrossHands"`), the 14-tool catalog
+  proves: handshake (`serverInfo.name: "CrossHands"` and the product version), the 14-tool catalog
   matches the contract, `capabilities` reaches the provider through the
   broker, and `protectedInput: true` is rejected before dispatch. Run it with
   the verification env exported:
