@@ -66,13 +66,13 @@ describe('CrossHands JSON CLI', () => {
     ['list-windows', ['--app', 'fixture.app'], 'listWindows', { app: 'fixture.app' }],
     [
       'get-app-state',
-      ['--app', 'fixture.app', '--window-index', '2', '--no-screenshot'],
+      ['--app', 'fixture.app', '--window-index', '2', '--no-screenshot', '--goal', 'Do the task.'],
       'getAppState',
       { app: 'fixture.app', window: { index: 2 }, captureScreenshot: false }
     ],
     [
       'click',
-      ['--context', 'ctx_' + 'a'.repeat(32), '--element-index', '4'],
+      ['--context', 'ctx_' + 'a'.repeat(32), '--element-index', '4', '--goal', 'Do the task.'],
       'click',
       { contextToken: 'ctx_' + 'a'.repeat(32), target: { kind: 'element', elementIndex: 4 } }
     ],
@@ -84,7 +84,9 @@ describe('CrossHands JSON CLI', () => {
         '--element-index',
         '4',
         '--modifiers',
-        'Shift+CmdOrCtrl'
+        'Shift+CmdOrCtrl',
+        '--goal',
+        'Do the task.'
       ],
       'click',
       {
@@ -95,7 +97,16 @@ describe('CrossHands JSON CLI', () => {
     ],
     [
       'perform-secondary-action',
-      ['--context', 'ctx_' + 'a'.repeat(32), '--element-index', '4', '--action', 'showMenu'],
+      [
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--element-index',
+        '4',
+        '--action',
+        'showMenu',
+        '--goal',
+        'Do the task.'
+      ],
       'performSecondaryAction',
       {
         contextToken: 'ctx_' + 'a'.repeat(32),
@@ -105,7 +116,18 @@ describe('CrossHands JSON CLI', () => {
     ],
     [
       'scroll',
-      ['--context', 'ctx_' + 'a'.repeat(32), '--x', '10', '--y', '20', '--direction', 'down'],
+      [
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--x',
+        '10',
+        '--y',
+        '20',
+        '--direction',
+        'down',
+        '--goal',
+        'Do the task.'
+      ],
       'scroll',
       {
         contextToken: 'ctx_' + 'a'.repeat(32),
@@ -172,7 +194,16 @@ describe('CrossHands JSON CLI', () => {
     ],
     [
       'set-value',
-      ['--context', 'ctx_' + 'a'.repeat(32), '--element-index', '2', '--value', 'hello'],
+      [
+        '--context',
+        'ctx_' + 'a'.repeat(32),
+        '--element-index',
+        '2',
+        '--value',
+        'hello',
+        '--goal',
+        'Do the task.'
+      ],
       'setValue',
       {
         contextToken: 'ctx_' + 'a'.repeat(32),
@@ -255,6 +286,34 @@ describe('CrossHands JSON CLI', () => {
     expect(state.calls).toEqual([])
   })
 
+  it('rejects a blank goal before calling the broker', async () => {
+    const state = harness()
+    const code = await runCli(
+      ['computer', 'get-app-state', '--app', 'Notes', '--goal', '   ', '--json'],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(2)
+    expect(state.calls).toEqual([])
+    expect(JSON.parse(state.stdout.join(''))).toMatchObject({
+      error: { code: 'invalid_argument', message: 'Invalid input' }
+    })
+  })
+
+  it('rejects a look that omits --goal', async () => {
+    const state = harness()
+    const code = await runCli(
+      ['computer', 'get-app-state', '--app', 'Notes', '--json'],
+      state.io,
+      state.client
+    )
+    expect(code).toBe(2)
+    expect(state.calls).toEqual([])
+    expect(JSON.parse(state.stdout.join(''))).toMatchObject({
+      error: { code: 'invalid_argument', message: 'Missing required --goal' }
+    })
+  })
+
   it('strips per-call goal before the broker when Jev is off', async () => {
     const state = harness({
       context: { token: 'ctx_' + 'a'.repeat(32) },
@@ -299,6 +358,8 @@ describe('CrossHands JSON CLI', () => {
         '--context',
         'ctx_' + 'a'.repeat(32),
         '--no-screenshot',
+        '--goal',
+        'Do the task.',
         '--json'
       ],
       state.io,
@@ -327,7 +388,16 @@ describe('CrossHands JSON CLI', () => {
       providerGeneration: 'provider-1'
     })
     const code = await runCli(
-      ['computer', 'get-app-state', '--app', 'Notes', '--no-screenshot', '--json'],
+      [
+        'computer',
+        'get-app-state',
+        '--app',
+        'Notes',
+        '--no-screenshot',
+        '--goal',
+        'Do the task.',
+        '--json'
+      ],
       state.io,
       state.client
     )
@@ -366,6 +436,8 @@ describe('CrossHands JSON CLI', () => {
       '--element-index',
       '2',
       '--value-stdin',
+      '--goal',
+      'Do the task.',
       '--json'
     ]
     const code = await runCli(argv, state.io, state.client)
@@ -398,6 +470,8 @@ describe('CrossHands JSON CLI', () => {
           'get-app-state',
           '--app',
           'fixture',
+          '--goal',
+          'Do the task.',
           '--screenshot-output',
           destination,
           '--json'
@@ -422,6 +496,8 @@ describe('CrossHands JSON CLI', () => {
           'get-app-state',
           '--app',
           'fixture',
+          '--goal',
+          'Do the task.',
           '--screenshot-output',
           destination,
           '--json'
@@ -438,7 +514,17 @@ describe('CrossHands JSON CLI', () => {
     const linked = harness(result)
     expect(
       await runCli(
-        ['computer', 'get-app-state', '--app', 'fixture', '--screenshot-output', link, '--json'],
+        [
+          'computer',
+          'get-app-state',
+          '--app',
+          'fixture',
+          '--goal',
+          'Do the task.',
+          '--screenshot-output',
+          link,
+          '--json'
+        ],
         linked.io,
         linked.client
       )

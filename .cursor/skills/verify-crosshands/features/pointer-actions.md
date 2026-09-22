@@ -16,9 +16,9 @@ to the accessibility action of the element at the point when one exists
 
 ## How to get to it (user POV)
 
-- Run `crosshands computer click --context <token> (--element-index <n> | --x <x> --y <y>) [--mouse-button left|right|middle] [--modifiers Shift+CmdOrCtrl] --json`.
-- Run `crosshands computer perform-secondary-action --context <token> --element-index <n> --action <name> --json`.
-- Run `crosshands computer scroll --context <token> (--element-index <n> | --x <x> --y <y>) --direction <up|down|left|right> [--pages <n>] --json`.
+- Run `crosshands computer click --context <token> (--element-index <n> | --x <x> --y <y>) --goal <goal> [--mouse-button left|right|middle] [--modifiers Shift+CmdOrCtrl] --json`.
+- Run `crosshands computer perform-secondary-action --context <token> --element-index <n> --action <name> --goal <goal> --json`.
+- Run `crosshands computer scroll --context <token> (--element-index <n> | --x <x> --y <y>) --direction <up|down|left|right> [--pages <n>] --goal <goal> --json`.
 - Run `crosshands computer drag --context <token> (--from-element-index <n> | --from-x <x> --from-y <y>) (--to-element-index <n> | --to-x <x> --to-y <y>) [--duration-ms <n>] --json`.
 
 ## Driving it with the repo-built CLI
@@ -31,7 +31,7 @@ Preconditions:
 - **Element click, named target.** Observe, find the toolbar button whose
   name matches `Sidebar` in `treeText` (it reads `Show Sidebar` when closed,
   `Hide Sidebar` when open), then run
-  `$CH click --context "$TOKEN" --element-index <n> --json`. Exit code `0`. A
+  `$CH click --context "$TOKEN" --element-index <n> --goal "Press the control." --json`. Exit code `0`. A
   fresh observation shows the sidebar opened: `elementCount` rises (30 → 57
   observed) and window `bounds.width` grows (230 → 458 observed). Click the
   same button again (now named `Hide Sidebar`) to restore.
@@ -40,12 +40,12 @@ Preconditions:
   `text` element in row-major order starting at `AC`, so `1` is
   (edit-text index) + 13 — verified as index 16 in the fresh 30-element tree
   and 43 in the 57-element sidebar tree; always recompute from the fresh
-  tree. Run `$CH click --context "$TOKEN" --element-index <n> --json`. A fresh
+  tree. Run `$CH click --context "$TOKEN" --element-index <n> --goal "Press the control." --json`. A fresh
   observation reads the edit field as `1`. Restore with `Escape`.
 - **Coordinate click, verified.** Observe with
   `--screenshot-output "$EVIDENCE/before-click.png"`, pick the target's pixel
   center in the PNG, divide by `screenshot.scale`, then run
-  `$CH click --context "$TOKEN" --x <x> --y <y> --json`. Re-observe and assert
+  `$CH click --context "$TOKEN" --x <x> --y <y> --goal "Press the control." --json`. Re-observe and assert
   the intended state change. Measure carefully: the PNG starts at the
   window's top-left but the title bar, toolbar, and display area consume the
   top of the basic Calculator window. A mis-measured point can hit another
@@ -53,7 +53,7 @@ Preconditions:
   unchanged display blindly.
 - **Secondary action refusal.** Observe, pick an element advertising
   `Secondary Actions` (the `scroll area Edit field` always does), then run
-  `$CH perform-secondary-action --context "$TOKEN" --element-index <n> --action delete --json`.
+  `$CH perform-secondary-action --context "$TOKEN" --element-index <n> --action delete --goal "Press the control." --json`.
   Exit code `0` with `outcome.state: "not_attempted"` and
   `outcome.error.code: "action_not_supported"` — the refusal with remediation
   is the proof; the valid action names are the ones advertised in the

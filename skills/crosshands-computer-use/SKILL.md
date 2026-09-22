@@ -31,9 +31,11 @@ Recording permissions. Never attempt to automate a permission prompt.
 ```bash
 crosshands computer list-apps --json
 crosshands computer list-windows --app <app> --json
-crosshands computer get-app-state --app <app> --json
-crosshands computer click --context <context.token> --element-index <n> --json
+crosshands computer get-app-state --app <app> --goal <goal> --json
+crosshands computer click --context <context.token> --element-index <n> --goal <goal> --json
 ```
+
+`--goal` is required on get-app-state, click, perform-secondary-action, scroll, and set-value. CrossHands ignores that sentence unless `CROSSHANDS_JEV=1`.
 
 Carry the complete `context` returned by observation in agent state and pass
 its `token` as `--context` to the next action. Element indexes and coordinates
@@ -60,17 +62,17 @@ crosshands computer capabilities --json
 crosshands computer permissions [--id accessibility|screenshots] --json
 crosshands computer list-apps --json
 crosshands computer list-windows --app <app> --json
-crosshands computer get-app-state --app <app> [--window-id <id> | --window-index <n>] --json
-crosshands computer click --context <token> (--element-index <n> | --x <x> --y <y>) [--mouse-button left|right|middle] [--modifiers Shift+CmdOrCtrl] --json
-crosshands computer perform-secondary-action --context <token> --element-index <n> --action <name> --json
-crosshands computer scroll --context <token> (--element-index <n> | --x <x> --y <y>) --direction <direction> --json
+crosshands computer get-app-state --app <app> [--window-id <id> | --window-index <n>] --goal <goal> --json
+crosshands computer click --context <token> (--element-index <n> | --x <x> --y <y>) --goal <goal> [--mouse-button left|right|middle] [--modifiers Shift+CmdOrCtrl] --json
+crosshands computer perform-secondary-action --context <token> --element-index <n> --action <name> --goal <goal> --json
+crosshands computer scroll --context <token> (--element-index <n> | --x <x> --y <y>) --direction <direction> --goal <goal> --json
 crosshands computer drag --context <token> --from-element-index <n> --to-element-index <n> --json
 crosshands computer drag --context <token> --from-x <x> --from-y <y> --to-x <x> --to-y <y> --json
 crosshands computer type-text --context <token> --text <text> --json
 crosshands computer press-key --context <token> --key <key> --json
 crosshands computer hotkey --context <token> --key CmdOrCtrl+Shift+P --json
 crosshands computer paste-text --context <token> --text <text> --json
-crosshands computer set-value --context <token> --element-index <n> --value <value> --json
+crosshands computer set-value --context <token> --element-index <n> --value <value> --goal <goal> --json
 ```
 
 Prefer semantic element actions over coordinates. Coordinates are local to the
@@ -87,7 +89,7 @@ the clipboard:
 
 ```bash
 printf '%s' "$SECRET" | crosshands computer type-text --context <token> --text-stdin --json
-printf '%s' "$SECRET" | crosshands computer set-value --context <token> --element-index <n> --value-stdin --json
+printf '%s' "$SECRET" | crosshands computer set-value --context <token> --element-index <n> --value-stdin --goal <goal> --json
 ```
 
 `paste-text` may replace and later restore clipboard contents; treat that as a

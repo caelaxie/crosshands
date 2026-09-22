@@ -196,13 +196,13 @@ async function lookAgain(request: IntentBroker['request'], token: string): Promi
 async function suggestObserve(
   request: IntentBroker['request'],
   input: PublicOperationInput<'getAppState'>,
-  goal: string | undefined,
+  goal: string,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
   record: RankRecorder
 ): Promise<unknown> {
   const result = await request('getAppState', toBrokerInput('getAppState', input))
-  if (goal === undefined || env.kind === 'off') return result
+  if (env.kind === 'off') return result
   const look = snapshotResultOf(result)
   if (env.kind === 'fail_closed' || evaluate === undefined) {
     return withSnapshotIssue(look, policyUnavailable())
@@ -225,7 +225,7 @@ async function bindIntentTarget(
   request: IntentBroker['request'],
   operation: ComputerOperationName,
   input: object,
-  goal: string | undefined,
+  goal: string,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
   record: RankRecorder
@@ -233,7 +233,7 @@ async function bindIntentTarget(
   if (env.kind === 'off') {
     throw createComputerError('invalid_argument', 'intent targeting requires CROSSHANDS_JEV=1')
   }
-  if (env.kind === 'fail_closed' || evaluate === undefined || goal === undefined) {
+  if (env.kind === 'fail_closed' || evaluate === undefined) {
     throw createComputerError('intent_unavailable', 'Jev is enabled but no TypeSafe key is set')
   }
   const token = contextTokenOf(input)
@@ -306,6 +306,12 @@ async function gateNamedTarget(
   return undefined
 }
 
+function parsedGoal(input: object): string {
+  const { goal } = splitPublicInput(input)
+  if (goal === undefined) throw createComputerError('invalid_argument', 'Missing required goal')
+  return goal
+}
+
 export async function dispatchPublicOperation(
   broker: IntentBroker,
   operation: ComputerOperationName,
@@ -328,17 +334,19 @@ export async function dispatchPublicOperation(
 
   async function dispatch(): Promise<unknown> {
     if (operation === 'getAppState') {
-      return suggestObserve(
+      const look = parsed as PublicOperationInput<'getAppState'>
+      return suggestObserve(request, look, parsedGoal(look), envState, evaluate, record)
+    }
+    if (hasIntentTarget(parsed)) {
+      return bindIntentTarget(
         request,
-        parsed as PublicOperationInput<'getAppState'>,
-        goal,
+        operation,
+        parsed,
+        parsedGoal(parsed),
         envState,
         evaluate,
         record
       )
-    }
-    if (hasIntentTarget(parsed)) {
-      return bindIntentTarget(request, operation, parsed, goal, envState, evaluate, record)
     }
     if (
       goal !== undefined &&

@@ -6,7 +6,7 @@ the CrossHands computer-use runtime.
 ```sh
 crosshands computer doctor --json
 crosshands computer list-apps --json
-crosshands computer get-app-state --app <app> --json
+crosshands computer get-app-state --app <app> --goal <goal> --json
 ```
 
 Install the matching platform payload for macOS, Windows, or Linux before

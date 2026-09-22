@@ -4,7 +4,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { describe, expect, it } from 'vitest'
 
-import { COMPUTER_OPERATIONS, CONTRACT_VERSIONS } from '../../packages/contract/src/index.js'
+import {
+  COMPUTER_OPERATIONS,
+  CONTRACT_VERSIONS,
+  operationRequiresGoal
+} from '../../packages/contract/src/index.js'
 import {
   MCP_TOOL_CATALOG,
   callMcpTool,
@@ -54,21 +58,35 @@ describe('CrossHands MCP adapter', () => {
     ['permissions', { id: 'accessibility' }],
     ['listApps', {}],
     ['listWindows', { app: 'fixture.app' }],
-    ['getAppState', { app: 'fixture.app', window: { index: 0 } }],
-    ['click', { contextToken, target: { kind: 'element', elementIndex: 1 } }],
+    ['getAppState', { app: 'fixture.app', window: { index: 0 }, goal: 'Do the task.' }],
+    ['click', { contextToken, target: { kind: 'element', elementIndex: 1 }, goal: 'Do the task.' }],
     [
       'click',
       {
         contextToken,
         target: { kind: 'element', elementIndex: 1 },
-        modifiers: ['Shift', 'CmdOrCtrl']
+        modifiers: ['Shift', 'CmdOrCtrl'],
+        goal: 'Do the task.'
       }
     ],
     [
       'performSecondaryAction',
-      { contextToken, target: { kind: 'element', elementIndex: 1 }, action: 'showMenu' }
+      {
+        contextToken,
+        target: { kind: 'element', elementIndex: 1 },
+        action: 'showMenu',
+        goal: 'Do the task.'
+      }
     ],
-    ['scroll', { contextToken, target: { kind: 'coordinate', x: 10, y: 20 }, direction: 'down' }],
+    [
+      'scroll',
+      {
+        contextToken,
+        target: { kind: 'coordinate', x: 10, y: 20 },
+        direction: 'down',
+        goal: 'Do the task.'
+      }
+    ],
     [
       'drag',
       {
@@ -81,7 +99,15 @@ describe('CrossHands MCP adapter', () => {
     ['pressKey', { contextToken, target: { kind: 'context-window' }, key: 'Return' }],
     ['hotkey', { contextToken, target: { kind: 'context-window' }, keys: ['CmdOrCtrl', 'P'] }],
     ['pasteText', { contextToken, target: { kind: 'context-window' }, text: 'hello' }],
-    ['setValue', { contextToken, target: { kind: 'element', elementIndex: 2 }, value: 'hello' }]
+    [
+      'setValue',
+      {
+        contextToken,
+        target: { kind: 'element', elementIndex: 2 },
+        value: 'hello',
+        goal: 'Do the task.'
+      }
+    ]
   ]
 
   it('derives exactly one tool for every shared computer operation', () => {
@@ -198,7 +224,10 @@ describe('CrossHands MCP adapter', () => {
       const result = { fixtureOperation: operation }
       const state = broker(result)
       await expect(callMcpTool(state.client, operation, input)).resolves.toEqual(result)
-      expect(state.calls).toEqual([{ operation, input }])
+      const brokerInput = operationRequiresGoal(operation)
+        ? Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'goal'))
+        : input
+      expect(state.calls).toEqual([{ operation, input: brokerInput }])
     }
   )
 
@@ -236,7 +265,8 @@ describe('CrossHands MCP adapter', () => {
     await expect(
       callMcpTool(success.client, 'click', {
         contextToken: `ctx_${'a'.repeat(32)}`,
-        target: { kind: 'coordinate', x: 1, y: 2 }
+        target: { kind: 'coordinate', x: 1, y: 2 },
+        goal: 'Do the task.'
       })
     ).resolves.toEqual(result)
 
@@ -249,7 +279,7 @@ describe('CrossHands MCP adapter', () => {
       })
     }
     await expect(
-      callMcpTool(failure.client, 'getAppState', { app: 'fixture.app' })
+      callMcpTool(failure.client, 'getAppState', { app: 'fixture.app', goal: 'Do the task.' })
     ).rejects.toMatchObject({
       code: 'permission_denied',
       remediation: 'grant_permission'
@@ -269,7 +299,7 @@ describe('CrossHands MCP adapter', () => {
     try {
       const response = await mcp.client.callTool({
         name: 'getAppState',
-        arguments: { app: 'fixture.app' }
+        arguments: { app: 'fixture.app', goal: 'Do the task.' }
       })
       expect(response).toMatchObject({
         isError: true,

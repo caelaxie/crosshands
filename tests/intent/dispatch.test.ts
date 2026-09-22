@@ -17,9 +17,12 @@ import { brokerSpawnEnv } from '../../packages/cli/src/local-client.js'
 import {
   ERROR_CATALOG,
   PUBLIC_ERROR_CATALOG,
+  PUBLIC_OPERATIONS,
+  operationRequiresGoal,
   parseOperationInput,
   parsePublicInput,
-  toBrokerInput
+  toBrokerInput,
+  type ComputerOperationName
 } from '../../packages/contract/src/index.js'
 
 const token = `ctx_${'a'.repeat(32)}`
@@ -143,10 +146,32 @@ describe('public vs broker input', () => {
     ).toMatchObject({ app: 'Notes', goal: 'Make a new note in Notes.' })
   })
 
-  it('requires a goal for intent targets', () => {
+  it('derives the goal requirement from the public schema', () => {
+    const names = Object.keys(PUBLIC_OPERATIONS) as ComputerOperationName[]
+    expect(names.filter((name) => operationRequiresGoal(name))).toEqual([
+      'getAppState',
+      'click',
+      'performSecondaryAction',
+      'scroll',
+      'setValue'
+    ])
+  })
+
+  it('requires a goal on public actions and leaves key presses alone', () => {
+    expect(() => parsePublicInput('getAppState', { app: 'Notes' })).toThrow()
     expect(() =>
-      parsePublicInput('click', { contextToken: token, target: { kind: 'intent' } })
+      parsePublicInput('click', {
+        contextToken: token,
+        target: { kind: 'element', elementIndex: 1 }
+      })
     ).toThrow()
+    expect(() =>
+      parsePublicInput('pressKey', {
+        contextToken: token,
+        target: { kind: 'context-window' },
+        key: 'Return'
+      })
+    ).not.toThrow()
   })
 
   it('rejects unbound intent before broker parse', () => {

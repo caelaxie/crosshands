@@ -240,13 +240,13 @@ function publicMutationInput(brokerInput: z.ZodObject<z.ZodRawShape>, target: z.
     .omit({ target: true })
     .extend({
       target,
-      goal: GoalSchema.optional()
+      goal: GoalSchema
     })
     .strict()
 }
 
-function withOptionalGoal(schema: z.ZodObject<z.ZodRawShape>) {
-  return schema.extend({ goal: GoalSchema.optional() }).strict()
+function withGoal(schema: z.ZodObject<z.ZodRawShape>) {
+  return schema.extend({ goal: GoalSchema }).strict()
 }
 
 const getAppStateArms = COMPUTER_OPERATIONS.getAppState.input.options
@@ -255,7 +255,7 @@ export const PUBLIC_OPERATIONS = {
   ...COMPUTER_OPERATIONS,
   getAppState: {
     mutation: false,
-    input: z.union([withOptionalGoal(getAppStateArms[0]), withOptionalGoal(getAppStateArms[1])]),
+    input: z.union([withGoal(getAppStateArms[0]), withGoal(getAppStateArms[1])]),
     output: PublicSnapshotResultSchema
   },
   click: {
@@ -308,21 +308,11 @@ export function hasIntentTarget(input: unknown): boolean {
   )
 }
 
-function requireGoalForIntent(input: unknown): void {
-  if (!hasIntentTarget(input)) return
-  const goal = (input as { goal?: unknown }).goal
-  if (typeof goal !== 'string' || goal.length === 0) {
-    throw createComputerError('invalid_argument', 'intent targeting requires goal')
-  }
-}
-
 export function parsePublicInput<K extends ComputerOperationName>(
   operation: K,
   input: unknown
 ): PublicOperationInput<K> {
-  const parsed = PUBLIC_OPERATIONS[operation].input.parse(input) as PublicOperationInput<K>
-  requireGoalForIntent(parsed)
-  return parsed
+  return PUBLIC_OPERATIONS[operation].input.parse(input) as PublicOperationInput<K>
 }
 
 export function parsePublicOutput(operation: ComputerOperationName, output: unknown): unknown {
@@ -333,11 +323,11 @@ export function splitPublicInput<T extends object>(
   input: T
 ): { goal: string | undefined; rest: Omit<T, 'goal'> } {
   if (!('goal' in input)) return { goal: undefined, rest: input as Omit<T, 'goal'> }
-  const { goal, ...rest } = input as T & { goal?: unknown }
-  return {
-    goal: typeof goal === 'string' && goal.length > 0 ? goal : undefined,
-    rest: rest as Omit<T, 'goal'>
+  const { goal, ...rest } = input as T & { goal: unknown }
+  if (typeof goal !== 'string') {
+    throw createComputerError('invalid_argument', 'Missing required goal')
   }
+  return { goal, rest: rest as Omit<T, 'goal'> }
 }
 
 export function toBrokerInput<K extends ComputerOperationName>(
