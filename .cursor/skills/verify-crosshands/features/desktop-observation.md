@@ -15,7 +15,7 @@ of the observe-act-verify loop.
 
 - Run `crosshands computer list-apps --json`.
 - Run `crosshands computer list-windows --app <app> --json`.
-- Run `crosshands computer get-app-state --app <app> [--window-id <id> | --window-index <n>] [--no-screenshot] [--screenshot-output <new-path>] --json`.
+- Run `crosshands computer get-app-state --app <app> [--window-id <id> | --window-index <n>] [--no-screenshot] [--screenshot-output <new-path>] --goal <goal> --json`.
 
 ## Driving it with the repo-built CLI
 
@@ -31,20 +31,20 @@ Preconditions:
 - **List windows.** Run `$CH list-windows --app com.apple.calculator --json`.
   Exit code `0`; `windows[0]` has a numeric-string `id`, `index` 0, title
   `Calculator`, and logical `bounds`.
-- **Read state.** Run `$CH get-app-state --app com.apple.calculator --json`.
+- **Read state.** Run `$CH get-app-state --app com.apple.calculator --goal "Read the Calculator window." --json`.
   Exit code `0`; the result has `context.token` (`ctx_…`), a `snapshot` with
   `treeText` (root line `App=com.apple.calculator (pid <pid>)`), `elementCount`, and a
   base64 `screenshot` with `scale`. `issues` is `[]`.
 - **Export screenshot.** Run
-  `$CH get-app-state --app com.apple.calculator --screenshot-output "$EVIDENCE/state.png" --json`.
+  `$CH get-app-state --app com.apple.calculator --goal "Read the Calculator window." --screenshot-output "$EVIDENCE/state.png" --json`.
   Exit code `0`; the file exists with mode `0600`; the result's `screenshot`
   carries `path`, `bytes`, `sha256`, and `dataOmitted: true`. Re-running with
   the same output path exits `2` (`invalid_argument`, overwrite refused).
 - **No-screenshot read.** Run
-  `$CH get-app-state --app com.apple.calculator --no-screenshot --json`. Exit
+  `$CH get-app-state --app com.apple.calculator --no-screenshot --goal "Read the Calculator window." --json`. Exit
   code `0`; `screenshot` is `null` and `issues` is `[]`.
 - **Window selector.** Run
-  `$CH get-app-state --app com.apple.calculator --window-index 0 --no-screenshot --json`.
+  `$CH get-app-state --app com.apple.calculator --window-index 0 --no-screenshot --goal "Read the Calculator window." --json`.
   Exit code `0`; same window as the unselected read.
 - **Proof.** `$EVIDENCE` holds the list-apps, list-windows, and state JSON
   plus `state.png`; the PNG visually matches the `treeText` content.
@@ -64,7 +64,7 @@ Preconditions:
 - `screenshot: null` is not proof of capture failure by itself; inspect the
   `issues` array for an actionable screenshot error.
 - Observation errors surface with their contract code:
-  `$CH get-app-state --app <missing> --json` and
+  `$CH get-app-state --app <missing> --goal "Read the window." --json` and
   `list-windows --app <missing>` exit `1` with `error.code: "app_not_found"`,
   `retry: true`, `remediation: "refresh_apps"`. (Found 2026-09-21 by this
   skill as a bug — the broker masked provider-originated observation errors as

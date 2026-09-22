@@ -17,7 +17,7 @@ Jev section. This file proves the gate. Do not invent a TypeSafe key.
 - Run `crosshands computer get-app-state --app <app> --goal <text> --json`.
 - Run `crosshands computer click --context <token> --goal <text> --json` (no `--element-index` / `--x` / `--y`).
 - Same `--goal` shape on `scroll`, `perform-secondary-action`, and `set-value`.
-- MCP: optional `goal` on those tools; `target: { "kind": "intent" }` with `goal`.
+- MCP: required `goal` on those tools; `target: { "kind": "intent" }` with `goal`.
 
 ## Driving it with the repo-built CLI
 

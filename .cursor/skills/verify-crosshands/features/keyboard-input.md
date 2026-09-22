@@ -20,7 +20,7 @@ canonical live proof for CrossHands: driving Calculator to evaluate `9*9`.
 - Run `crosshands computer press-key --context <token> --key <key> --json`.
 - Run `crosshands computer hotkey --context <token> --key CmdOrCtrl+Shift+P --json`.
 - Run `crosshands computer paste-text --context <token> --text <text> --json`.
-- Run `crosshands computer set-value --context <token> --element-index <n> --value <value> --json`.
+- Run `crosshands computer set-value --context <token> --element-index <n> --value <value> --goal <goal> --json`.
 - Run `printf '%s' "$SECRET" | crosshands computer type-text --context <token> --text-stdin --json`.
 
 ## Driving it with the repo-built CLI
@@ -40,7 +40,7 @@ Preconditions:
   is not success). A fresh observation reads the edit field as `9×9`.
 - **Evaluate.** Observe, then run
   `$CH press-key --context "$TOKEN" --key "=" --json`. Wait ~1s, then run
-  `$CH get-app-state --app com.apple.calculator --screenshot-output "$EVIDENCE/calc-proof.png" --json`.
+  `$CH get-app-state --app com.apple.calculator --goal "Read the Calculator window." --screenshot-output "$EVIDENCE/calc-proof.png" --json`.
   The edit field reads `81`; the `Last Expression` area reads `9×9`; the PNG
   shows both. This is the canonical proof.
 - **Protected stdin.** Run
@@ -49,7 +49,7 @@ Preconditions:
   field shows the typed digits, so that text also appears in the result
   snapshot.
 - **Set-value refusal.** Observe, find the edit field's `text` element index,
-  then run `$CH set-value --context "$TOKEN" --element-index <n> --value "123" --json`.
+  then run `$CH set-value --context "$TOKEN" --element-index <n> --value "123" --goal "Set the field." --json`.
   Exit code `0` with `outcome.state: "not_attempted"` and
   `outcome.error.code: "value_not_settable"` — Calculator's display is
   read-only, and the refusal is the proof.

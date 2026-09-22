@@ -32,6 +32,8 @@ feature file as the recipe.
   line containing `scroll area Edit field`, then take the first following
   `text` line, strip leading element index and U+200E marks.
 - Treat every command as literal. Keep quoted names and flags unchanged.
+- `--goal` is required on get-app-state, click, perform-secondary-action,
+  scroll, and set-value. With `CROSSHANDS_JEV` unset, that sentence is ignored.
 - Restore app state after a mutation (clear the Calculator field with Escape,
   quit apps the run launched). Do not remove proof artifacts during cleanup.
 

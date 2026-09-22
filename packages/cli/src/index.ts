@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import { chmod, lstat, open } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
-import type { ComputerOperationName } from '@crosshands/contract'
+import { operationRequiresGoal, type ComputerOperationName } from '@crosshands/contract'
 
 import { unwrapBrokerResult } from './broker-result.js'
 import { dispatchPublicOperation } from './intent/dispatch.js'
@@ -221,6 +221,8 @@ function parseFlags(args: string[], command: string): Flags {
   return flags
 }
 
+function stringFlag(flags: Flags, name: string, required: true): string
+function stringFlag(flags: Flags, name: string, required?: false): string | undefined
 function stringFlag(flags: Flags, name: string, required = false): string | undefined {
   const value = flags.get(name)
   if (typeof value === 'string') return value
@@ -262,7 +264,7 @@ function windowSelector(flags: Flags): unknown {
 }
 
 function contextToken(flags: Flags): string {
-  return stringFlag(flags, 'context', true)!
+  return stringFlag(flags, 'context', true)
 }
 
 function chordTokens(raw: string): string[] {
@@ -276,11 +278,6 @@ function parseClickModifiers(flags: Flags): string[] | undefined {
   if (modifiers.length === 0 || modifiers.length > 4)
     throw new CliError('invalid_argument', 'Invalid --modifiers')
   return modifiers
-}
-
-function optionalGoal(flags: Flags): { goal?: string } {
-  const goal = stringFlag(flags, 'goal')
-  return goal === undefined ? {} : { goal }
 }
 
 function actionTarget(flags: Flags, options: { coordinates?: boolean } = {}): unknown {
@@ -315,6 +312,22 @@ async function protectedText(flags: Flags, name: 'text' | 'value', io: CliIo): P
 }
 
 async function operationInput(command: string, flags: Flags, io: CliIo): Promise<unknown> {
+  const input = await operationFields(command, flags, io)
+  const operation = COMMANDS[command]
+  if (
+    operation === undefined ||
+    operation === 'doctor' ||
+    !operationRequiresGoal(operation) ||
+    input === null ||
+    typeof input !== 'object' ||
+    Array.isArray(input)
+  ) {
+    return input
+  }
+  return { ...input, goal: stringFlag(flags, 'goal', true) }
+}
+
+async function operationFields(command: string, flags: Flags, io: CliIo): Promise<unknown> {
   const common = () => {
     const app = stringFlag(flags, 'app')
     return {
@@ -341,14 +354,12 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       if (context !== undefined) {
         return {
           contextToken: context,
-          ...optionalGoal(flags),
           ...observationFlags(flags)
         }
       }
       return {
         app: stringFlag(flags, 'app', true),
         ...(window === undefined ? {} : { window }),
-        ...optionalGoal(flags),
         ...observationFlags(flags)
       }
     }
@@ -361,7 +372,6 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       return {
         ...common(),
         target: actionTarget(flags, { coordinates: true }),
-        ...optionalGoal(flags),
         ...(clickCount === undefined ? {} : { clickCount }),
         ...(button === undefined ? {} : { button }),
         ...(modifiers === undefined ? {} : { modifiers })
@@ -371,11 +381,10 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       return {
         ...common(),
         target: actionTarget(flags),
-        action: stringFlag(flags, 'action', true),
-        ...optionalGoal(flags)
+        action: stringFlag(flags, 'action', true)
       }
     case 'scroll': {
-      const direction = stringFlag(flags, 'direction', true)!
+      const direction = stringFlag(flags, 'direction', true)
       if (!['up', 'down', 'left', 'right'].includes(direction))
         throw new CliError('invalid_argument', 'Invalid --direction')
       const pages = numberFlag(flags, 'pages', { integer: true, min: 1 })
@@ -383,7 +392,6 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
         ...common(),
         target: actionTarget(flags, { coordinates: true }),
         direction,
-        ...optionalGoal(flags),
         ...(pages === undefined ? {} : { pages })
       }
     }
@@ -429,7 +437,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
         key: stringFlag(flags, 'key', true)
       }
     case 'hotkey': {
-      const keys = chordTokens(stringFlag(flags, 'key', true)!)
+      const keys = chordTokens(stringFlag(flags, 'key', true))
       if (keys.length < 2 || keys.some((key) => key.length === 0))
         throw new CliError('invalid_argument', 'Hotkeys require a modifier and key')
       return { ...common(), target: { kind: 'context-window' }, keys }
@@ -438,8 +446,7 @@ async function operationInput(command: string, flags: Flags, io: CliIo): Promise
       return {
         ...common(),
         target: actionTarget(flags),
-        value: await protectedText(flags, 'value', io),
-        ...optionalGoal(flags)
+        value: await protectedText(flags, 'value', io)
       }
     default:
       throw new CliError('invalid_argument', `Unknown computer command: ${command}`)
@@ -469,6 +476,14 @@ async function runDoctor(client: CliBrokerClient): Promise<unknown> {
 }
 
 function serializedError(cause: unknown): Record<string, unknown> {
+  if (cause instanceof Error && cause.name === 'ZodError') {
+    return {
+      code: 'invalid_argument',
+      message: 'Invalid input',
+      retry: false,
+      remediation: 'correct_request'
+    }
+  }
   if (cause !== null && typeof cause === 'object') {
     const record = cause as Record<string, unknown>
     if (typeof record.toJSON === 'function')
