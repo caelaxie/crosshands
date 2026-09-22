@@ -28,13 +28,13 @@
   },
   "integration": {
     "cliSkill": {
-      "package": "@crosshands/cli@0.2.2",
+      "package": "@crosshands/cli@0.2.3",
       "command": "crosshands computer",
       "skill": "skills/crosshands-computer-use/SKILL.md",
       "skillSha256": "23c7591da273800a1c7296b118e2615bbd68097eeb26b2e4b1f575975984e5f8"
     },
     "mcp": {
-      "package": "@crosshands/mcp@0.2.2",
+      "package": "@crosshands/mcp@0.2.3",
       "transport": "stdio",
       "command": "crosshands-mcp",
       "args": []
