@@ -66,8 +66,9 @@ describe('set product version', () => {
     expect(() => parseProductVersion('latest')).toThrow(/Invalid product version: latest/)
   })
 
-  it('rewrites registry files to 0.2.1 and is idempotent', async () => {
+  it('rewrites registry files to a new version and is idempotent', async () => {
     const root = await copyTree()
+    const version = '9.9.9'
     const originalCatalog = JSON.parse(
       await readFile(join(root, 'benchmarks/agents/catalog.json'), 'utf8')
     ) as {
@@ -75,8 +76,8 @@ describe('set product version', () => {
       promptSha256: string
       releasePolicySha256: string
     }
-    const result = await setProductVersion({ root, version: '0.2.1' })
-    expect(result.version).toBe('0.2.1')
+    const result = await setProductVersion({ root, version })
+    expect(result.version).toBe(version)
     expect(result.changedPaths).toContain('packages/cli/package.json')
     expect(result.changedPaths).toContain('packages/contract/src/versions.ts')
     expect(result.changedPaths).toContain('benchmarks/agents/configs/codex-macos.json')
@@ -86,20 +87,20 @@ describe('set product version', () => {
     const cli = JSON.parse(await readFile(join(root, 'packages/cli/package.json'), 'utf8')) as {
       version: string
     }
-    expect(cli.version).toBe('0.2.1')
+    expect(cli.version).toBe(version)
     expect(JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))).toMatchObject({
       version: '0.0.0'
     })
 
     const versions = await readFile(join(root, 'packages/contract/src/versions.ts'), 'utf8')
-    expect(versions).toContain("product: '0.2.1'")
+    expect(versions).toContain(`product: '${version}'`)
     expect(versions).toContain("publicContract: '1.2.0'")
 
     const pin = JSON.parse(
       await readFile(join(root, 'integrations/codex/integration.json'), 'utf8')
     ) as { cli: { package: string }; mcp: { package: string } }
-    expect(pin.cli.package).toBe('@crosshands/cli@0.2.1')
-    expect(pin.mcp.package).toBe('@crosshands/mcp@0.2.1')
+    expect(pin.cli.package).toBe(`@crosshands/cli@${version}`)
+    expect(pin.mcp.package).toBe(`@crosshands/mcp@${version}`)
 
     const configPath = join(root, 'benchmarks/agents/configs/codex-macos.json')
     const configBytes = await readFile(configPath)
@@ -118,8 +119,8 @@ describe('set product version', () => {
     expect(catalog.releasePolicySha256).toBe(originalCatalog.releasePolicySha256)
     expect(JSON.parse(configBytes.toString('utf8'))).toMatchObject({
       integration: {
-        cliSkill: { package: '@crosshands/cli@0.2.1' },
-        mcp: { package: '@crosshands/mcp@0.2.1' }
+        cliSkill: { package: `@crosshands/cli@${version}` },
+        mcp: { package: `@crosshands/mcp@${version}` }
       }
     })
     expect(await readFile(join(root, 'tests/fixtures/example.json'), 'utf8')).toBe(
@@ -127,7 +128,7 @@ describe('set product version', () => {
     )
 
     const before = await readFile(join(root, 'packages/cli/package.json'))
-    const again = await setProductVersion({ root, version: '0.2.1' })
+    const again = await setProductVersion({ root, version })
     expect(again.changedPaths).toEqual([])
     expect(await readFile(join(root, 'packages/cli/package.json'))).toEqual(before)
   })
