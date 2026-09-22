@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Agent-agnostic local computer-use CLI",
   "license": "MIT",
   "bin": {
