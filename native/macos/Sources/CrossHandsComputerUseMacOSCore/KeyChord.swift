@@ -55,7 +55,16 @@ public enum KeyChordParser {
                 keyName = part
             }
         }
-        guard let keyName, let keyCode = codes[keyName] else {
+        guard var keyName else {
+            throw KeyChordError.unsupportedKey(spec)
+        }
+        if keyName == "*" || keyName == "multiply" {
+            keyName = "8"
+            if !modifiers.contains(.shift) {
+                modifiers.append(.shift)
+            }
+        }
+        guard let keyCode = codes[keyName] else {
             throw KeyChordError.unsupportedKey(spec)
         }
         return KeyChord(keyCode: keyCode, modifiers: modifiers)

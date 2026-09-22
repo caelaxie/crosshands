@@ -16,6 +16,7 @@ final class KeyChordTests: XCTestCase {
         let shiftedEight = try KeyChordParser.parse("shift+8")
         XCTAssertEqual(try KeyChordParser.parse("*"), shiftedEight)
         XCTAssertEqual(try KeyChordParser.parse("multiply"), shiftedEight)
+        XCTAssertEqual(try KeyChordParser.parse("shift+*"), shiftedEight)
         XCTAssertEqual(shiftedEight, KeyChord(keyCode: 28, modifiers: [.shift]))
     }
 }
