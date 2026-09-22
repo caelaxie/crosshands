@@ -33,7 +33,7 @@ Preconditions:
   `Calculator`, and logical `bounds`.
 - **Read state.** Run `$CH get-app-state --app com.apple.calculator --json`.
   Exit code `0`; the result has `context.token` (`ctx_…`), a `snapshot` with
-  `treeText` (root line `App=com.apple.calculator`), `elementCount`, and a
+  `treeText` (root line `App=com.apple.calculator (pid <pid>)`), `elementCount`, and a
   base64 `screenshot` with `scale`. `issues` is `[]`.
 - **Export screenshot.** Run
   `$CH get-app-state --app com.apple.calculator --screenshot-output "$EVIDENCE/state.png" --json`.
@@ -51,6 +51,10 @@ Preconditions:
 
 ## Gotchas
 
+- A Calculator window that has just opened can make `get-app-state` exit `4`
+  with `permission_denied` ("visible windows but no accessibility window")
+  even while doctor says `ready`. Wait a couple of seconds and observe again
+  before treating that as a missing Accessibility grant.
 - Element indexes in `treeText` belong to the returned context token and go
   stale after any mutation, rerender, or window change. Always re-observe.
 - Calculator's `treeText` shows buttons without names; identify digit buttons

@@ -45,8 +45,9 @@ Preconditions:
   shows both. This is the canonical proof.
 - **Protected stdin.** Run
   `printf '%s' "42" | $CH type-text --context "$TOKEN" --text-stdin --json`.
-  Exit code `0`; the canary string appears in no stdout/stderr; the field
-  shows the typed digits.
+  Exit code `0`; stderr is empty and the canary is not a CLI argument. The
+  field shows the typed digits, so that text also appears in the result
+  snapshot.
 - **Set-value refusal.** Observe, find the edit field's `text` element index,
   then run `$CH set-value --context "$TOKEN" --element-index <n> --value "123" --json`.
   Exit code `0` with `outcome.state: "not_attempted"` and
@@ -66,7 +67,9 @@ Preconditions:
   shows the pre-key state, wait ~1s and observe again before concluding.
 - The key name set is finite (`native/macos/.../KeyMap.swift`): letters,
   digits, `=`, `-`, arrows, `Return`/`Enter`, `Escape`/`Esc`, `Tab`, `Space`,
-  `Backspace`/`Delete`, etc. Unsupported names exit `2` (`invalid_argument`).
+  `Backspace`/`Delete`, etc. Unsupported names such as `*` exit `0` with
+  `outcome.state: "not_attempted"` and `outcome.error.code: "invalid_argument"`.
+  Exit `2` is only a CLI-local rejection, such as a missing flag.
 - `hotkey` requires at least one modifier plus a key; `paste-text` clobbers
   then restores the operator's clipboard — prefer `type-text` in proofs and
   never use paste for secrets.

@@ -48,11 +48,9 @@ Preconditions:
   `$CH click --context "$TOKEN" --x <x> --y <y> --json`. Re-observe and assert
   the intended state change. Measure carefully: the PNG starts at the
   window's top-left but the title bar, toolbar, and display area consume the
-  top ~60% of the basic Calculator window — on 2026-09-21 a mis-measured
-  point landed on `Change Sign` instead of `1`, which looks exactly like a
-  dropped click on a `0` field. If nothing changed at a well-measured point,
-  that is the expected staged-payload behavior (see Gotchas) — record it; do
-  not retry blindly.
+  top of the basic Calculator window. A mis-measured point can hit another
+  button. Re-observe. Do not treat a `0` exit as proof, and do not retry an
+  unchanged display blindly.
 - **Secondary action refusal.** Observe, pick an element advertising
   `Secondary Actions` (the `scroll area Edit field` always does), then run
   `$CH perform-secondary-action --context "$TOKEN" --element-index <n> --action delete --json`.
@@ -67,25 +65,20 @@ Preconditions:
 
 ## Gotchas
 
-- Prefer element targets. Coordinate clicks post synthetic mouse events to
-  the target pid (`CGEvent.postToPid`), and SwiftUI apps such as Calculator
-  silently drop queue-injected mouse events — the click dispatches but nothing
-  changes. Root-caused 2026-09-21: at the same point, HID-tap events and an AX
-  hit-test + `AXPress` both work, while `postToPid` does not; the HID tap is
-  deliberately off-limits (pinned by `ProviderBoundarySourceTests`), so in
-  source, plain coordinate clicks now upgrade to the accessibility action of
-  the element at the point (same action preference as element clicks,
-  pid-checked, synthetic fallback when nothing actionable sits there). The fix
-  ships with the next native payload release; staged payloads ≤ 0.1.6 still
-  drop synthetic coordinate clicks. A `0` exit code and even
-  `dispatched: true` in diagnostics are not proof of effect — re-observe.
+- Prefer element targets. A plain coordinate click with no modifiers and a
+  click count of 1 uses the accessibility action of the element at that
+  point when the element's process is the target. The synthetic
+  `postToPid` path remains for points with no actionable element, for
+  modified clicks, and for a click count above 1. Re-observe. Exit `0` is
+  not proof of effect.
 - Element indexes shift when the tree changes (opening Calculator's history
   sidebar renumbers everything). Compute indexes from the same observation
   whose token you pass.
 - Non-empty `--modifiers` on click skips the AX press path and forces the
   synthetic path — expect the weaker verification story.
-- Middle-click is rejected (`invalid_argument`); right-click element targets
-  try `AXShowMenu`.
+- Middle-click is rejected on the synthetic path (`invalid_argument`). An
+  element middle-click with no modifiers still tries `AXPress` first.
+  Right-click element targets try `AXShowMenu`.
 - `perform-secondary-action` matches action names case-insensitively against
   the element's advertised actions; anything else is `action_not_supported`,
   returned as `outcome.state: "not_attempted"` with exit code `0`.
