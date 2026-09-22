@@ -89,7 +89,11 @@ function description(name: ComputerOperationName, mutation: boolean): string {
   const protectedInput = PROTECTED_INPUT_OPERATIONS.has(name)
     ? ' Literal text/value arguments over MCP are not secret-safe. Set protectedInput=true to reject before dispatch with CLI stdin remediation.'
     : ''
-  return `${humanize(name)} through the shared CrossHands operation contract. ${effect}${protectedInput} ${UNTRUSTED_RESULT_NOTICE}`
+  const keyNames =
+    name === 'pressKey'
+      ? ' `*` and `multiply` press Shift+8. Other names are US virtual keys such as `9`, `x`, `=`, and `return`.'
+      : ''
+  return `${humanize(name)} through the shared CrossHands operation contract. ${effect}${protectedInput}${keyNames} ${UNTRUSTED_RESULT_NOTICE}`
 }
 
 function inputJsonSchema(name: ComputerOperationName): Record<string, unknown> {
