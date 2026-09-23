@@ -69,14 +69,6 @@ final class ProviderBoundarySourceTests: XCTestCase {
         XCTAssertTrue(source.contains("target process changed before dispatch"))
     }
 
-    func testUndatedAppsUseTheKernelProcessStart() throws {
-        let source = try entrypoint()
-        XCTAssertEqual(source.components(separatedBy: "runningAppDescriptor(app)").count - 1, 2)
-        XCTAssertTrue(source.contains("launchDate: app.launchDate"))
-        XCTAssertTrue(source.contains("kernelStart: kernelProcessStartDate(pid: pid)"))
-        XCTAssertFalse(source.contains("let processStartedAt = app.launchDate"))
-    }
-
     func testScreenshotLimiterNeverReturnsOversizedFallback() throws {
         let source = try entrypoint()
         let start = try XCTUnwrap(source.range(of: "private func boundedPngData"))

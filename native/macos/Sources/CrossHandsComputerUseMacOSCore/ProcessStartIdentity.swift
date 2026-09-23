@@ -2,12 +2,7 @@ import Darwin
 import Foundation
 
 /// Launch Services can omit `NSRunningApplication.launchDate` for a live app.
-/// Prefer that date when it exists so an app keeps the same `processStartedAt`.
-/// Otherwise use the kernel start time, which stays constant for the life of the pid.
-public func processStartedAt(launchDate: Date?, kernelStart: Date?) -> Date? {
-    launchDate ?? kernelStart
-}
-
+/// The kernel start time stays constant for the life of that pid.
 public func kernelProcessStartDate(pid: pid_t) -> Date? {
     guard pid > 0 else { return nil }
     var info = proc_bsdinfo()

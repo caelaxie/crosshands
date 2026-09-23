@@ -672,10 +672,7 @@ final class Provider {
               pidIsLive(pid),
               let executableId = app.executableURL?.resolvingSymlinksInPath().path,
               !executableId.isEmpty,
-              let startedAt = processStartedAt(
-                  launchDate: app.launchDate,
-                  kernelStart: kernelProcessStartDate(pid: pid)
-              )
+              let startedAt = app.launchDate ?? kernelProcessStartDate(pid: pid)
         else { return nil }
         return AppDescriptor(
             name: name,
