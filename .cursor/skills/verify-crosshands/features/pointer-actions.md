@@ -1,7 +1,7 @@
 # Pointer actions
 
-Pointer actions let the agent click elements or coordinates, invoke advertised
-accessibility secondary actions, scroll, and drag inside a target window.
+Pointer actions let the agent click elements or coordinates, invoke an
+element's accessibility actions, scroll, and drag inside a target window.
 Element targets use the accessibility press path; coordinate targets upgrade
 to the accessibility action of the element at the point when one exists
 (synthetic fallback) and must always be re-verified.
@@ -10,7 +10,7 @@ to the accessibility action of the element at the point when one exists
 
 - `click-element` presses an element by index (AX action path).
 - `click-coordinate` synthetic-clicks a window-local point.
-- `secondary-action` performs an element's advertised AX secondary action.
+- `secondary-action` performs an action the element has, including names the tree omits from `Secondary Actions`.
 - `scroll` scrolls a window or element in a direction.
 - `drag` drags between two elements or two points.
 
@@ -19,7 +19,7 @@ to the accessibility action of the element at the point when one exists
 - Run `crosshands computer click --context <token> (--element-index <n> | --x <x> --y <y>) --goal <goal> [--mouse-button left|right|middle] [--modifiers Shift+CmdOrCtrl] --json`.
 - Run `crosshands computer perform-secondary-action --context <token> --element-index <n> --action <name> --goal <goal> --json`.
 - Run `crosshands computer scroll --context <token> (--element-index <n> | --x <x> --y <y>) --direction <up|down|left|right> [--pages <n>] --goal <goal> --json`.
-- Run `crosshands computer drag --context <token> (--from-element-index <n> | --from-x <x> --from-y <y>) (--to-element-index <n> | --to-x <x> --to-y <y>) [--duration-ms <n>] --json`.
+- Run `crosshands computer drag --context <token>` with both ends as element indexes (`--from-element-index` and `--to-element-index`) or both ends as points (`--from-x`, `--from-y`, `--to-x`, `--to-y`). Optional `--duration-ms`. A mixed pair is not a drag.
 
 ## Driving it with the repo-built CLI
 
@@ -55,9 +55,9 @@ Preconditions:
   `Secondary Actions` (the `scroll area Edit field` always does), then run
   `$CH perform-secondary-action --context "$TOKEN" --element-index <n> --action delete --goal "Press the control." --json`.
   Exit code `0` with `outcome.state: "not_attempted"` and
-  `outcome.error.code: "action_not_supported"` — the refusal with remediation
-  is the proof; the valid action names are the ones advertised in the
-  element's `Secondary Actions` list.
+  `outcome.error.code: "action_not_supported"`. The refusal is the proof.
+  Names on the `Secondary Actions` line work. Raw names the tree omits,
+  including `AXPress`, work too.
 - **Scroll and drag.** Calculator's basic mode has no deterministic
   scrollable or draggable surface. Verify these only against an
   operator-authorized app with such a surface, using the exact command shapes
@@ -80,5 +80,9 @@ Preconditions:
   element middle-click with no modifiers still tries `AXPress` first.
   Right-click element targets try `AXShowMenu`.
 - `perform-secondary-action` matches action names case-insensitively against
-  the element's advertised actions; anything else is `action_not_supported`,
+  every action on the element, including names omitted from the
+  `Secondary Actions` line. Anything else is `action_not_supported`,
   returned as `outcome.state: "not_attempted"` with exit code `0`.
+- A drag whose ends are not both elements or both points exits `0` with
+  `outcome.state: "not_attempted"` and `outcome.error.code: "invalid_argument"`.
+  It does not move the pointer.

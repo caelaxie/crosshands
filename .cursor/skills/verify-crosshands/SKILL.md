@@ -17,7 +17,7 @@ and a signed native helper. The primary surface is the CLI; the MCP adapter
 must stay equivalent. This skill drives the **repo build** end to end against
 the **real desktop of the machine you run on**.
 
-Verified on macOS (darwin, Apple silicon) with product version 0.2.1. The
+Verified on macOS (darwin, Apple silicon) with product version 0.2.4. The
 CLI/broker/contract tiers are platform-agnostic; the live desktop recipes use
 Calculator and are macOS-specific.
 

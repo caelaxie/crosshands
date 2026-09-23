@@ -10,7 +10,7 @@ canonical live proof for CrossHands: driving Calculator to evaluate `9*9`.
 - `type-text` types literal characters into the context window.
 - `press-key` presses a named key (`Return`, `Escape`, `=`, arrows, ...).
 - `hotkey` sends a modifier chord (`CmdOrCtrl+Shift+P`).
-- `paste-text` sets the clipboard, pastes, and restores the clipboard.
+- `paste-text` writes into a focused field that accepts replacement, and does not touch the clipboard on that path. Otherwise it saves the clipboard, pastes, and restores it.
 - `set-value` writes an element's AX value when the element is settable.
 - `protected-stdin` reads `--text-stdin` / `--value-stdin` from stdin only.
 
@@ -65,13 +65,14 @@ Preconditions:
   once, then re-observe.
 - Key delivery is asynchronous. If an observation right after a keypress
   shows the pre-key state, wait ~1s and observe again before concluding.
-- The key name set is finite (`native/macos/.../KeyMap.swift`): letters,
+- The key name set is finite (`native/macos/.../KeyChord.swift`): letters,
   digits, `=`, `-`, arrows, `Return`/`Enter`, `Escape`/`Esc`, `Tab`, `Space`,
-  `Backspace`/`Delete`, etc. Unsupported names such as `*` exit `0` with
+  `Backspace`/`Delete`, etc. `*` and `multiply` are accepted and sent as
+  Shift-8. An unknown name such as `f1` exits `0` with
   `outcome.state: "not_attempted"` and `outcome.error.code: "invalid_argument"`.
   Exit `2` is only a CLI-local rejection, such as a missing flag.
-- `hotkey` requires at least one modifier plus a key; `paste-text` clobbers
-  then restores the operator's clipboard — prefer `type-text` in proofs and
-  never use paste for secrets.
+- `hotkey` requires at least one modifier plus a key. `paste-text` touches
+  the clipboard only when the focused field does not accept replacement.
+  Prefer `type-text` in proofs and never use paste for secrets.
 - `type-text`/`set-value` accept `--text`/`--value` literals, but protected
   values must go over stdin; the CLI never falls back across channels.
