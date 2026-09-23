@@ -99,9 +99,18 @@ export function suggestionFromAnswers(
   }
 }
 
+const CRITERION_TEXT_MAX = 80
+
+function postedControlName(move: TreeMove): string {
+  const combined = `${move.role} ${move.label}`.trim()
+  const head = combined.split(/[\n,]/, 1)[0]?.trim() ?? ''
+  if (head.length <= CRITERION_TEXT_MAX) return head
+  return head.slice(0, CRITERION_TEXT_MAX)
+}
+
 export function criteria(moves: readonly TreeMove[]): Record<string, string> {
   return Object.fromEntries(
-    moves.map((move) => [String(move.elementIndex), `${move.role} ${move.label}`.trim()])
+    moves.map((move) => [String(move.elementIndex), postedControlName(move)])
   )
 }
 
