@@ -29,7 +29,7 @@ function move(elementIndex: number, role: string, label: string): TreeMove {
   }
 }
 
-const eighty = `button ${'N'.repeat(73)}`
+const eighty = 'button NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN'
 
 describe('criteria', () => {
   it('keeps a short control name', () => {
@@ -43,14 +43,24 @@ describe('criteria', () => {
         move(41, 'text area', 'Body\nCANARY-AREA keeps going'),
         move(12, 'button', 'N'.repeat(74)),
         move(7, 'button', 'N'.repeat(73)),
-        move(3, 'text field', ', Value: CANARY-ONLY')
+        move(3, 'text field', ', Value: CANARY-ONLY'),
+        move(42, 'text field', '(selected, settable) Compose, Value: the essay'),
+        move(43, 'text field', 'Address, Placeholder: Search'),
+        move(44, 'button', 'Save, Secondary Actions: press'),
+        move(45, 'heading', 'Title, Description: subtitle'),
+        move(46, 'text', 'Note, Text: body')
       ])
     ).toEqual({
       '40': 'text field Compose',
       '41': 'text area Body',
       '12': eighty,
       '7': eighty,
-      '3': 'text field'
+      '3': 'text field',
+      '42': 'text field (selected, settable) Compose',
+      '43': 'text field Address',
+      '44': 'button Save',
+      '45': 'heading Title',
+      '46': 'text Note'
     })
   })
 
@@ -60,6 +70,7 @@ describe('criteria', () => {
       '0 standard window Chat',
       '\t13 button Send',
       `\t40 text field Compose, Value: ${essay}`,
+      '\t42 text field (selected, settable) Compose, Value: the essay',
       '\t41 text area Note',
       'the rest of the note is CANARY-AREA and has no comma',
       `\t12 button ${'N'.repeat(90)}`
@@ -67,6 +78,7 @@ describe('criteria', () => {
     expect(criteria(clickableMoves(parseTreeMoves(tree)))).toEqual({
       '13': 'button Send',
       '40': 'text field Compose',
+      '42': 'text field (selected, settable) Compose',
       '41': 'text area Note',
       '12': eighty
     })

@@ -101,11 +101,24 @@ export function suggestionFromAnswers(
 
 const CRITERION_TEXT_MAX = 80
 
+const METADATA_MARKS = [
+  ', Value:',
+  ', Placeholder:',
+  ', Description:',
+  ', Text:',
+  ', Secondary Actions:'
+] as const
+
 function postedControlName(move: TreeMove): string {
   const combined = `${move.role} ${move.label}`.trim()
-  const head = combined.split(/[\n,]/, 1)[0]?.trim() ?? ''
-  if (head.length <= CRITERION_TEXT_MAX) return head
-  return head.slice(0, CRITERION_TEXT_MAX)
+  const newline = combined.indexOf('\n')
+  const firstLine = newline === -1 ? combined : combined.slice(0, newline)
+  let end = firstLine.length
+  for (const mark of METADATA_MARKS) {
+    const at = firstLine.indexOf(mark)
+    if (at !== -1 && at < end) end = at
+  }
+  return firstLine.slice(0, end).trim().slice(0, CRITERION_TEXT_MAX)
 }
 
 export function criteria(moves: readonly TreeMove[]): Record<string, string> {
