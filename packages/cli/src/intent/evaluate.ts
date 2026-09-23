@@ -101,29 +101,14 @@ export function suggestionFromAnswers(
 
 const CRITERION_TEXT_MAX = 80
 
-const METADATA_MARKS = [
-  ', Value:',
-  ', Placeholder:',
-  ', Description:',
-  ', Text:',
-  ', Secondary Actions:'
-] as const
-
-function postedControlName(move: TreeMove): string {
-  const combined = `${move.role} ${move.label}`.trim()
-  const newline = combined.indexOf('\n')
-  const firstLine = newline === -1 ? combined : combined.slice(0, newline)
-  let end = firstLine.length
-  for (const mark of METADATA_MARKS) {
-    const at = firstLine.indexOf(mark)
-    if (at !== -1 && at < end) end = at
-  }
-  return firstLine.slice(0, end).trim().slice(0, CRITERION_TEXT_MAX)
-}
-
 export function criteria(moves: readonly TreeMove[]): Record<string, string> {
   return Object.fromEntries(
-    moves.map((move) => [String(move.elementIndex), postedControlName(move)])
+    moves.map((move) => {
+      const name = `${move.role} ${move.label}`.trim()
+      // Code points, so a cap on an emoji name does not end on a lone surrogate.
+      const capped = [...name].slice(0, CRITERION_TEXT_MAX).join('')
+      return [String(move.elementIndex), capped]
+    })
   )
 }
 

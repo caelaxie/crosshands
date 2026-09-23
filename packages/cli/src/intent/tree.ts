@@ -51,23 +51,40 @@ function isHeaderOrFooter(line: string): boolean {
   return false
 }
 
-function roleAndLabel(body: string): { role: string; label: string } {
-  const lower = body.toLowerCase()
+// Darwin, Linux, and Windows append these after the visible name.
+// Darwin writes a leading space and no comma on Placeholder when name and value are absent.
+const METADATA_MARK = /, (?:Value|Placeholder|Description|Text|Secondary Actions):| Placeholder:/
+
+function visibleControlText(body: string): string {
+  const newline = body.indexOf('\n')
+  const firstLine = newline === -1 ? body : body.slice(0, newline)
+  const mark = firstLine.search(METADATA_MARK)
+  const visible = mark === -1 ? firstLine : firstLine.slice(0, mark)
+  return visible.trim()
+}
+
+const DISABLED_TRAIT = /\((?:[^)]*,\s*)?disabled(?:\s*,[^)]*)?\)/
+const SETTABLE_TRAIT = /\((?:[^)]*,\s*)?settable(?:\s*,[^)]*)?\)/
+
+function splitRole(visible: string): { role: string; label: string } {
+  const lower = visible.toLowerCase()
   const multi = MULTI_WORD_ROLES.find(
     (role) =>
-      lower.startsWith(role) && (body.length === role.length || /[\s,(]/.test(body[role.length]!))
+      lower.startsWith(role) &&
+      (visible.length === role.length || /[\s,(]/.test(visible[role.length]!))
   )
   if (multi !== undefined) {
     return {
-      role: body.slice(0, multi.length),
-      label: body.slice(multi.length).replace(/^[\s,]+/, '')
+      role: visible.slice(0, multi.length),
+      label: visible
+        .slice(multi.length)
+        .replace(/^[\s,]+/, '')
+        .trim()
     }
   }
-  const comma = body.indexOf(',')
-  const head = (comma === -1 ? body : body.slice(0, comma)).trim()
-  const space = head.indexOf(' ')
-  if (space === -1) return { role: head, label: '' }
-  return { role: head.slice(0, space), label: head.slice(space + 1).trim() }
+  const space = visible.indexOf(' ')
+  if (space === -1) return { role: visible, label: '' }
+  return { role: visible.slice(0, space), label: visible.slice(space + 1).trim() }
 }
 
 export function parseTreeMoves(treeText: string): TreeMove[] {
@@ -82,10 +99,11 @@ export function parseTreeMoves(treeText: string): TreeMove[] {
     if (previous !== undefined && !isHeaderOrFooter(line)) previous.body += `\n${line}`
   }
   return rows.map((row) => {
-    const { role, label } = roleAndLabel(row.body)
-    const disabled = /\(disabled\)/.test(row.body)
+    const visible = visibleControlText(row.body)
+    const { role, label } = splitRole(visible)
+    const disabled = DISABLED_TRAIT.test(visible)
     const roleKey = role.toLowerCase()
-    const settable = /\(settable\)/.test(row.body) || SETTABLE_ROLE.has(roleKey)
+    const settable = SETTABLE_TRAIT.test(visible) || SETTABLE_ROLE.has(roleKey)
     const clickable = !disabled && (CLICKABLE_ROLE.has(roleKey) || settable)
     return {
       elementIndex: row.elementIndex,
