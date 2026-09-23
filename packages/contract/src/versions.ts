@@ -1,7 +1,7 @@
 import { createComputerError } from './errors.js'
 
 export const CONTRACT_VERSIONS = {
-  product: '0.2.3',
+  product: '0.2.4',
   publicContract: '1.2.0',
   brokerControl: 1,
   providerProtocol: 1,

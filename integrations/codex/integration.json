@@ -1,12 +1,12 @@
 {
   "client": "codex",
   "cli": {
-    "package": "@crosshands/cli@0.2.3",
+    "package": "@crosshands/cli@0.2.4",
     "command": "crosshands",
     "skill": "../../skills/crosshands-computer-use/SKILL.md"
   },
   "mcp": {
-    "package": "@crosshands/mcp@0.2.3",
+    "package": "@crosshands/mcp@0.2.4",
     "transport": "stdio",
     "command": "crosshands-mcp",
     "args": []
