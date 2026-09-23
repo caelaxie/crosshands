@@ -17,6 +17,7 @@ import {
   DIAGNOSTIC_RECORD_VERSION,
   diagnosticError,
   diagnosticPlatform,
+  diagnosticAct,
   diagnosticRequestResult,
   diagnosticTarget,
   emitDiagnostic,
@@ -600,6 +601,7 @@ export class LocalBroker {
     cause: unknown
   }): void {
     const target = diagnosticTarget(entry.request.input, entry.bindings)
+    const act = diagnosticAct(entry.request.operation, entry.request.input)
     this.#emit({
       kind: 'request',
       ...this.diagnosticEnvelope(),
@@ -613,6 +615,7 @@ export class LocalBroker {
         total: Math.max(0, this.#now() - entry.enqueuedAt)
       },
       ...(target === undefined ? {} : { target }),
+      ...(act === undefined ? {} : { act }),
       result:
         entry.cause !== undefined
           ? { type: 'error', ...diagnosticError(entry.cause) }

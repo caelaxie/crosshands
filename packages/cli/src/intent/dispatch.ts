@@ -15,26 +15,30 @@ import {
   type Suggestion
 } from '@crosshands/contract'
 
-import { unwrapBrokerResult } from '../broker-result.js'
+import { isBrokerResultEnvelope, unwrapBrokerResult } from '../broker-result.js'
 import { parseJevEnv, type JevEnv } from './env.js'
 import {
   JevEvaluateError,
+  criteria,
   liveEvaluator,
   namedTargetAllowed,
   suggestionFromAnswers,
-  type EvaluateFn
+  type EvaluateFn,
+  type JevAnswers
 } from './evaluate.js'
 import { elapsedMs } from './http.js'
 import {
   createJevCall,
   emitCall,
+  failBeforeCall,
+  failCall,
   recordRank,
   type JevCall,
   type JevLogger,
-  type JevRankStats,
-  type RankRecorder
+  type JevPhase,
+  type JevRankStats
 } from './log.js'
-import { clickableMoves, parseTreeMoves } from './tree.js'
+import { clickableMoves, parseTreeMoves, type TreeMove } from './tree.js'
 
 export type IntentBroker = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
@@ -49,8 +53,38 @@ export type DispatchOptions = {
 const NAMED_GATE = new Set<ComputerOperationName>(['click', 'setValue'])
 
 type RankOutcome =
-  | { ok: true; suggestion: Suggestion; stats: JevRankStats }
-  | { ok: false; stats: JevRankStats }
+  | {
+      ok: true
+      suggestion: Suggestion
+      stats: JevRankStats
+      answers?: JevAnswers
+      moves: readonly TreeMove[]
+    }
+  | {
+      ok: false
+      stats: JevRankStats
+      error?: JevEvaluateError
+      moves: readonly TreeMove[]
+    }
+
+type NamedDecision = {
+  named: number
+  picked?: number
+  refused?: 'index' | 'confidence'
+}
+
+type NamedGate =
+  | { kind: 'skip' }
+  | { kind: 'continue'; decision: NamedDecision }
+  | { kind: 'stop'; result: unknown; decision?: NamedDecision }
+
+type CallTrace = {
+  request(operation: ComputerOperationName, input: unknown): Promise<unknown>
+  note(phase: JevPhase, goal: string, ranked: RankOutcome): void
+  setNamed(decision: NamedDecision): void
+  finish(result: unknown): void
+  fail(cause: unknown): void
+}
 
 function policyUnavailable() {
   return createComputerError('policy_unavailable', 'Jev could not rank this snapshot').toJSON()
@@ -80,6 +114,12 @@ function withSnapshotIssue(
   })
 }
 
+function choiceIndex(which: string | undefined): number | undefined {
+  if (which === undefined || !/^\d+$/.test(which)) return undefined
+  const index = Number(which)
+  return Number.isSafeInteger(index) ? index : undefined
+}
+
 function contextTokenOf(input: object): string | undefined {
   if (!('contextToken' in input) || typeof input.contextToken !== 'string') return undefined
   return input.contextToken
@@ -104,6 +144,24 @@ function boundIndex(operation: ComputerOperationName, suggestion: Suggestion): n
   return undefined
 }
 
+function classifyNamed(named: number, suggestion: Suggestion): NamedDecision {
+  const picked =
+    suggestion.move.kind === 'click' || suggestion.move.kind === 'setValue'
+      ? suggestion.move.elementIndex
+      : undefined
+  const refused =
+    picked !== named
+      ? 'index'
+      : namedTargetAllowed(suggestion.confidence)
+        ? undefined
+        : 'confidence'
+  return {
+    named,
+    ...(picked === undefined ? {} : { picked }),
+    ...(refused === undefined ? {} : { refused })
+  }
+}
+
 function errorFromResult(result: unknown): string | undefined {
   const mutation = PublicMutationResultSchema.safeParse(result)
   if (mutation.success) {
@@ -122,6 +180,62 @@ function boundFromCall(call: JevCall | undefined, result: unknown): boolean | un
   return mutation.success && mutation.data.resolvedTarget !== undefined
 }
 
+function openTrace(
+  broker: IntentBroker,
+  log: JevLogger | undefined,
+  operation: string,
+  goal: string | undefined,
+  started: number
+): CallTrace {
+  const call = log === undefined ? undefined : createJevCall(operation, goal)
+  return {
+    async request(name, input) {
+      const raw = await broker.request(name, input)
+      if (call !== undefined) {
+        call.brokerCalls += 1
+        if (isBrokerResultEnvelope(raw)) call.brokerRequestIds.push(raw.requestId)
+      }
+      return unwrapBrokerResult(raw)
+    },
+    note(phase, goalText, ranked) {
+      recordRank(log, call, phase, ranked.stats, ranked.ok ? ranked.suggestion : undefined)
+      if (log === undefined || !log.debugEnabled) return
+      const answers = ranked.ok ? ranked.answers : undefined
+      const error = ranked.ok ? undefined : ranked.error
+      log.debug({
+        kind: 'jev.debug',
+        operation: call?.operation ?? operation,
+        ...(call === undefined ? {} : { callId: call.callId }),
+        phase,
+        ...(goalText.length > 0 ? { goal: goalText } : {}),
+        clickable: criteria(ranked.moves),
+        ...(answers === undefined ? {} : { answers }),
+        ...(ranked.stats.http === undefined ? {} : { status: ranked.stats.http.status }),
+        ...(error?.errorBody === undefined ? {} : { errorBody: error.errorBody }),
+        ...(error?.errorBodyTruncated !== true ? {} : { errorBodyTruncated: true })
+      })
+    },
+    setNamed(decision) {
+      if (call === undefined) return
+      call.namedIndex = decision.named
+      if (decision.picked !== undefined) call.pickedIndex = decision.picked
+      if (decision.refused !== undefined) call.refused = decision.refused
+    },
+    finish(result) {
+      if (call === undefined) return
+      const extra: { error?: string; bound?: boolean } = {}
+      const error = errorFromResult(result)
+      const bound = boundFromCall(call, result)
+      if (error !== undefined) extra.error = error
+      if (bound !== undefined) extra.bound = bound
+      emitCall(log, call, started, extra)
+    },
+    fail(cause) {
+      failCall(log, call, started, cause)
+    }
+  }
+}
+
 async function rank(
   look: SnapshotResult,
   goal: string,
@@ -130,15 +244,19 @@ async function rank(
 ): Promise<RankOutcome> {
   const snapshotId = look.snapshot.id
   const parseStarted = Date.now()
-  const moves = clickableMoves(parseTreeMoves(look.snapshot.treeText))
+  const parsedMoves = parseTreeMoves(look.snapshot.treeText)
+  const candidateTotal = parsedMoves.filter((move) => move.clickable).length
+  const moves = clickableMoves(parsedMoves)
   const stats: JevRankStats = {
     snapshotId,
     treeChars: look.snapshot.treeText.length,
     elementCount: look.snapshot.elementCount,
     candidateCount: moves.length,
+    candidateTotal,
     parseMs: elapsedMs(parseStarted),
     goalChars: goal.length,
-    app: look.snapshot.app.id
+    app: look.snapshot.app.id,
+    ...(candidateTotal > moves.length ? { capped: true } : {})
   }
   if (moves.length === 0) {
     return {
@@ -148,7 +266,8 @@ async function rank(
         snapshotId,
         move: { kind: 'blocked', reason: 'no_candidate' }
       },
-      stats
+      stats,
+      moves
     }
   }
   const evalStarted = Date.now()
@@ -158,14 +277,26 @@ async function rank(
       ...(app === undefined ? {} : { app }),
       moves
     })
+    const suggestion = suggestionFromAnswers(snapshotId, moves, evaluated.answers)
+    const which =
+      evaluated.answers.move === 'setValue'
+        ? evaluated.answers.setValueWhich
+        : evaluated.answers.clickWhich
+    if (suggestion.move.kind === 'blocked' && suggestion.move.reason === 'no_candidate') {
+      const index = choiceIndex(which)
+      if (index !== undefined) stats.unresolvedIndex = index
+    }
+    if (evaluated.answers.goalMet !== undefined) stats.goalMet = evaluated.answers.goalMet
     return {
       ok: true,
-      suggestion: suggestionFromAnswers(snapshotId, moves, evaluated.answers),
+      suggestion,
+      answers: evaluated.answers,
       stats: {
         ...stats,
         evaluateMs: elapsedMs(evalStarted),
         ...(evaluated.http === undefined ? {} : { http: evaluated.http })
-      }
+      },
+      moves
     }
   } catch (cause) {
     if (cause instanceof ComputerError) throw cause
@@ -176,7 +307,9 @@ async function rank(
         ...stats,
         evaluateMs: elapsedMs(evalStarted),
         ...(http === undefined ? {} : { http })
-      }
+      },
+      moves,
+      ...(cause instanceof JevEvaluateError ? { error: cause } : {})
     }
   }
 }
@@ -187,21 +320,20 @@ function evaluatorFor(env: JevEnv, override: EvaluateFn | undefined): EvaluateFn
   return liveEvaluator(env.apiKey)
 }
 
-async function lookAgain(request: IntentBroker['request'], token: string): Promise<SnapshotResult> {
+async function lookAgain(request: CallTrace['request'], token: string): Promise<SnapshotResult> {
   return snapshotResultOf(
     await request('getAppState', { contextToken: token, captureScreenshot: false })
   )
 }
 
 async function suggestObserve(
-  request: IntentBroker['request'],
   input: PublicOperationInput<'getAppState'>,
   goal: string,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
-  record: RankRecorder
+  trace: CallTrace
 ): Promise<unknown> {
-  const result = await request('getAppState', toBrokerInput('getAppState', input))
+  const result = await trace.request('getAppState', toBrokerInput('getAppState', input))
   if (env.kind === 'off') return result
   const look = snapshotResultOf(result)
   if (env.kind === 'fail_closed' || evaluate === undefined) {
@@ -210,11 +342,8 @@ async function suggestObserve(
   const app = 'app' in input && typeof input.app === 'string' ? input.app : undefined
   try {
     const ranked = await rank(look, goal, evaluate, app)
-    if (!ranked.ok) {
-      record('observe', ranked.stats)
-      return withSnapshotIssue(look, policyUnavailable())
-    }
-    record('observe', ranked.stats, ranked.suggestion)
+    trace.note('observe', goal, ranked)
+    if (!ranked.ok) return withSnapshotIssue(look, policyUnavailable())
     return parsePublicOutput('getAppState', { ...look, suggestion: ranked.suggestion })
   } catch {
     return withSnapshotIssue(look, policyUnavailable())
@@ -222,13 +351,12 @@ async function suggestObserve(
 }
 
 async function bindIntentTarget(
-  request: IntentBroker['request'],
   operation: ComputerOperationName,
   input: object,
   goal: string,
   env: JevEnv,
   evaluate: EvaluateFn | undefined,
-  record: RankRecorder
+  trace: CallTrace
 ): Promise<unknown> {
   if (env.kind === 'off') {
     throw createComputerError('invalid_argument', 'intent targeting requires CROSSHANDS_JEV=1')
@@ -242,17 +370,14 @@ async function bindIntentTarget(
   }
   let look: SnapshotResult
   try {
-    look = await lookAgain(request, token)
+    look = await lookAgain(trace.request, token)
   } catch (cause) {
     if (cause instanceof ComputerError) throw cause
     return notAttempted(policyUnavailable())
   }
   const ranked = await rank(look, goal, evaluate)
-  if (!ranked.ok) {
-    record('bind', ranked.stats)
-    return notAttempted(policyUnavailable())
-  }
-  record('bind', ranked.stats, ranked.suggestion)
+  trace.note('bind', goal, ranked)
+  if (!ranked.ok) return notAttempted(policyUnavailable())
   const index = boundIndex(operation, ranked.suggestion)
   if (index === undefined) return notAttempted(policyUnavailable(), ranked.suggestion)
   const bound = {
@@ -260,7 +385,7 @@ async function bindIntentTarget(
     contextToken: look.context.token,
     target: { kind: 'element' as const, elementIndex: index }
   }
-  const result = await request(operation, toBrokerInput(operation, bound))
+  const result = await trace.request(operation, toBrokerInput(operation, bound))
   const body = result !== null && typeof result === 'object' ? result : {}
   return parsePublicOutput(operation, {
     ...body,
@@ -270,40 +395,39 @@ async function bindIntentTarget(
 }
 
 async function gateNamedTarget(
-  request: IntentBroker['request'],
   input: object,
   goal: string,
   evaluate: EvaluateFn,
-  record: RankRecorder
-): Promise<unknown | undefined> {
+  trace: CallTrace
+): Promise<NamedGate> {
   const named = elementIndexOf(input)
   const token = contextTokenOf(input)
-  if (token === undefined || named === undefined) return undefined
+  if (token === undefined || named === undefined) return { kind: 'skip' }
   try {
-    const look = await lookAgain(request, token)
+    const look = await lookAgain(trace.request, token)
     const ranked = await rank(look, goal, evaluate)
+    trace.note('named', goal, ranked)
     if (!ranked.ok) {
-      record('named', ranked.stats)
-      return notAttempted(policyUnavailable())
+      return { kind: 'stop', decision: { named }, result: notAttempted(policyUnavailable()) }
     }
-    record('named', ranked.stats, ranked.suggestion)
-    const picked =
-      ranked.suggestion.move.kind === 'click' || ranked.suggestion.move.kind === 'setValue'
-        ? ranked.suggestion.move.elementIndex
-        : undefined
-    if (picked !== named || !namedTargetAllowed(ranked.suggestion.confidence)) {
-      return notAttempted(
-        createComputerError(
-          'goal_mismatch',
-          'Named target does not match the per-call goal'
-        ).toJSON(),
-        ranked.suggestion
-      )
+    const decision = classifyNamed(named, ranked.suggestion)
+    if (decision.refused !== undefined) {
+      return {
+        kind: 'stop',
+        decision,
+        result: notAttempted(
+          createComputerError(
+            'goal_mismatch',
+            'Named target does not match the per-call goal'
+          ).toJSON(),
+          ranked.suggestion
+        )
+      }
     }
+    return { kind: 'continue', decision }
   } catch {
-    return notAttempted(policyUnavailable())
+    return { kind: 'stop', result: notAttempted(policyUnavailable()) }
   }
-  return undefined
 }
 
 function parsedGoal(input: object): string {
@@ -319,34 +443,26 @@ export async function dispatchPublicOperation(
   options: DispatchOptions = {}
 ): Promise<unknown> {
   const envState = parseJevEnv(options.env)
-  const parsed = parsePublicInput(operation, rawInput)
+  const log = options.log
+  let parsed: ReturnType<typeof parsePublicInput>
+  try {
+    parsed = parsePublicInput(operation, rawInput)
+  } catch (cause) {
+    failBeforeCall(log, operation, cause)
+    throw cause
+  }
   const { goal } = splitPublicInput(parsed)
   const evaluate = evaluatorFor(envState, options.evaluate)
-  const log = options.log
-  const call = log === undefined ? undefined : createJevCall(operation, goal)
-  const record: RankRecorder = (phase, stats, suggestion) => {
-    recordRank(log, call, phase, stats, suggestion)
-  }
-  const request: IntentBroker['request'] = async (name, input) => {
-    if (call !== undefined) call.brokerCalls += 1
-    return unwrapBrokerResult(await broker.request(name, input))
-  }
+  const started = Date.now()
+  const trace = openTrace(broker, log, operation, goal, started)
 
   async function dispatch(): Promise<unknown> {
     if (operation === 'getAppState') {
       const look = parsed as PublicOperationInput<'getAppState'>
-      return suggestObserve(request, look, parsedGoal(look), envState, evaluate, record)
+      return suggestObserve(look, parsedGoal(look), envState, evaluate, trace)
     }
     if (hasIntentTarget(parsed)) {
-      return bindIntentTarget(
-        request,
-        operation,
-        parsed,
-        parsedGoal(parsed),
-        envState,
-        evaluate,
-        record
-      )
+      return bindIntentTarget(operation, parsed, parsedGoal(parsed), envState, evaluate, trace)
     }
     if (
       goal !== undefined &&
@@ -354,28 +470,19 @@ export async function dispatchPublicOperation(
       evaluate !== undefined &&
       NAMED_GATE.has(operation)
     ) {
-      const gated = await gateNamedTarget(request, parsed, goal, evaluate, record)
-      if (gated !== undefined) return gated
+      const gated = await gateNamedTarget(parsed, goal, evaluate, trace)
+      if (gated.kind !== 'skip' && gated.decision !== undefined) trace.setNamed(gated.decision)
+      if (gated.kind === 'stop') return gated.result
     }
-    return request(operation, toBrokerInput(operation, parsed))
+    return trace.request(operation, toBrokerInput(operation, parsed))
   }
 
-  const started = Date.now()
   try {
     const result = await dispatch()
-    if (call !== undefined) {
-      const extra: { error?: string; bound?: boolean } = {}
-      const error = errorFromResult(result)
-      const bound = boundFromCall(call, result)
-      if (error !== undefined) extra.error = error
-      if (bound !== undefined) extra.bound = bound
-      emitCall(log, call, started, extra)
-    }
+    trace.finish(result)
     return result
   } catch (cause) {
-    if (call !== undefined) {
-      emitCall(log, call, started, cause instanceof ComputerError ? { error: cause.code } : {})
-    }
+    trace.fail(cause)
     throw cause
   }
 }

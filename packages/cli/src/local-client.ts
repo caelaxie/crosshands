@@ -12,7 +12,6 @@ import {
   type LocalControlIdentity
 } from '@crosshands/runtime'
 
-import { unwrapBrokerResult } from './broker-result.js'
 import type { CliBrokerClient } from './index.js'
 
 export type LocalClientPaths = {
@@ -180,8 +179,7 @@ export async function createProductionBrokerClient(
 
 function controlAdapter(control: LocalControlClient): CliBrokerClient {
   return {
-    request: async (operation, input) =>
-      unwrapBrokerResult(await control.request({ operation, input }, { deadlineMs: 30_000 })),
+    request: (operation, input) => control.request({ operation, input }, { deadlineMs: 30_000 }),
     close: () => control.close()
   }
 }

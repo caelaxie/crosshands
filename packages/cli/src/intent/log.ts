@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 
-import type { Suggestion } from '@crosshands/contract'
+import { ComputerError, type Suggestion } from '@crosshands/contract'
 import { JsonlFileWriter, diagnosticsDirectory } from '@crosshands/runtime'
 
 import { localClientPaths } from '../local-client.js'
-import { parseJevEnv } from './env.js'
+import { jevDebugEnabled, parseJevEnv } from './env.js'
+import type { JevAnswers } from './evaluate.js'
 import { elapsedMs, type JevHttpStats } from './http.js'
 
 export type JevPhase = 'observe' | 'bind' | 'named'
@@ -29,6 +30,10 @@ export type JevCallRecord = {
   bound?: boolean
   error?: string
   goal?: string
+  brokerRequestIds?: string[]
+  namedIndex?: number
+  pickedIndex?: number
+  refused?: 'index' | 'confidence'
 }
 
 export type JevHttpRecord = JevShared & {
@@ -53,12 +58,33 @@ export type JevDecisionRecord = JevShared & {
   candidateCount: number
   parseMs: number
   evaluateMs?: number
+  goalMet?: number
+  candidateTotal?: number
+  capped?: true
+  unresolvedIndex?: number
+}
+
+export type JevDebugRecord = {
+  kind: 'jev.debug'
+  operation: string
+  callId?: string
+  phase?: JevPhase
+  goal?: string
+  clickable?: Record<string, string>
+  answers?: JevAnswers
+  status?: number
+  errorBody?: string
+  errorBodyTruncated?: true
+  error?: string
 }
 
 export type JevRecord = JevCallRecord | JevHttpRecord | JevDecisionRecord
 
 export type JevLogger = {
+  readonly calls: boolean
+  readonly debugEnabled: boolean
   emit(record: JevRecord): void
+  debug(record: JevDebugRecord): void
   close(): Promise<void>
 }
 
@@ -70,6 +96,10 @@ export type JevCall = {
   httpMs: number
   brokerCalls: number
   phase?: JevPhase
+  brokerRequestIds: string[]
+  namedIndex?: number
+  pickedIndex?: number
+  refused?: 'index' | 'confidence'
 }
 
 export type JevRankStats = {
@@ -82,9 +112,11 @@ export type JevRankStats = {
   evaluateMs?: number
   app?: string
   http?: JevHttpStats
+  goalMet?: number
+  candidateTotal?: number
+  capped?: true
+  unresolvedIndex?: number
 }
-
-export type RankRecorder = (phase: JevPhase, stats: JevRankStats, suggestion?: Suggestion) => void
 
 export function hashGoal(goal: string): string {
   return createHash('sha256').update(goal).digest('hex')
@@ -99,7 +131,8 @@ export function createJevCall(operation: string, goal?: string): JevCall {
     ...(goal === undefined ? {} : { goal }),
     ranks: 0,
     httpMs: 0,
-    brokerCalls: 0
+    brokerCalls: 0,
+    brokerRequestIds: []
   }
 }
 
@@ -154,7 +187,59 @@ export function recordRank(
     elementCount: stats.elementCount,
     candidateCount: stats.candidateCount,
     parseMs: stats.parseMs,
-    ...(stats.evaluateMs === undefined ? {} : { evaluateMs: stats.evaluateMs })
+    ...(stats.evaluateMs === undefined ? {} : { evaluateMs: stats.evaluateMs }),
+    ...(stats.goalMet === undefined ? {} : { goalMet: stats.goalMet }),
+    ...(stats.candidateTotal === undefined ? {} : { candidateTotal: stats.candidateTotal }),
+    ...(stats.capped === undefined ? {} : { capped: stats.capped }),
+    ...(stats.unresolvedIndex === undefined ? {} : { unresolvedIndex: stats.unresolvedIndex })
+  })
+}
+
+function failureCode(cause: unknown): string | undefined {
+  if (cause instanceof ComputerError) return cause.code
+  if (cause instanceof Error && cause.name === 'ZodError') return 'invalid_argument'
+  return undefined
+}
+
+export function debugFailure(
+  log: JevLogger | undefined,
+  failure: { operation: string; callId?: string; error: string }
+): void {
+  if (log === undefined || !log.debugEnabled) return
+  log.debug({
+    kind: 'jev.debug',
+    operation: failure.operation,
+    ...(failure.callId === undefined ? {} : { callId: failure.callId }),
+    error: failure.error
+  })
+}
+
+export function failBeforeCall(
+  log: JevLogger | undefined,
+  operation: string,
+  cause: unknown
+): void {
+  const error = failureCode(cause)
+  if (error === undefined) return
+  debugFailure(log, { operation, error })
+}
+
+export function failCall(
+  log: JevLogger | undefined,
+  call: JevCall | undefined,
+  started: number,
+  cause: unknown
+): void {
+  const error = failureCode(cause)
+  if (log !== undefined && call !== undefined && log.calls) {
+    emitCall(log, call, started, error === undefined ? {} : { error })
+    return
+  }
+  if (error === undefined) return
+  debugFailure(log, {
+    operation: call?.operation ?? 'computer',
+    ...(call === undefined ? {} : { callId: call.callId }),
+    error
   })
 }
 
@@ -176,44 +261,67 @@ export function emitCall(
     ...(call.phase === undefined ? {} : { phase: call.phase }),
     ...(extra.bound === undefined ? {} : { bound: extra.bound }),
     ...(extra.error === undefined ? {} : { error: extra.error }),
-    ...(call.goal === undefined ? {} : { goal: call.goal })
+    ...(call.goal === undefined ? {} : { goal: call.goal }),
+    ...(call.brokerRequestIds.length > 0 ? { brokerRequestIds: call.brokerRequestIds } : {}),
+    ...(call.namedIndex === undefined ? {} : { namedIndex: call.namedIndex }),
+    ...(call.pickedIndex === undefined ? {} : { pickedIndex: call.pickedIndex }),
+    ...(call.refused === undefined ? {} : { refused: call.refused })
   })
+}
+
+function writeJevLine(
+  writer: JsonlFileWriter,
+  record: Record<string, unknown>,
+  keepGoal: boolean
+): void {
+  try {
+    const goal = record.goal
+    const rest: Record<string, unknown> = { ...record, v: 1, ts: new Date().toISOString() }
+    for (const key of OMIT) {
+      if (keepGoal && key === 'goal') continue
+      delete rest[key]
+    }
+    writer.emit({
+      ...rest,
+      ...(typeof goal === 'string' ? { goalSha256: hashGoal(goal) } : {})
+    })
+  } catch {
+    // Jev logs must not fail computer-use.
+  }
 }
 
 export function createJevLogger(
   graphicalSessionId: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: { calls?: boolean; debug?: boolean } = {}
 ): JevLogger {
+  const calls = options.calls !== false
+  const debugEnabled = options.debug === true
   const writer = new JsonlFileWriter({
     directory: diagnosticsDirectory(graphicalSessionId, { env }),
     generation: `jev-${randomUUID()}`
   })
   writer.start()
   return {
+    calls,
+    debugEnabled,
     emit(record) {
-      try {
-        const raw = record as JevRecord & Record<string, unknown>
-        const goal = raw.goal
-        const rest: Record<string, unknown> = {
-          ...raw,
-          kind: record.kind,
-          v: 1,
-          ts: new Date().toISOString()
-        }
-        for (const key of OMIT) delete rest[key]
-        writer.emit({
-          ...rest,
-          ...(typeof goal === 'string' ? { goalSha256: hashGoal(goal) } : {})
-        })
-      } catch {
-        // Jev logs must not fail computer-use.
-      }
+      if (!calls) return
+      writeJevLine(writer, record, false)
+    },
+    debug(record) {
+      if (!debugEnabled) return
+      writeJevLine(writer, record, true)
     },
     close: () => writer.close()
   }
 }
 
 export function createCliJevLogger(env: NodeJS.ProcessEnv = process.env): JevLogger | undefined {
-  if (parseJevEnv(env).kind === 'off') return undefined
-  return createJevLogger(localClientPaths().identity.graphicalSessionId, env)
+  const debug = jevDebugEnabled(env)
+  if (parseJevEnv(env).kind === 'off' && !debug) return undefined
+  return createJevLogger(localClientPaths().identity.graphicalSessionId, env, {
+    calls: parseJevEnv(env).kind !== 'off',
+    debug
+  })
 }

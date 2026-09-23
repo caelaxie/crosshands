@@ -5,13 +5,30 @@ import type { TreeMove } from './tree.js'
 
 export type { JevHttpStats }
 
+const ERROR_BODY_CAP = 512
+
 export class JevEvaluateError extends Error {
   readonly http: JevHttpStats
-  constructor(message: string, http: JevHttpStats) {
+  readonly errorBody?: string
+  readonly errorBodyTruncated?: true
+  constructor(message: string, http: JevHttpStats, body?: { text: string; truncated: boolean }) {
     super(message)
     this.name = 'JevEvaluateError'
     this.http = http
+    if (body !== undefined) {
+      this.errorBody = body.text
+      if (body.truncated) this.errorBodyTruncated = true
+    }
   }
+}
+
+function scrubErrorBody(body: string, apiKey: string): { text: string; truncated: boolean } {
+  const scrubbed = body
+    .split(apiKey)
+    .join('[redacted]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+  if (scrubbed.length <= ERROR_BODY_CAP) return { text: scrubbed, truncated: false }
+  return { text: scrubbed.slice(0, ERROR_BODY_CAP), truncated: true }
 }
 
 export type JevAnswers = {
@@ -82,7 +99,7 @@ export function suggestionFromAnswers(
   }
 }
 
-function criteria(moves: readonly TreeMove[]): Record<string, string> {
+export function criteria(moves: readonly TreeMove[]): Record<string, string> {
   return Object.fromEntries(
     moves.map((move) => [String(move.elementIndex), `${move.role} ${move.label}`.trim()])
   )
@@ -198,7 +215,7 @@ export function liveEvaluator(apiKey: string): EvaluateFn {
     }
     const http = httpStats(started, requestBytes, status, responseBytes)
     if (status < 200 || status >= 300) {
-      throw new JevEvaluateError(`TypeSafe HTTP ${status}`, http)
+      throw new JevEvaluateError(`TypeSafe HTTP ${status}`, http, scrubErrorBody(raw, apiKey))
     }
     let parsed: { answers?: Record<string, SystemOneAnswer> }
     try {
