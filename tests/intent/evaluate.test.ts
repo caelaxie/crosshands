@@ -54,8 +54,40 @@ describe('liveEvaluator', () => {
       })
     ).rejects.toMatchObject({
       name: 'JevEvaluateError',
-      http: { status: 503, responseBytes: 4 }
+      http: { status: 503, responseBytes: 4 },
+      errorBody: 'nope'
     })
+  })
+
+  it('scrubs and caps a non-2xx body and leaves a 2xx body off the error', async () => {
+    const secret = `sk-test Bearer live-token ${'y'.repeat(600)}`
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(secret, { status: 502 }))
+    )
+    await expect(
+      liveEvaluator('sk-test')({ goal: 'Make a new note in Notes.', moves })
+    ).rejects.toMatchObject({
+      errorBodyTruncated: true,
+      http: { status: 502 }
+    })
+    try {
+      await liveEvaluator('sk-test')({ goal: 'Make a new note in Notes.', moves })
+    } catch (cause) {
+      expect(cause).toMatchObject({ errorBodyTruncated: true })
+      const body = String((cause as { errorBody?: string }).errorBody)
+      expect(body).toHaveLength(512)
+      expect(body).not.toContain('sk-test')
+      expect(body).not.toContain('live-token')
+      expect(body).toContain('[redacted]')
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"answers":{}}', { status: 200 }))
+    )
+    const ok = await liveEvaluator('sk-test')({ goal: 'Make a new note in Notes.', moves })
+    expect(ok).not.toHaveProperty('errorBody')
+    expect(JSON.stringify(ok.http)).not.toContain('Make a new note')
   })
 
   it('records a network failure as status 0', async () => {

@@ -352,4 +352,257 @@ describe('local broker diagnostics file', () => {
       result: { type: 'mutation', dispatched: true, outcome: { state: 'verified' } }
     })
   })
+
+  it('records a skipped mutation by error code and leaves the message out', async () => {
+    const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({ directory, generation: 'broker-skip' })
+    const bound = bindings('broker-skip')
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'result',
+      result: {
+        outcome: {
+          state: 'not_attempted',
+          error: createComputerError('value_not_settable', canary).toJSON()
+        }
+      }
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-skip',
+      providerFactory: () => provider,
+      diagnostics,
+      inspectTarget: async () => ({
+        bindings: bound,
+        appIdentity: { appId: 'fixture.app', executableId: 'fixture' }
+      })
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const context = broker.issueContext(bound)
+    await client.request({
+      operation: 'setValue',
+      input: {
+        contextToken: context.token,
+        value: canary,
+        target: { kind: 'element', elementIndex: 3 }
+      }
+    })
+    await broker.close()
+    const serialized = JSON.stringify(readJsonl(directory, 'broker-skip'))
+    expect(serialized).not.toContain(canary)
+    expect(serialized).not.toContain(context.token)
+    const request = readJsonl(directory, 'broker-skip').find((record) => record.kind === 'request')
+    expect(request).toMatchObject({
+      operation: 'setValue',
+      result: {
+        type: 'mutation',
+        outcome: { state: 'not_attempted', code: 'value_not_settable' }
+      }
+    })
+    expect(JSON.stringify(request)).not.toContain(canary)
+  })
+
+  it('records the key name and the drag end without typed text', async () => {
+    const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({ directory, generation: 'broker-keys' })
+    const bound = bindings('broker-keys')
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    })
+      .enqueue({
+        kind: 'result',
+        result: { outcome: { state: 'indeterminate', reason: 'synthetic_input' } }
+      })
+      .enqueue({ kind: 'result', result: { outcome: { state: 'verified' } } })
+      .enqueue({ kind: 'result', result: { outcome: { state: 'verified' } } })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-keys',
+      providerFactory: () => provider,
+      diagnostics,
+      inspectTarget: async () => ({
+        bindings: bound,
+        appIdentity: { appId: 'fixture.app', executableId: 'fixture' }
+      })
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const context = broker.issueContext(bound)
+    const target = {
+      kind: 'element' as const,
+      ref: {
+        ...bound,
+        ref: 'element:2',
+        kind: 'element' as const,
+        contextToken: context.token,
+        expiresAt: '2099-01-01T00:00:00.000Z'
+      }
+    }
+    await client.request({
+      operation: 'pressKey',
+      input: { contextToken: context.token, key: 'return', text: canary, target }
+    })
+    await client.request({
+      operation: 'hotkey',
+      input: { contextToken: context.token, keys: ['command', 'v'], text: canary, target }
+    })
+    await client.request({
+      operation: 'drag',
+      input: {
+        contextToken: context.token,
+        text: canary,
+        from: { kind: 'element', elementIndex: 1 },
+        to: { kind: 'element', elementIndex: 4 }
+      }
+    })
+    await broker.close()
+    const serialized = JSON.stringify(readJsonl(directory, 'broker-keys'))
+    expect(serialized).not.toContain(canary)
+    const requests = readJsonl(directory, 'broker-keys').filter(
+      (record) => record.kind === 'request'
+    )
+    expect(requests[0]).toMatchObject({ operation: 'pressKey', key: 'return' })
+    expect(requests[1]).toMatchObject({ operation: 'hotkey', keys: ['command', 'v'] })
+    expect(requests[2]).toMatchObject({
+      operation: 'drag',
+      target: { ref: 'element:1', toRef: 'element:4' }
+    })
+  })
+
+  it('records a screenshot request separately from the screenshot boolean', async () => {
+    const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({ directory, generation: 'broker-shot' })
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'result',
+      result: observedState(canary, { format: 'png', width: 1, height: 1, scale: 1, data: canary }),
+      dispatched: false
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-shot',
+      providerFactory: () => provider,
+      diagnostics
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    listening(broker, diagnostics)
+    await client.request({
+      operation: 'getAppState',
+      input: { app: 'fixture.app', captureScreenshot: false, restoreWindow: true }
+    })
+    await broker.close()
+    const serialized = JSON.stringify(readJsonl(directory, 'broker-shot'))
+    expect(serialized).not.toContain(canary)
+    const request = readJsonl(directory, 'broker-shot').find((record) => record.kind === 'request')
+    expect(request).toMatchObject({
+      captureScreenshot: false,
+      restoreWindow: true,
+      result: { type: 'observation', screenshot: true }
+    })
+  })
+
+  it('records capability operation flags', async () => {
+    const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({ directory, generation: 'broker-cap' })
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'result',
+      result: {
+        platform: 'darwin',
+        provider: 'crosshands-fake',
+        providerVersion: '0',
+        operations: { click: true, drag: false },
+        permissions: { accessibility: 'granted' }
+      },
+      dispatched: false
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-cap',
+      providerFactory: () => provider,
+      diagnostics
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    await client.request({ operation: 'capabilities', input: {} })
+    await broker.close()
+    const request = readJsonl(directory, 'broker-cap').find((record) => record.kind === 'request')
+    expect(request).toMatchObject({
+      operation: 'capabilities',
+      result: {
+        type: 'lookup',
+        operations: { click: true, drag: false },
+        permissions: { accessibility: 'granted' }
+      }
+    })
+  })
+
+  it('records a fresh snapshot summary without the tree', async () => {
+    const directory = tempDir()
+    const diagnostics = new JsonlDiagnosticsWriter({ directory, generation: 'broker-fresh' })
+    const bound = bindings('broker-fresh')
+    const provider = new FakeComputerProvider({
+      generation: 'provider-1',
+      graphicalSessionId: peer.graphicalSessionId
+    }).enqueue({
+      kind: 'result',
+      result: {
+        outcome: { state: 'verified' },
+        freshState: {
+          bindings: { ...bound, snapshotId: 'snapshot-2' },
+          snapshot: {
+            ...observedState(canary).snapshot,
+            id: 'snapshot-2',
+            elementCount: 9
+          },
+          screenshot: null,
+          issues: [
+            {
+              code: 'screenshot_failed',
+              message: canary,
+              retry: true,
+              remediation: 'check_screenshot_permission'
+            }
+          ]
+        }
+      }
+    })
+    const broker = new LocalBroker({
+      identity: peer,
+      generation: 'broker-fresh',
+      providerFactory: () => provider,
+      diagnostics,
+      inspectTarget: async () => ({
+        bindings: bound,
+        appIdentity: { appId: 'fixture.app', executableId: 'fixture' }
+      })
+    })
+    const client = await broker.connect({ peer, versions: CONTRACT_VERSIONS })
+    const context = broker.issueContext(bound)
+    await client.request({
+      operation: 'click',
+      input: {
+        contextToken: context.token,
+        target: { kind: 'element', elementIndex: 2 }
+      }
+    })
+    await broker.close()
+    const serialized = JSON.stringify(readJsonl(directory, 'broker-fresh'))
+    expect(serialized).not.toContain(canary)
+    expect(serialized).not.toContain('ctx_')
+    expect(serialized).not.toContain('treeText')
+    const request = readJsonl(directory, 'broker-fresh').find((record) => record.kind === 'request')
+    expect(request).toMatchObject({
+      operation: 'click',
+      result: {
+        type: 'mutation',
+        fresh: { snapshotId: 'snapshot-2', elementCount: 9, issues: ['screenshot_failed'] }
+      }
+    })
+  })
 })

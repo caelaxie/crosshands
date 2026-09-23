@@ -35,6 +35,7 @@ export type DiagnosticTarget = {
   snapshotId?: string
   kind?: string
   ref?: string
+  toRef?: string
 }
 
 export type DiagnosticTimings = {
@@ -48,7 +49,8 @@ export type DiagnosticRequestResult =
   | {
       type: 'mutation'
       dispatched: boolean
-      outcome: { state: string; reason?: string }
+      outcome: { state: string; reason?: string; code?: string }
+      fresh?: { snapshotId: string; elementCount: number; issues: string[] }
     }
   | {
       type: 'observation'
@@ -100,6 +102,10 @@ export type DiagnosticRecord =
       mutation: boolean
       ms: DiagnosticTimings
       target?: DiagnosticTarget
+      key?: string
+      keys?: string[]
+      captureScreenshot?: boolean
+      restoreWindow?: boolean
       result: DiagnosticRequestResult
     })
 
@@ -155,7 +161,32 @@ export function diagnosticTarget(
     ...(bindings?.window.id === undefined ? {} : { windowId: bindings.window.id }),
     ...(bindings?.snapshotId === undefined ? {} : { snapshotId: bindings.snapshotId }),
     ...(selector.kind === undefined ? {} : { kind: selector.kind }),
-    ...(selector.ref === undefined ? {} : { ref: selector.ref })
+    ...(selector.ref === undefined ? {} : { ref: selector.ref }),
+    ...(selector.toRef === undefined ? {} : { toRef: selector.toRef })
+  }
+}
+
+export function diagnosticAct(
+  operation: ComputerOperationName,
+  input: unknown
+): {
+  key?: string
+  keys?: string[]
+  captureScreenshot?: boolean
+  restoreWindow?: boolean
+} {
+  if (input === null || typeof input !== 'object') return {}
+  const record = input as Record<string, unknown>
+  const keys = Array.isArray(record.keys)
+    ? record.keys.filter((key): key is string => typeof key === 'string')
+    : []
+  return {
+    ...(operation === 'pressKey' && typeof record.key === 'string' ? { key: record.key } : {}),
+    ...(operation === 'hotkey' && keys.length > 0 ? { keys } : {}),
+    ...(typeof record.captureScreenshot === 'boolean'
+      ? { captureScreenshot: record.captureScreenshot }
+      : {}),
+    ...(typeof record.restoreWindow === 'boolean' ? { restoreWindow: record.restoreWindow } : {})
   }
 }
 
@@ -165,7 +196,9 @@ export function diagnosticRequestResult(
   dispatched: boolean | undefined
 ): DiagnosticRequestResult {
   if (COMPUTER_OPERATIONS[operation].mutation) {
-    const { outcome } = result as MutationResult
+    const mutation = result as MutationResult
+    const { outcome } = mutation
+    const fresh = mutation.freshState
     return {
       type: 'mutation',
       dispatched: dispatched ?? true,
@@ -173,8 +206,21 @@ export function diagnosticRequestResult(
         state: outcome.state,
         ...('reason' in outcome && typeof outcome.reason === 'string'
           ? { reason: outcome.reason }
+          : {}),
+        ...((outcome.state === 'failed' || outcome.state === 'not_attempted') &&
+        outcome.error !== undefined
+          ? { code: outcome.error.code }
           : {})
-      }
+      },
+      ...(fresh === undefined
+        ? {}
+        : {
+            fresh: {
+              snapshotId: fresh.snapshot.id,
+              elementCount: fresh.snapshot.elementCount,
+              issues: fresh.issues.map((issue) => issue.code)
+            }
+          })
     }
   }
   if (operation === 'getAppState') {
@@ -210,7 +256,22 @@ export function diagnosticRequestResult(
       windowCount: (result as { windows: readonly unknown[] }).windows.length
     }
   }
-  if (operation === 'capabilities' || operation === 'permissions') {
+  if (operation === 'capabilities') {
+    const body = result as {
+      permissions?: Record<string, string>
+      operations?: Record<string, unknown>
+    }
+    const operations: Record<string, boolean> = {}
+    for (const [name, enabled] of Object.entries(body.operations ?? {})) {
+      if (typeof enabled === 'boolean') operations[name] = enabled
+    }
+    return {
+      type: 'lookup',
+      ...(body.permissions === undefined ? {} : { permissions: body.permissions }),
+      ...(Object.keys(operations).length > 0 ? { operations } : {})
+    }
+  }
+  if (operation === 'permissions') {
     const permissions = (result as { permissions: Record<string, string> }).permissions
     return { type: 'lookup', permissions }
   }
@@ -239,10 +300,7 @@ function inputAppId(input: unknown): string | undefined {
   return typeof app === 'string' && app.length > 0 ? app : undefined
 }
 
-function inputSelector(input: unknown): { kind?: string; ref?: string } {
-  if (input === null || typeof input !== 'object') return {}
-  const record = input as { target?: unknown; from?: unknown }
-  const selector = record.target ?? record.from
+function selectorRef(selector: unknown): { kind?: string; ref?: string } {
   if (selector === null || typeof selector !== 'object') return {}
   const target = selector as { kind?: unknown; elementIndex?: unknown; ref?: unknown }
   let kind = typeof target.kind === 'string' ? target.kind : undefined
@@ -258,5 +316,16 @@ function inputSelector(input: unknown): { kind?: string; ref?: string } {
   return {
     ...(kind === undefined ? {} : { kind }),
     ...(ref === undefined ? {} : { ref })
+  }
+}
+
+function inputSelector(input: unknown): { kind?: string; ref?: string; toRef?: string } {
+  if (input === null || typeof input !== 'object') return {}
+  const record = input as { target?: unknown; from?: unknown; to?: unknown }
+  const main = selectorRef(record.target ?? record.from)
+  const to = selectorRef(record.to)
+  return {
+    ...main,
+    ...(to.ref === undefined ? {} : { toRef: to.ref })
   }
 }

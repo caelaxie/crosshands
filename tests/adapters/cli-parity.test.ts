@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -222,6 +222,42 @@ describe('CrossHands JSON CLI', () => {
     expect(state.calls).toEqual([{ operation, input }])
     expect(JSON.parse(state.stdout.join(''))).toEqual({ ok: true })
     expect(state.stderr).toEqual([])
+  })
+
+  it('writes a code-only debug line for a CLI usage error', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-cli-debug-'))
+    const previous = {
+      debug: process.env.CROSSHANDS_JEV_DEBUG,
+      dir: process.env.CROSSHANDS_DIAGNOSTICS_DIR,
+      jev: process.env.CROSSHANDS_JEV
+    }
+    process.env.CROSSHANDS_JEV_DEBUG = '1'
+    process.env.CROSSHANDS_DIAGNOSTICS_DIR = directory
+    delete process.env.CROSSHANDS_JEV
+    try {
+      const state = harness()
+      const code = await runCli(['computer', 'get-app-state', '--json'], state.io, state.client)
+      expect(code).toBe(2)
+      const files = await readdir(directory)
+      expect(files).toHaveLength(1)
+      const body = await readFile(join(directory, files[0]!), 'utf8')
+      const record = JSON.parse(body.trim()) as Record<string, unknown>
+      expect(record).toMatchObject({
+        kind: 'jev.debug',
+        operation: 'getAppState',
+        error: 'invalid_argument'
+      })
+      expect(body).not.toContain('Missing required')
+      expect(record).not.toHaveProperty('goal')
+    } finally {
+      if (previous.debug === undefined) delete process.env.CROSSHANDS_JEV_DEBUG
+      else process.env.CROSSHANDS_JEV_DEBUG = previous.debug
+      if (previous.dir === undefined) delete process.env.CROSSHANDS_DIAGNOSTICS_DIR
+      else process.env.CROSSHANDS_DIAGNOSTICS_DIR = previous.dir
+      if (previous.jev === undefined) delete process.env.CROSSHANDS_JEV
+      else process.env.CROSSHANDS_JEV = previous.jev
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 
   it('rejects removed Orca routing flags with migration guidance', async () => {
@@ -637,7 +673,8 @@ describe('CrossHands JSON CLI', () => {
         }
       })
       await expect(client.request('capabilities', {})).resolves.toMatchObject({
-        provider: 'crosshands-fake'
+        requestId: 'broker-1',
+        result: { provider: 'crosshands-fake' }
       })
       expect(starts).toBe(1)
       expect(provider.calls).toHaveLength(1)

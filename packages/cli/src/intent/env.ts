@@ -3,6 +3,10 @@ export type JevEnv =
   | { kind: 'fail_closed'; reason: 'missing_key' }
   | { kind: 'on'; apiKey: string }
 
+export function jevDebugEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.CROSSHANDS_JEV_DEBUG === '1'
+}
+
 export function parseJevEnv(env: NodeJS.ProcessEnv = process.env): JevEnv {
   if (env.CROSSHANDS_JEV !== '1') return { kind: 'off' }
   const apiKey = env.TYPESAFE_API_KEY

@@ -471,7 +471,7 @@ function readiness(capabilities: unknown): string {
 
 async function runDoctor(client: CliBrokerClient): Promise<unknown> {
   const capabilities = unwrapBrokerResult(await client.request('capabilities', {}))
-  const permissions = await client.request('permissions', {})
+  const permissions = unwrapBrokerResult(await client.request('permissions', {}))
   return { readiness: readiness(capabilities), checks: { capabilities, permissions } }
 }
 
@@ -591,6 +591,11 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     io.stdout(`${JSON.stringify(result)}\n`)
     return 0
   } catch (cause) {
+    if (cause instanceof CliError && log?.debugEnabled) {
+      const command = argv[1]
+      const operation = command === undefined ? 'computer' : (COMMANDS[command] ?? 'computer')
+      log.debug({ kind: 'jev.debug', operation, error: cause.code })
+    }
     const error = serializedError(cause)
     io.stdout(`${JSON.stringify({ error })}\n`)
     if (!json) io.stderr(`${String(error.message)}\n`)
