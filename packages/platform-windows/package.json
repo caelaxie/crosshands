@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/platform-windows",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Windows x64 computer-use provider for CrossHands",
   "license": "MIT",
   "files": [

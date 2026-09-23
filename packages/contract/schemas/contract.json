@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "versions": {
-    "product": "0.2.4",
+    "product": "0.2.5",
     "publicContract": "1.2.0",
     "brokerControl": 1,
     "providerProtocol": 1,
