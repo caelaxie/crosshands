@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { liveEvaluator } from '../../packages/cli/src/intent/evaluate.js'
-import { clickableMoves, parseTreeMoves } from '../../packages/cli/src/intent/tree.js'
+import { criteria, liveEvaluator } from '../../packages/cli/src/intent/evaluate.js'
+import {
+  clickableMoves,
+  parseTreeMoves,
+  type TreeMove
+} from '../../packages/cli/src/intent/tree.js'
 
 const moves = clickableMoves(
   parseTreeMoves(`0 standard window Notes
@@ -11,6 +15,62 @@ const moves = clickableMoves(
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+function move(elementIndex: number, role: string, label: string): TreeMove {
+  return {
+    elementIndex,
+    role,
+    label,
+    line: `${elementIndex} ${role} ${label}`,
+    disabled: false,
+    clickable: true,
+    settable: role === 'text field' || role === 'text area'
+  }
+}
+
+const eighty = `button ${'N'.repeat(73)}`
+
+describe('criteria', () => {
+  it('keeps a short control name', () => {
+    expect(criteria([move(68, 'button', 'New Note')])).toEqual({ '68': 'button New Note' })
+  })
+
+  it('drops the field value and wrapped lines, and caps a long name at 80 characters', () => {
+    expect(
+      criteria([
+        move(40, 'text field', 'Compose, Value: CANARY-ESSAY'),
+        move(41, 'text area', 'Body\nCANARY-AREA keeps going'),
+        move(12, 'button', 'N'.repeat(74)),
+        move(7, 'button', 'N'.repeat(73)),
+        move(3, 'text field', ', Value: CANARY-ONLY')
+      ])
+    ).toEqual({
+      '40': 'text field Compose',
+      '41': 'text area Body',
+      '12': eighty,
+      '7': eighty,
+      '3': 'text field'
+    })
+  })
+
+  it('posts those short names from a parsed accessibility tree', () => {
+    const essay = `CANARY-ESSAY ${'word '.repeat(40)}`
+    const tree = [
+      '0 standard window Chat',
+      '\t13 button Send',
+      `\t40 text field Compose, Value: ${essay}`,
+      '\t41 text area Note',
+      'the rest of the note is CANARY-AREA and has no comma',
+      `\t12 button ${'N'.repeat(90)}`
+    ].join('\n')
+    expect(criteria(clickableMoves(parseTreeMoves(tree)))).toEqual({
+      '13': 'button Send',
+      '40': 'text field Compose',
+      '41': 'text area Note',
+      '12': eighty
+    })
+  })
 })
 
 describe('liveEvaluator', () => {
@@ -88,6 +148,35 @@ describe('liveEvaluator', () => {
     const ok = await liveEvaluator('sk-test')({ goal: 'Make a new note in Notes.', moves })
     expect(ok).not.toHaveProperty('errorBody')
     expect(JSON.stringify(ok.http)).not.toContain('Make a new note')
+  })
+
+  it('sends the short control name in the state and in both choice questions', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"answers":{}}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const ranked = [
+      move(68, 'button', 'New Note'),
+      move(40, 'text field', `Compose, Value: CANARY-ESSAY ${'word '.repeat(40)}`)
+    ]
+    await liveEvaluator('sk-test')({
+      goal: 'Open the compose field.',
+      app: 'com.github.Electron',
+      moves: ranked
+    })
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const body = JSON.parse(String(request.body)) as {
+      state: { goal: string; app: string; clickable: Record<string, string> }
+      questions: {
+        click_which: { criteria: Record<string, string> }
+        setvalue_which: { criteria: Record<string, string> }
+      }
+    }
+    const posted = { '68': 'button New Note', '40': 'text field Compose' }
+    expect(body.state.goal).toBe('Open the compose field.')
+    expect(body.state.app).toBe('com.github.Electron')
+    expect(body.state.clickable).toEqual(posted)
+    expect(body.questions.click_which.criteria).toEqual(posted)
+    expect(body.questions.setvalue_which.criteria).toEqual(posted)
+    expect(JSON.stringify(body)).not.toContain('CANARY-ESSAY')
   })
 
   it('records a network failure as status 0', async () => {
