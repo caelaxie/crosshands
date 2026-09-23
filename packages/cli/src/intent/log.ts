@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 
-import type { Suggestion } from '@crosshands/contract'
+import { ComputerError, type Suggestion } from '@crosshands/contract'
 import { JsonlFileWriter, diagnosticsDirectory } from '@crosshands/runtime'
 
 import { localClientPaths } from '../local-client.js'
 import { jevDebugEnabled, parseJevEnv } from './env.js'
+import type { JevAnswers } from './evaluate.js'
 import { elapsedMs, type JevHttpStats } from './http.js'
 
 export type JevPhase = 'observe' | 'bind' | 'named'
@@ -60,15 +61,7 @@ export type JevDecisionRecord = JevShared & {
   goalMet?: number
   candidateTotal?: number
   capped?: true
-  unresolvedChoice?: string
-}
-
-export type JevDebugAnswers = {
-  move: string
-  clickWhich?: string
-  setValueWhich?: string
-  confidence?: number
-  goalMet?: number
+  unresolvedIndex?: number
 }
 
 export type JevDebugRecord = {
@@ -78,7 +71,7 @@ export type JevDebugRecord = {
   phase?: JevPhase
   goal?: string
   clickable?: Record<string, string>
-  answers?: JevDebugAnswers
+  answers?: JevAnswers
   status?: number
   errorBody?: string
   errorBodyTruncated?: true
@@ -122,10 +115,8 @@ export type JevRankStats = {
   goalMet?: number
   candidateTotal?: number
   capped?: true
-  unresolvedChoice?: string
+  unresolvedIndex?: number
 }
-
-export type RankRecorder = (phase: JevPhase, stats: JevRankStats, suggestion?: Suggestion) => void
 
 export function hashGoal(goal: string): string {
   return createHash('sha256').update(goal).digest('hex')
@@ -200,7 +191,55 @@ export function recordRank(
     ...(stats.goalMet === undefined ? {} : { goalMet: stats.goalMet }),
     ...(stats.candidateTotal === undefined ? {} : { candidateTotal: stats.candidateTotal }),
     ...(stats.capped === undefined ? {} : { capped: stats.capped }),
-    ...(stats.unresolvedChoice === undefined ? {} : { unresolvedChoice: stats.unresolvedChoice })
+    ...(stats.unresolvedIndex === undefined ? {} : { unresolvedIndex: stats.unresolvedIndex })
+  })
+}
+
+function failureCode(cause: unknown): string | undefined {
+  if (cause instanceof ComputerError) return cause.code
+  if (cause instanceof Error && cause.name === 'ZodError') return 'invalid_argument'
+  return undefined
+}
+
+export function debugFailure(
+  log: JevLogger | undefined,
+  failure: { operation: string; callId?: string; error: string }
+): void {
+  if (log === undefined || !log.debugEnabled) return
+  log.debug({
+    kind: 'jev.debug',
+    operation: failure.operation,
+    ...(failure.callId === undefined ? {} : { callId: failure.callId }),
+    error: failure.error
+  })
+}
+
+export function failBeforeCall(
+  log: JevLogger | undefined,
+  operation: string,
+  cause: unknown
+): void {
+  const error = failureCode(cause)
+  if (error === undefined) return
+  debugFailure(log, { operation, error })
+}
+
+export function failCall(
+  log: JevLogger | undefined,
+  call: JevCall | undefined,
+  started: number,
+  cause: unknown
+): void {
+  const error = failureCode(cause)
+  if (log !== undefined && call !== undefined && log.calls) {
+    emitCall(log, call, started, error === undefined ? {} : { error })
+    return
+  }
+  if (error === undefined) return
+  debugFailure(log, {
+    operation: call?.operation ?? 'computer',
+    ...(call === undefined ? {} : { callId: call.callId }),
+    error
   })
 }
 

@@ -237,6 +237,8 @@ export const ProviderCapabilitiesSchema = z
   })
   .strict()
 
+export type ProviderCapabilities = z.infer<typeof ProviderCapabilitiesSchema>
+
 export const ProviderHandshakeSchema = z
   .object({
     provider: IdentifierSchema,

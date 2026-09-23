@@ -9,6 +9,7 @@ import {
   createProductionBrokerClient,
   localClientPaths,
   runCli,
+  unwrapBrokerResult,
   type CliBrokerClient,
   type CliIo,
   type LocalClientPaths
@@ -588,10 +589,25 @@ describe('CrossHands JSON CLI', () => {
     expect(JSON.parse(state.stdout.join(''))).toMatchObject({ error: { code: errorCode } })
   })
 
+  it('unwraps only a full broker response', () => {
+    const result = { operations: { click: true } }
+    expect(unwrapBrokerResult({ requestId: 'r', result })).toEqual({ requestId: 'r', result })
+    expect(
+      unwrapBrokerResult({
+        requestId: 'r',
+        result,
+        desktopEpoch: 1,
+        providerGeneration: 'provider-1'
+      })
+    ).toEqual(result)
+  })
+
   it('unwraps production broker envelopes when computing doctor readiness', async () => {
     const state = harness()
     state.client.request = async (operation) => ({
       requestId: `r-${operation}`,
+      desktopEpoch: 0,
+      providerGeneration: 'provider-1',
       result:
         operation === 'capabilities'
           ? {

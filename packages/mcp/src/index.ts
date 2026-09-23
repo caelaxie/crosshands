@@ -13,8 +13,8 @@ import {
 import {
   createCliJevLogger,
   createProductionBrokerClient,
+  debugFailure,
   dispatchPublicOperation,
-  unwrapBrokerResult,
   type CliBrokerClient,
   type JevLogger,
   type ProductionClientOptions
@@ -187,24 +187,18 @@ export async function callMcpTool(
   if (PROTECTED_INPUT_OPERATIONS.has(operation)) {
     if (rawInput !== null && typeof rawInput === 'object' && !Array.isArray(rawInput)) {
       const { protectedInput, ...contractInput } = rawInput as Record<string, unknown>
-      if (protectedInput === true) {
-        options.log?.debug({ kind: 'jev.debug', operation, error: 'invalid_argument' })
-        throw protectedInputError()
-      }
-      if (protectedInput !== undefined && protectedInput !== false) {
-        options.log?.debug({ kind: 'jev.debug', operation, error: 'invalid_argument' })
-        throw invalidInputError()
+      if (protectedInput === true || (protectedInput !== undefined && protectedInput !== false)) {
+        debugFailure(options.log, { operation, error: 'invalid_argument' })
+        throw protectedInput === true ? protectedInputError() : invalidInputError()
       }
       input = contractInput
     }
   }
   try {
-    return unwrapBrokerResult(
-      await dispatchPublicOperation(client, operation, input, {
-        env: process.env,
-        ...(options.log === undefined ? {} : { log: options.log })
-      })
-    )
+    return await dispatchPublicOperation(client, operation, input, {
+      env: process.env,
+      ...(options.log === undefined ? {} : { log: options.log })
+    })
   } catch (cause) {
     if (cause instanceof z.ZodError) throw invalidInputError()
     throw cause

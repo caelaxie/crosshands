@@ -615,7 +615,7 @@ export class LocalBroker {
         total: Math.max(0, this.#now() - entry.enqueuedAt)
       },
       ...(target === undefined ? {} : { target }),
-      ...act,
+      ...(act === undefined ? {} : { act }),
       result:
         entry.cause !== undefined
           ? { type: 'error', ...diagnosticError(entry.cause) }

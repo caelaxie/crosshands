@@ -7,7 +7,7 @@ import { operationRequiresGoal, type ComputerOperationName } from '@crosshands/c
 
 import { unwrapBrokerResult } from './broker-result.js'
 import { dispatchPublicOperation } from './intent/dispatch.js'
-import { createCliJevLogger } from './intent/log.js'
+import { createCliJevLogger, debugFailure } from './intent/log.js'
 
 export type CliBrokerClient = {
   request(operation: ComputerOperationName, input: unknown): Promise<unknown>
@@ -577,13 +577,14 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     const brokerResult =
       operation === 'doctor'
         ? await runDoctor(client)
-        : unwrapBrokerResult(
-            await dispatchPublicOperation(
-              client,
-              operation,
-              await operationInput(command, flags, io),
-              { env: process.env, ...(log === undefined ? {} : { log }) }
-            )
+        : await dispatchPublicOperation(
+            client,
+            operation,
+            await operationInput(command, flags, io),
+            {
+              env: process.env,
+              ...(log === undefined ? {} : { log })
+            }
           )
     const result = structuredClone(brokerResult)
     const screenshotOutput = stringFlag(flags, 'screenshot-output')
@@ -591,10 +592,10 @@ export async function runCli(argv: string[], io: CliIo, client: CliBrokerClient)
     io.stdout(`${JSON.stringify(result)}\n`)
     return 0
   } catch (cause) {
-    if (cause instanceof CliError && log?.debugEnabled) {
+    if (cause instanceof CliError) {
       const command = argv[1]
       const operation = command === undefined ? 'computer' : (COMMANDS[command] ?? 'computer')
-      log.debug({ kind: 'jev.debug', operation, error: cause.code })
+      debugFailure(log, { operation, error: cause.code })
     }
     const error = serializedError(cause)
     io.stdout(`${JSON.stringify({ error })}\n`)
@@ -610,5 +611,5 @@ export { createProductionBrokerClient, localClientPaths, brokerSpawnEnv } from '
 export type { LocalClientPaths, ProductionClientOptions } from './local-client.js'
 export { dispatchPublicOperation } from './intent/dispatch.js'
 export { parseJevEnv } from './intent/env.js'
-export { createCliJevLogger, createJevLogger, hashGoal } from './intent/log.js'
+export { createCliJevLogger, createJevLogger, debugFailure, hashGoal } from './intent/log.js'
 export type { JevLogger } from './intent/log.js'

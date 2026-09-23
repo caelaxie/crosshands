@@ -99,7 +99,7 @@ export function suggestionFromAnswers(
   }
 }
 
-function criteria(moves: readonly TreeMove[]): Record<string, string> {
+export function criteria(moves: readonly TreeMove[]): Record<string, string> {
   return Object.fromEntries(
     moves.map((move) => [String(move.elementIndex), `${move.role} ${move.label}`.trim()])
   )

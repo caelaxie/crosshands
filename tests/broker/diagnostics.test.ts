@@ -463,8 +463,10 @@ describe('local broker diagnostics file', () => {
     const requests = readJsonl(directory, 'broker-keys').filter(
       (record) => record.kind === 'request'
     )
-    expect(requests[0]).toMatchObject({ operation: 'pressKey', key: 'return' })
-    expect(requests[1]).toMatchObject({ operation: 'hotkey', keys: ['command', 'v'] })
+    expect(requests[0]).toMatchObject({ operation: 'pressKey', act: { key: 'return' } })
+    expect(requests[0]).not.toHaveProperty('key')
+    expect(requests[1]).toMatchObject({ operation: 'hotkey', act: { keys: ['command', 'v'] } })
+    expect(requests[1]).not.toHaveProperty('keys')
     expect(requests[2]).toMatchObject({
       operation: 'drag',
       target: { ref: 'element:1', toRef: 'element:4' }
@@ -499,10 +501,11 @@ describe('local broker diagnostics file', () => {
     expect(serialized).not.toContain(canary)
     const request = readJsonl(directory, 'broker-shot').find((record) => record.kind === 'request')
     expect(request).toMatchObject({
-      captureScreenshot: false,
-      restoreWindow: true,
+      act: { captureScreenshot: false, restoreWindow: true },
       result: { type: 'observation', screenshot: true }
     })
+    expect(request).not.toHaveProperty('captureScreenshot')
+    expect(request).not.toHaveProperty('restoreWindow')
   })
 
   it('records capability operation flags', async () => {

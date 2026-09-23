@@ -591,7 +591,12 @@ describe('dispatchPublicOperation', () => {
             operation === 'getAppState'
               ? snapshotResult()
               : { outcome: { state: 'indeterminate', reason: 'synthetic_input' } }
-          return { requestId: operation === 'getAppState' ? 'broker-1' : 'broker-2', result: body }
+          return {
+            requestId: operation === 'getAppState' ? 'broker-1' : 'broker-2',
+            result: body,
+            desktopEpoch: 0,
+            providerGeneration: 'provider-1'
+          }
         }
       },
       'click',
@@ -813,9 +818,30 @@ describe('dispatchPublicOperation', () => {
       candidateCount: 255,
       candidateTotal: 256,
       capped: true,
-      unresolvedChoice: '999'
+      unresolvedIndex: 999
     })
+    expect(decision).not.toHaveProperty('unresolvedChoice')
     expect(JSON.stringify(decision)).not.toContain('button Item')
+  })
+
+  it('leaves a non-numeric unmatched choice off the decision line', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'crosshands-jev-'))
+    const log = createJevLogger('session-test', { CROSSHANDS_DIAGNOSTICS_DIR: directory })
+    await dispatchPublicOperation(
+      { request: async () => snapshotResult() },
+      'getAppState',
+      { app: 'Notes', goal: 'Make a new note in Notes.', captureScreenshot: false },
+      {
+        env: { CROSSHANDS_JEV: '1', TYPESAFE_API_KEY: 'sk-test' },
+        evaluate: recordedEvaluator({ move: 'click', clickWhich: 'New Note', confidence: 0.4 }),
+        log
+      }
+    )
+    await log.close()
+    const decision = recordOf(await readJevRecords(directory), 'jev.decision')
+    expect(decision).toMatchObject({ move: 'blocked', reason: 'no_candidate' })
+    expect(decision).not.toHaveProperty('unresolvedIndex')
+    expect(JSON.stringify(decision)).not.toContain('New Note')
   })
 
   it('writes the goal and labels only on jev.debug', async () => {

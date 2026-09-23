@@ -3,6 +3,7 @@ import {
   ComputerError,
   type ComputerOperationName,
   type MutationResult,
+  type ProviderCapabilities,
   type ReferenceBindings,
   type SnapshotResult
 } from '@crosshands/contract'
@@ -38,6 +39,13 @@ export type DiagnosticTarget = {
   toRef?: string
 }
 
+export type DiagnosticAct = {
+  key?: string
+  keys?: string[]
+  captureScreenshot?: boolean
+  restoreWindow?: boolean
+}
+
 export type DiagnosticTimings = {
   queue: number
   inspect: number
@@ -65,6 +73,7 @@ export type DiagnosticRequestResult =
       appCount?: number
       windowCount?: number
       permissions?: Record<string, string>
+      operations?: Record<string, boolean>
     }
   | ({ type: 'error' } & DiagnosticError)
 
@@ -102,10 +111,7 @@ export type DiagnosticRecord =
       mutation: boolean
       ms: DiagnosticTimings
       target?: DiagnosticTarget
-      key?: string
-      keys?: string[]
-      captureScreenshot?: boolean
-      restoreWindow?: boolean
+      act?: DiagnosticAct
       result: DiagnosticRequestResult
     })
 
@@ -169,18 +175,13 @@ export function diagnosticTarget(
 export function diagnosticAct(
   operation: ComputerOperationName,
   input: unknown
-): {
-  key?: string
-  keys?: string[]
-  captureScreenshot?: boolean
-  restoreWindow?: boolean
-} {
-  if (input === null || typeof input !== 'object') return {}
+): DiagnosticAct | undefined {
+  if (input === null || typeof input !== 'object') return undefined
   const record = input as Record<string, unknown>
   const keys = Array.isArray(record.keys)
     ? record.keys.filter((key): key is string => typeof key === 'string')
     : []
-  return {
+  const act: DiagnosticAct = {
     ...(operation === 'pressKey' && typeof record.key === 'string' ? { key: record.key } : {}),
     ...(operation === 'hotkey' && keys.length > 0 ? { keys } : {}),
     ...(typeof record.captureScreenshot === 'boolean'
@@ -188,6 +189,15 @@ export function diagnosticAct(
       : {}),
     ...(typeof record.restoreWindow === 'boolean' ? { restoreWindow: record.restoreWindow } : {})
   }
+  if (
+    act.key === undefined &&
+    act.keys === undefined &&
+    act.captureScreenshot === undefined &&
+    act.restoreWindow === undefined
+  ) {
+    return undefined
+  }
+  return act
 }
 
 export function diagnosticRequestResult(
@@ -257,18 +267,11 @@ export function diagnosticRequestResult(
     }
   }
   if (operation === 'capabilities') {
-    const body = result as {
-      permissions?: Record<string, string>
-      operations?: Record<string, unknown>
-    }
-    const operations: Record<string, boolean> = {}
-    for (const [name, enabled] of Object.entries(body.operations ?? {})) {
-      if (typeof enabled === 'boolean') operations[name] = enabled
-    }
+    const body = result as ProviderCapabilities
     return {
       type: 'lookup',
-      ...(body.permissions === undefined ? {} : { permissions: body.permissions }),
-      ...(Object.keys(operations).length > 0 ? { operations } : {})
+      permissions: body.permissions,
+      operations: body.operations
     }
   }
   if (operation === 'permissions') {
