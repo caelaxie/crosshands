@@ -479,25 +479,11 @@ final class Provider {
         var seen = Set<String>()
         return NSWorkspace.shared.runningApplications
             .filter { !$0.isTerminated && $0.activationPolicy == .regular }
-            .compactMap { app in
-                guard let name = app.localizedName, !name.isEmpty else { return nil }
-                let pid = app.processIdentifier
-                guard pid > 0,
-                      pidIsLive(pid),
-                      let processStartedAt = app.launchDate,
-                      let executableId = app.executableURL?.resolvingSymlinksInPath().path,
-                      !executableId.isEmpty
-                else { return nil }
-                let key = (app.bundleIdentifier ?? "pid:\(pid)").lowercased()
+            .compactMap { app -> AppDescriptor? in
+                guard let descriptor = runningAppDescriptor(app) else { return nil }
+                let key = (descriptor.bundleId ?? "pid:\(descriptor.pid)").lowercased()
                 guard seen.insert(key).inserted else { return nil }
-                return AppDescriptor(
-                    name: name,
-                    bundleId: app.bundleIdentifier,
-                    pid: pid,
-                    processStartedAt: processStartedAt,
-                    executableId: executableId,
-                    app: app
-                )
+                return descriptor
             }
             .sorted { lhs, rhs in
                 if lhs.app.isActive != rhs.app.isActive {
@@ -672,20 +658,30 @@ final class Provider {
     }
 
     private func appByPid(_ pid: pid_t) -> AppDescriptor? {
-        guard let app = NSRunningApplication(processIdentifier: pid),
-              !app.isTerminated,
+        guard let app = NSRunningApplication(processIdentifier: pid) else { return nil }
+        return runningAppDescriptor(app)
+    }
+
+    private func runningAppDescriptor(_ app: NSRunningApplication) -> AppDescriptor? {
+        guard !app.isTerminated,
               let name = app.localizedName,
-              let processStartedAt = app.launchDate,
+              !name.isEmpty
+        else { return nil }
+        let pid = app.processIdentifier
+        guard pid > 0,
+              pidIsLive(pid),
               let executableId = app.executableURL?.resolvingSymlinksInPath().path,
-              !executableId.isEmpty
-        else {
-            return nil
-        }
+              !executableId.isEmpty,
+              let startedAt = processStartedAt(
+                  launchDate: app.launchDate,
+                  kernelStart: kernelProcessStartDate(pid: pid)
+              )
+        else { return nil }
         return AppDescriptor(
             name: name,
             bundleId: app.bundleIdentifier,
             pid: pid,
-            processStartedAt: processStartedAt,
+            processStartedAt: startedAt,
             executableId: executableId,
             app: app
         )
