@@ -25,6 +25,8 @@ import {
 const outputDirectories: string[] = []
 let packed: Awaited<ReturnType<typeof inspectPack>>[] = []
 
+// macos-15-intel spends most of this hook on the universal release helper.
+// The pack step still has to run after that build, and five minutes ends first.
 beforeAll(async () => {
   if (currentPlatformPackage === undefined)
     throw new Error(`Unsupported platform ${process.platform}`)
@@ -39,7 +41,7 @@ beforeAll(async () => {
     // oxlint-disable-next-line no-await-in-loop -- avoid concurrent pnpm pack store races.
     packed.push(await packOne(descriptor, output))
   }
-}, 300_000)
+}, 600_000)
 
 afterAll(async () => {
   await cleanCurrentNativeBuild()
