@@ -1,6 +1,6 @@
 {
   "name": "@crosshands/contract",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Versioned computer-use contract shared by CrossHands adapters and providers",
   "license": "MIT",
   "files": [
