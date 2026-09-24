@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { liveEvaluator } from '../../packages/cli/src/intent/evaluate.js'
-import { clickableMoves, parseTreeMoves } from '../../packages/cli/src/intent/tree.js'
+import {
+  criteria,
+  liveEvaluator,
+  suggestionFromAnswers
+} from '../../packages/cli/src/intent/evaluate.js'
+import {
+  clickableMoves,
+  parseTreeMoves,
+  type TreeMove
+} from '../../packages/cli/src/intent/tree.js'
 
 const moves = clickableMoves(
   parseTreeMoves(`0 standard window Notes
@@ -11,6 +19,97 @@ const moves = clickableMoves(
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+function move(elementIndex: number, role: string, label: string): TreeMove {
+  return {
+    elementIndex,
+    role,
+    label,
+    line: `${elementIndex} ${role} ${label}`,
+    disabled: false,
+    clickable: true,
+    settable: role === 'text field' || role === 'text area'
+  }
+}
+
+describe('criteria', () => {
+  it('keeps a short control name', () => {
+    expect(criteria([move(68, 'button', 'New Note')])).toEqual({ '68': 'button New Note' })
+  })
+
+  it('caps the joined name at 80 code points', () => {
+    const posted = criteria([
+      move(1, 'button', 'N'.repeat(72)),
+      move(2, 'button', 'N'.repeat(73)),
+      move(3, 'button', 'N'.repeat(74)),
+      move(4, 'button', 'N'.repeat(5000))
+    ])
+    expect(posted['1']).toBe(`button ${'N'.repeat(72)}`)
+    expect([...(posted['1'] ?? '')]).toHaveLength(79)
+    expect(posted['2']).toBe(`button ${'N'.repeat(73)}`)
+    expect([...(posted['2'] ?? '')]).toHaveLength(80)
+    expect(posted['3']).toBe(`button ${'N'.repeat(73)}`)
+    expect([...(posted['3'] ?? '')]).toHaveLength(80)
+    expect(posted['4']).toBe(`button ${'N'.repeat(73)}`)
+    expect([...(posted['4'] ?? '')]).toHaveLength(80)
+  })
+
+  it('does not split an emoji name into a lone surrogate', () => {
+    const posted = criteria([move(1, 'button', '😀'.repeat(100))])['1'] ?? ''
+    expect([...posted]).toHaveLength(80)
+    expect(posted).toBe([...`button ${'😀'.repeat(100)}`].slice(0, 80).join(''))
+    expect(posted).not.toMatch(/[\uD800-\uDBFF]$/)
+  })
+
+  it('leaves renderer metadata on a label the parser already stored', () => {
+    expect(criteria([move(40, 'text field', 'Compose, Value: CANARY-ESSAY')])).toEqual({
+      '40': 'text field Compose, Value: CANARY-ESSAY'
+    })
+  })
+
+  it('posts the parsed visible name and caps only that name', () => {
+    const essay = `CANARY-ESSAY ${'word '.repeat(40)}`
+    const hint = `CANARY-HINT ${'h'.repeat(80)}`
+    const tree = [
+      '0 standard window Chat',
+      '\t13 button Send',
+      `\t40 text field Compose, Value: ${essay}`,
+      '\t42 text field (selected, settable) Compose, Value: the essay',
+      '\t7 button (selected, expanded) New Note, Secondary Actions: press',
+      `\t3 text field Placeholder: ${hint}`,
+      '\t43 text field Address, Placeholder: Search',
+      '\t44 button Save, Description: CANARY-SUB',
+      '\t41 text area Note',
+      'the rest of the note is CANARY-AREA and has no comma',
+      `\t12 button ${'N'.repeat(90)}`,
+      `\t9 text ${'m'.repeat(200)}`
+    ].join('\n')
+    const parsed = parseTreeMoves(tree)
+    expect(criteria(clickableMoves(parsed))).toEqual({
+      '13': 'button Send',
+      '40': 'text field Compose',
+      '42': 'text field (selected, settable) Compose',
+      '7': 'button (selected, expanded) New Note',
+      '3': 'text field',
+      '43': 'text field Address',
+      '44': 'button Save',
+      '41': 'text area Note',
+      '12': `button ${'N'.repeat(73)}`
+    })
+    expect(criteria(parsed)['9']).toBe(`text ${'m'.repeat(75)}`)
+    expect(JSON.stringify(criteria(parsed))).not.toContain('CANARY')
+  })
+
+  it('keeps the full visible name on the suggestion', () => {
+    const name = 'N'.repeat(200)
+    const parsed = parseTreeMoves(`12 button ${name}, Value: CANARY-ESSAY`)
+    expect(suggestionFromAnswers('snap', parsed, { move: 'click', clickWhich: '12' }).label).toBe(
+      `button ${name}`
+    )
+    expect(criteria(parsed)['12']).toBe(`button ${'N'.repeat(73)}`)
+    expect(JSON.stringify(criteria(parsed))).not.toContain('CANARY')
+  })
 })
 
 describe('liveEvaluator', () => {
@@ -88,6 +187,45 @@ describe('liveEvaluator', () => {
     const ok = await liveEvaluator('sk-test')({ goal: 'Make a new note in Notes.', moves })
     expect(ok).not.toHaveProperty('errorBody')
     expect(JSON.stringify(ok.http)).not.toContain('Make a new note')
+  })
+
+  it('sends the parsed name in the state and in both choice questions', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"answers":{}}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const essay = `CANARY-ESSAY ${'word '.repeat(40)}`
+    const ranked = clickableMoves(
+      parseTreeMoves(
+        [
+          '68 button New Note',
+          `40 text field Compose, Value: ${essay}`,
+          '7 button (selected, expanded) New Note'
+        ].join('\n')
+      )
+    )
+    await liveEvaluator('sk-test')({
+      goal: 'Open the compose field.',
+      app: 'com.github.Electron',
+      moves: ranked
+    })
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const body = JSON.parse(String(request.body)) as {
+      state: { goal: string; app: string; clickable: Record<string, string> }
+      questions: {
+        click_which: { criteria: Record<string, string> }
+        setvalue_which: { criteria: Record<string, string> }
+      }
+    }
+    const posted = {
+      '68': 'button New Note',
+      '40': 'text field Compose',
+      '7': 'button (selected, expanded) New Note'
+    }
+    expect(body.state.goal).toBe('Open the compose field.')
+    expect(body.state.app).toBe('com.github.Electron')
+    expect(body.state.clickable).toEqual(posted)
+    expect(body.questions.click_which.criteria).toEqual(posted)
+    expect(body.questions.setvalue_which.criteria).toEqual(posted)
+    expect(JSON.stringify(body)).not.toContain('CANARY-ESSAY')
   })
 
   it('records a network failure as status 0', async () => {

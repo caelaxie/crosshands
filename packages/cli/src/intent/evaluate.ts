@@ -99,9 +99,16 @@ export function suggestionFromAnswers(
   }
 }
 
+const CRITERION_TEXT_MAX = 80
+
 export function criteria(moves: readonly TreeMove[]): Record<string, string> {
   return Object.fromEntries(
-    moves.map((move) => [String(move.elementIndex), `${move.role} ${move.label}`.trim()])
+    moves.map((move) => {
+      const name = `${move.role} ${move.label}`.trim()
+      // Code points, so a cap on an emoji name does not end on a lone surrogate.
+      const capped = [...name].slice(0, CRITERION_TEXT_MAX).join('')
+      return [String(move.elementIndex), capped]
+    })
   )
 }
 
